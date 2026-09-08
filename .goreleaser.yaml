@@ -1,0 +1,203 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# Documentation: https://goreleaser.com
+version: 2
+
+project_name: odjson
+
+before:
+  hooks:
+    # NOTE: never `go mod tidy` here. The binary's version comes from
+    # runtime/debug.ReadBuildInfo() VCS stamping, which the Go toolchain only
+    # performs when the working tree is clean at the tagged commit.
+    - go mod download
+    - go mod verify
+
+builds:
+  - id: odjson
+    main: .
+    binary: odjson
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    # Version/commit/date are stamped by the toolchain into buildinfo
+    # (runtime/debug.ReadBuildInfo), so no -X overrides are needed. This
+    # replaces GoReleaser's default ldflags, which would inject -X main.version.
+    ldflags:
+      - -s -w
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: odjson
+    ids:
+      - odjson
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: github
+  sort: asc
+  abbrev: -1
+  filters:
+    exclude:
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "^docs:"
+      - "^style:"
+      - "Merge pull request"
+      - "Merge branch"
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Performance improvements
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Refactors
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: Others
+      order: 999
+
+release:
+  draft: false
+  prerelease: auto
+  footer: |
+    **Full changelog**: https://github.com/mazrean/odjson/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+# Homebrew (cask, not the deprecated `brews`).
+# Requires the external repo github.com/mazrean/homebrew-tap and a PAT with
+# write access to it, exposed as HOMEBREW_TAP_GITHUB_TOKEN.
+homebrew_casks:
+  - name: odjson
+    binaries:
+      - odjson
+    ids:
+      - odjson
+    homepage: https://github.com/mazrean/odjson
+    description: Reflection-free JSON marshal/unmarshal code generator for Go
+    license: MIT
+    directory: Casks
+    commit_author:
+      name: mazrean
+      email: mazrean@users.noreply.github.com
+    commit_msg_template: "chore: brew cask update for {{ .ProjectName }} version {{ .Tag }}"
+    repository:
+      owner: mazrean
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    hooks:
+      post:
+        # The released binaries are not notarized; strip the quarantine bit so
+        # macOS Gatekeeper does not refuse to run them.
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/odjson"]
+          end
+
+# Winget. Requires the fork github.com/mazrean/winget-pkgs and a PAT with
+# write access to it, exposed as WINGET_GITHUB_TOKEN. GoReleaser pushes a
+# branch to the fork and opens a PR against microsoft/winget-pkgs.
+winget:
+  - name: odjson
+    package_identifier: mazrean.odjson
+    publisher: mazrean
+    publisher_url: https://github.com/mazrean
+    publisher_support_url: https://github.com/mazrean/odjson/issues
+    homepage: https://github.com/mazrean/odjson
+    short_description: Reflection-free JSON marshal/unmarshal code generator for Go
+    description: |-
+      odjson is a CLI code generator that speeds up JSON encoding and decoding
+      in Go. It reads a struct's field tags, so it knows at compile time exactly
+      which JSON fields are acceptable, and emits dedicated reflection-free
+      MarshalJSON/UnmarshalJSON (plus encoding/json/v2's MarshalJSONTo and
+      UnmarshalJSONFrom) implementations for each struct.
+    license: MIT
+    license_url: https://github.com/mazrean/odjson/blob/main/LICENSE
+    copyright: mazrean
+    tags:
+      - go
+      - golang
+      - json
+      - codegen
+      - performance
+    ids:
+      - odjson
+    commit_author:
+      name: mazrean
+      email: mazrean@users.noreply.github.com
+    commit_msg_template: "New version: {{ .PackageIdentifier }} version {{ .Tag }}"
+    repository:
+      owner: mazrean
+      name: winget-pkgs
+      # Must be templated: a fixed branch name collides on the second release.
+      branch: "odjson-{{ .Version }}"
+      token: "{{ .Env.WINGET_GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        draft: false
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+
+# Linux packages: deb (apt), rpm (yum/dnf) and apk (Alpine).
+nfpms:
+  - id: odjson
+    package_name: odjson
+    ids:
+      - odjson
+    formats:
+      - deb
+      - rpm
+      - apk
+    vendor: mazrean
+    homepage: https://github.com/mazrean/odjson
+    maintainer: mazrean <mazrean@users.noreply.github.com>
+    description: Reflection-free JSON marshal/unmarshal code generator for Go
+    license: MIT
+    bindir: /usr/bin
+    file_name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    contents:
+      - src: LICENSE
+        dst: /usr/share/licenses/odjson/LICENSE
+        file_info:
+          mode: 0644
+      - src: README.md
+        dst: /usr/share/doc/odjson/README.md
+        file_info:
+          mode: 0644
