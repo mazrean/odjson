@@ -2,3 +2,13 @@
 # APM dependencies
 apm_modules/
 .claude
+
+# Go
+/odjson
+/dist/
+
+# lint tool build output
+/tools/lint/lint
+
+# Go test binaries
+*.test
