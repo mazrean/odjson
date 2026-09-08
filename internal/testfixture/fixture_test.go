@@ -1,0 +1,252 @@
+package testfixture
+
+import (
+	"bytes"
+	"encoding/json"
+	"math"
+	"reflect"
+	"testing"
+	"time"
+)
+
+// marshalParity asserts the generated encoder is byte-for-byte identical to
+// encoding/json for v.
+func marshalParity[T any](t *testing.T, name string, v T, appendFn func([]byte, *T) ([]byte, error)) {
+	t.Helper()
+	want, wantErr := json.Marshal(v)
+	got, gotErr := appendFn(nil, &v)
+	if (wantErr != nil) != (gotErr != nil) {
+		t.Errorf("%s: error mismatch: encoding/json=%v odjson=%v", name, wantErr, gotErr)
+		return
+	}
+	if wantErr != nil {
+		return
+	}
+	if !bytes.Equal(want, got) {
+		t.Errorf("%s:\n encoding/json: %s\n odjson:        %s", name, want, got)
+	}
+}
+
+// unmarshalParity asserts the generated decoder agrees with encoding/json both
+// on the decoded value and on whether the input was rejected.
+func unmarshalParity[T any](t *testing.T, name, in string, unmarshalFn func([]byte, *T) error) {
+	t.Helper()
+	var a, b T
+	errA := json.Unmarshal([]byte(in), &a)
+	errB := unmarshalFn([]byte(in), &b)
+	if (errA != nil) != (errB != nil) {
+		t.Errorf("%s: error mismatch for %s: encoding/json=%v odjson=%v", name, in, errA, errB)
+		return
+	}
+	if errA != nil {
+		return
+	}
+	if !reflect.DeepEqual(a, b) {
+		t.Errorf("%s: value mismatch for %s:\n encoding/json: %#v\n odjson:        %#v", name, in, a, b)
+	}
+}
+
+func ptr[T any](v T) *T { return &v }
+
+func scalarCases() map[string]Scalars {
+	n := 7
+	s := "set"
+	return map[string]Scalars{
+		"zero": {},
+		"full": {
+			Base:            Base{BaseID: 1, BaseName: "base"},
+			PtrBase:         &PtrBase{PtrField: "p"},
+			Bool:            true,
+			Int:             -1,
+			Int8:            math.MinInt8,
+			Int16:           math.MinInt16,
+			Int32:           math.MinInt32,
+			Int64:           math.MinInt64,
+			Uint:            1,
+			Uint8:           math.MaxUint8,
+			Uint16:          math.MaxUint16,
+			Uint32:          math.MaxUint32,
+			Uint64:          math.MaxUint64,
+			Float32:         1.5,
+			Float64:         -1e21,
+			String:          "a\"b\\c\n<&>\u2028\u007f日本語",
+			Named:           "red",
+			NamedLevel:      3,
+			QuotedInt:       -42,
+			QuotedBool:      true,
+			QuotedString:    `he said "hi"`,
+			QuotedFloat:     0.5,
+			QuotedPtr:       &n,
+			Skipped:         "invisible",
+			Renamed:         "renamed",
+			Untagged:        "untagged",
+			OmitEmptyString: "x",
+			OmitEmptyInt:    2,
+			OmitEmptyPtr:    &s,
+			OmitEmptySlice:  []int{1},
+			OmitZeroTime:    time.Unix(1700000000, 0).UTC(),
+			OmitZeroInner:   Inner{ID: 9, Note: "n"},
+			OmitZeroString:  "z",
+		},
+		"floats": {
+			Float32:     math.MaxFloat32,
+			Float64:     1e-7,
+			QuotedFloat: math.SmallestNonzeroFloat64,
+		},
+		"empty-strings": {String: "", Named: "", OmitEmptyPtr: ptr("")},
+	}
+}
+
+func TestMarshalScalars(t *testing.T) {
+	for name, v := range scalarCases() {
+		marshalParity(t, name, v, AppendScalars)
+	}
+}
+
+func TestMarshalComposites(t *testing.T) {
+	inner := &Inner{ID: 2, Note: "note"}
+	tm := time.Unix(1700000000, 123456789).UTC()
+	cases := map[string]Composites{
+		"zero": {},
+		"full": {
+			Bytes:     []byte{0, 1, 2, 253, 254, 255},
+			NamedFlag: Flags("hello"),
+			ByteArray: [4]byte{1, 2, 3, 4},
+			IntArray:  [3]int{5, 6, 7},
+			Ints:      []int{1, 2, 3},
+			Strings:   Tags{"a", "b"},
+			Inners:    []Inner{{ID: 1}, {ID: 2, Note: "x"}},
+			InnerPtrs: []*Inner{nil, inner},
+			Nested:    [][]int{{1}, nil, {}},
+			StringMap: map[string]string{"b": "2", "a": "1", "<": ">"},
+			InnerMap:  map[string]Inner{"k": {ID: 3}},
+			NamedMap:  Meta{"z": 26, "a": 1},
+			ColorMap:  map[Color]int{"red": 1, "blue": 2},
+			Inner:     Inner{ID: 4, Note: "in"},
+			InnerPtr:  inner,
+			DeepPtr:   ptr(inner),
+			Any:       map[string]any{"n": 1.0, "s": "t", "b": true, "z": nil},
+			Anys:      []any{1.0, "two", nil, false, []any{1.0}},
+			Raw:       json.RawMessage(`{"raw":[1,2,3]}`),
+			Number:    json.Number("12345678901234567890"),
+			Time:      tm,
+			TimePtr:   &tm,
+			Dur:       time.Second,
+		},
+		"empty-collections": {
+			Bytes:     []byte{},
+			Ints:      []int{},
+			Strings:   Tags{},
+			StringMap: map[string]string{},
+			Anys:      []any{},
+			Raw:       json.RawMessage(`null`),
+		},
+	}
+	for name, v := range cases {
+		marshalParity(t, name, v, AppendComposites)
+	}
+}
+
+func TestMarshalRecursive(t *testing.T) {
+	v := Recursive{Name: "root", Children: []*Recursive{
+		{Name: "a"},
+		{Name: "b", Children: []*Recursive{{Name: "c"}}},
+	}}
+	marshalParity(t, "tree", v, AppendRecursive)
+	marshalParity(t, "leaf", Recursive{Name: "leaf"}, AppendRecursive)
+}
+
+func TestUnmarshalScalars(t *testing.T) {
+	inputs := []string{
+		`{}`,
+		`null`,
+		`  {  }  `,
+		`{"bool":true,"int":-5,"int8":-128,"uint64":18446744073709551615,"float64":1.5,"string":"x\u00e9\ud83d\ude00"}`,
+		`{"BOOL":true,"InT":3}`,
+		`{"qint":"-42","qbool":"true","qstring":"\"quoted\"","qfloat":"0.5","qptr":"7"}`,
+		`{"qint":"-42","qptr":null}`,
+		`{"base_id":1,"base_name":"b","ptr_field":"p"}`,
+		`{"unknown":{"a":[1,2,{"b":null}]},"int":1}`,
+		`{"renamed":"r","Untagged":"u"}`,
+		`{"oz_time":"2023-11-14T22:13:20Z","oz_inner":{"id":1,"note":"n"}}`,
+		`{"int":1,}`,
+		`{"int":}`,
+		`{"int":"nan"}`,
+		`{"int":1.5}`,
+		`{"uint":-1}`,
+		`{"int8":300}`,
+		`[]`,
+		`{`,
+		`{"a":1} trailing`,
+		`{"float64":1e400}`,
+	}
+	for _, in := range inputs {
+		unmarshalParity(t, "scalars", in, UnmarshalScalars)
+	}
+}
+
+func TestUnmarshalComposites(t *testing.T) {
+	inputs := []string{
+		`{}`,
+		`{"bytes":"AAECzQ==","named_flags":"aGVsbG8=","byte_array":[1,2,3,4],"int_array":[1,2,3]}`,
+		`{"int_array":[1]}`,
+		`{"int_array":[1,2,3,4,5]}`,
+		`{"ints":[1,2,3],"strings":["a","b"],"nested":[[1],[],null]}`,
+		`{"ints":[]}`,
+		`{"ints":null}`,
+		`{"inners":[{"id":1},{"id":2,"note":"x"}],"inner_ptrs":[null,{"id":3}]}`,
+		`{"string_map":{"a":"1","b":"2"},"inner_map":{"k":{"id":9}},"named_map":{"z":26},"color_map":{"red":1}}`,
+		`{"inner":{"id":1},"inner_ptr":{"id":2},"deep_ptr":{"id":3}}`,
+		`{"any":{"a":[1,2,{"b":null}],"c":true},"anys":[1,"two",null]}`,
+		`{"raw":{"x":[1,2]},"number":"123","time":"2023-11-14T22:13:20Z","time_ptr":null,"dur":1000000000}`,
+		`{"raw":null}`,
+		`{"time":"not a time"}`,
+		`{"bytes":"!!!!"}`,
+		`{"ints":[1,"x"]}`,
+		`{"color_map":{"red":"x"}}`,
+	}
+	for _, in := range inputs {
+		unmarshalParity(t, "composites", in, UnmarshalComposites)
+	}
+}
+
+func TestUnmarshalReusesExistingValue(t *testing.T) {
+	in := []byte(`{"ints":[9],"inner_ptr":{"note":"kept"}}`)
+	var a, b Composites
+	seed := func(v *Composites) {
+		v.Ints = []int{1, 2, 3}
+		v.InnerPtr = &Inner{ID: 42}
+	}
+	seed(&a)
+	seed(&b)
+	if err := json.Unmarshal(in, &a); err != nil {
+		t.Fatal(err)
+	}
+	if err := UnmarshalComposites(in, &b); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(a, b) {
+		t.Errorf("reuse mismatch:\n encoding/json: %#v\n odjson:        %#v", a, b)
+	}
+}
+
+func TestUnmarshalRecursive(t *testing.T) {
+	unmarshalParity(t, "recursive", `{"name":"r","children":[{"name":"a"},{"name":"b","children":[{"name":"c"}]}]}`, UnmarshalRecursive)
+}
+
+func TestRoundTrip(t *testing.T) {
+	for name, v := range scalarCases() {
+		b, err := MarshalScalars(&v)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		var got Scalars
+		if err := UnmarshalScalars(b, &got); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		v.Skipped = ""
+		if !reflect.DeepEqual(v, got) {
+			t.Errorf("%s round trip mismatch:\n want %#v\n got  %#v", name, v, got)
+		}
+	}
+}
