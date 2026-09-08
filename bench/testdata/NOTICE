@@ -1,0 +1,46 @@
+Third-party benchmark fixtures
+==============================
+
+The JSON payload and the Go type definitions used by the benchmarks in this
+directory tree are copied from the sonic project:
+
+    https://github.com/bytedance/sonic
+
+Upstream revision: 2a36d6da63e25b9080cc4e11398bd5b3512dfc2a (branch `main`)
+
+Files and their upstream sources
+--------------------------------
+
+  bench/testdata/twitter.json
+    https://raw.githubusercontent.com/bytedance/sonic/main/testdata/twitter.json
+    Copied byte-for-byte, unmodified.
+
+  bench/plain/twitter.go
+    https://raw.githubusercontent.com/bytedance/sonic/main/testdata/twitter.go
+    Copied unmodified except for the package clause, which was changed from
+    `package testdata` to `package plain`. The file also carries an unused
+    `TwitterJson` string constant from upstream; it was kept as-is rather than
+    stripped, so that the copy stays verbatim.
+
+  bench/plain/small.go
+    https://raw.githubusercontent.com/bytedance/sonic/main/testdata/small.go
+    Copied unmodified except for the package clause, which was changed from
+    `package testdata` to `package plain`.
+
+License
+-------
+
+These files are licensed by ByteDance Inc. under the Apache License,
+Version 2.0:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+The original Apache-2.0 copyright headers are retained verbatim in
+bench/plain/twitter.go and bench/plain/small.go. twitter.json carries no
+header, being pure data.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations
+under the License.
