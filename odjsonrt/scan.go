@@ -1,5 +1,7 @@
 package odjsonrt
 
+import "encoding/binary"
+
 // inlineDepth is the number of nesting levels the scanner can track without
 // touching the heap.
 const inlineDepth = 128
@@ -7,16 +9,34 @@ const inlineDepth = 128
 // SkipSpace returns the index of the first byte at or after p that is not
 // JSON whitespace.
 func SkipSpace(data []byte, p int) int {
-	for p < len(data) {
-		switch data[p] {
-		case ' ', '\t', '\n', '\r':
-			p++
-		default:
-			return p
+	// Every JSON whitespace byte is <= ' ' and every byte that can start a
+	// value is greater, so one comparison settles the common case. Keeping
+	// this body tiny matters: it is called between every token, and it stops
+	// being inlined the moment it grows.
+	if p < len(data) && data[p] > ' ' {
+		return p
+	}
+	return skipSpaceSlow(data, p)
+}
+
+// skipSpaceSlow consumes an actual run of whitespace.
+func skipSpaceSlow(data []byte, p int) int {
+	for p < len(data) && spaceSet[data[p]] {
+		p++
+		// An indented document is mostly a newline followed by a long run of
+		// spaces, so consume those a word at a time.
+		for p+8 <= len(data) && binary.NativeEndian.Uint64(data[p:]) == allSpaces {
+			p += 8
 		}
 	}
 	return p
 }
+
+// spaceSet marks the four bytes JSON accepts as whitespace.
+var spaceSet = func() (t [256]bool) {
+	t[' '], t['\t'], t['\n'], t['\r'] = true, true, true, true
+	return
+}()
 
 // SkipValue scans the single JSON value that starts at p and returns the index
 // just past it. Leading whitespace must already have been consumed. The scan
@@ -154,6 +174,27 @@ func scanKey(data []byte, p int) (int, error) {
 func scanString(data []byte, p int) (end int, hasEscape, nonASCII bool, err error) {
 	i := p + 1
 	for i < len(data) {
+		// Consume runs of ordinary characters a word at a time. The mask also
+		// locates the byte that ended the run, so a short string costs one
+		// word test instead of a byte loop. The high bits of the consumed
+		// lanes are accumulated rather than branched on: they only say, once
+		// the run is over, whether it contained non-ASCII.
+		var hi uint64
+		for i+8 <= len(data) {
+			w := binary.LittleEndian.Uint64(data[i:])
+			if m := swarStringStop(w); m != 0 {
+				k := swarIndex(m)
+				hi |= swarBelow(w, k)
+				i += k
+				break
+			}
+			hi |= w
+			i += 8
+		}
+		nonASCII = nonASCII || hi&swarHi != 0
+		if i >= len(data) {
+			break
+		}
 		switch c := data[i]; {
 		case c == '"':
 			return i + 1, hasEscape, nonASCII, nil

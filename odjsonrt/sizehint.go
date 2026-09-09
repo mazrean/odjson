@@ -31,6 +31,17 @@ func (h *SizeHint) New() []byte {
 	return make([]byte, 0, n)
 }
 
+// Need reports the capacity a buffer must have for the largest encoding seen
+// so far to fit without growing.
+func (h *SizeHint) Need() int {
+	n := int(h.n.Load())
+	n += n / 8
+	if n < minHint {
+		n = minHint
+	}
+	return n
+}
+
 // Record notes the length of a finished encoding. The hint only ever grows, so
 // a single large value does not make every later call allocate small buffers
 // and grow them again.

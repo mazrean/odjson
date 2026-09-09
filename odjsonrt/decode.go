@@ -13,11 +13,25 @@ import (
 // ParseString parses the JSON string that starts at p and returns its
 // unescaped content as a Go string.
 func ParseString(data []byte, p int) (string, int, error) {
-	b, _, next, err := ParseStringBytes(data, p)
+	b, aliased, next, err := ParseStringBytes(data, p)
 	if err != nil {
 		return "", next, err
 	}
-	return string(b), next, nil
+	return adoptString(b, aliased), next, nil
+}
+
+// adoptString turns the result of [ParseStringBytes] into a string. When the
+// bytes are not a view into the input they were allocated for this call alone
+// and nothing else refers to them, so the string can take them over instead of
+// copying a buffer that was just built.
+func adoptString(b []byte, aliased bool) string {
+	if aliased {
+		return string(b)
+	}
+	if len(b) == 0 {
+		return ""
+	}
+	return unsafe.String(unsafe.SliceData(b), len(b))
 }
 
 // ParseStringBytes parses the JSON string that starts at p and returns its
@@ -188,7 +202,10 @@ func ParseBool(data []byte, p int) (bool, int, error) {
 // ParseNull consumes a null literal at p. When the value at p is not null, ok
 // is false and next equals p.
 func ParseNull(data []byte, p int) (next int, ok bool) {
-	if hasLiteral(data, p, "null") {
+	// The leading byte settles it for every value that is not null, which is
+	// almost all of them; keeping that test in the caller's inlined body is
+	// worth several percent of a decode.
+	if p < len(data) && data[p] == 'n' && hasLiteral(data, p, "null") {
 		return p + 4, true
 	}
 	return p, false

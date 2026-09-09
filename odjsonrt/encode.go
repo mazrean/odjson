@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"unicode/utf8"
+	"unsafe"
 )
 
 // hexDigits is the lowercase alphabet used by \uXXXX escapes.
@@ -55,24 +56,12 @@ var safeSetUTF8, htmlSafeSetUTF8 = func() (safe, html [256]bool) {
 // that the result is always valid JSON. When escapeHTML is true, '<', '>' and
 // '&' are escaped as well. This reproduces encoding/json byte for byte.
 func AppendString(dst []byte, s string, escapeHTML bool) []byte {
-	return appendQuoted(dst, s, escapeHTML)
+	return appendQuotedString(dst, s, escapeHTML)
 }
 
 // AppendStringBytes is [AppendString] for a byte slice.
 func AppendStringBytes(dst []byte, s []byte, escapeHTML bool) []byte {
 	return appendQuoted(dst, s, escapeHTML)
-}
-
-// validUTF8 reports whether src is valid UTF-8, dispatching to the vectorised
-// standard library check for whichever representation Bytes is.
-func validUTF8[Bytes []byte | string](src Bytes) bool {
-	switch v := any(src).(type) {
-	case string:
-		return utf8.ValidString(v)
-	case []byte:
-		return utf8.Valid(v)
-	}
-	return false
 }
 
 // appendQuoted is the shared implementation of [AppendString] and
@@ -85,7 +74,7 @@ func validUTF8[Bytes []byte | string](src Bytes) bool {
 // stops on 0xE2 (the lead byte of U+2028 and U+2029), otherwise it falls back
 // to decoding rune by rune so that invalid bytes become U+FFFD the way
 // encoding/json does.
-func appendQuoted[Bytes []byte | string](dst []byte, src Bytes, escapeHTML bool) []byte {
+func appendQuoted(dst []byte, src []byte, escapeHTML bool) []byte {
 	safe, safeUTF8 := &safeSet, &safeSetUTF8
 	if escapeHTML {
 		safe, safeUTF8 = &htmlSafeSet, &htmlSafeSetUTF8
@@ -95,7 +84,10 @@ func appendQuoted[Bytes []byte | string](dst []byte, src Bytes, escapeHTML bool)
 	dst = append(dst, '"')
 	start := 0
 	for i := 0; i < len(src); {
-		// Copy runs of bytes that need no escaping in one go.
+		// Copy runs of bytes that need no escaping in one go. A word at a
+		// time scan was tried here and measured no faster: the escape set is
+		// wide enough that computing the mask costs about what eight table
+		// lookups do, and the CPU pipelines the lookups well.
 		for i < len(src) && safe[src[i]] {
 			i++
 		}
@@ -104,7 +96,7 @@ func appendQuoted[Bytes []byte | string](dst []byte, src Bytes, escapeHTML bool)
 		}
 		if !checked && src[i] >= utf8.RuneSelf {
 			checked = true
-			if valid = validUTF8(src[i:]); valid {
+			if valid = utf8.Valid(src[i:]); valid {
 				safe = safeUTF8
 				continue
 			}
@@ -148,7 +140,7 @@ func appendQuoted[Bytes []byte | string](dst []byte, src Bytes, escapeHTML bool)
 			continue
 		}
 		n := min(len(src)-i, utf8.UTFMax)
-		c, size := utf8.DecodeRuneInString(string(src[i : i+n]))
+		c, size := utf8.DecodeRune(src[i : i+n])
 		if c == utf8.RuneError && size == 1 {
 			dst = append(dst, src[start:i]...)
 			dst = append(dst, replacementChar...)
@@ -169,13 +161,21 @@ func appendQuoted[Bytes []byte | string](dst []byte, src Bytes, escapeHTML bool)
 	return append(dst, '"')
 }
 
+// appendQuotedString is [appendQuoted] for a string. The conversion is a view,
+// not a copy, and it keeps the hot loop out of a generic function: a generic
+// one would have to type switch on any(src) to read words, which boxes the
+// string header on every call.
+func appendQuotedString(dst []byte, s string, escapeHTML bool) []byte {
+	return appendQuoted(dst, unsafe.Slice(unsafe.StringData(s), len(s)), escapeHTML)
+}
+
 // AppendStringQuoted appends s as a JSON string whose content is itself a JSON
 // string. It implements the `,string` struct tag option for string fields:
 // the value is escaped once with the requested HTML escaping and the result is
 // escaped a second time without it, exactly like encoding/json.
 func AppendStringQuoted(dst []byte, s string, escapeHTML bool) []byte {
 	buf := AcquireBuffer()
-	buf = appendQuoted(buf, s, escapeHTML)
+	buf = appendQuotedString(buf, s, escapeHTML)
 	dst = appendQuoted(dst, buf, false)
 	ReleaseBuffer(buf)
 	return dst
@@ -200,6 +200,18 @@ func AppendUint(dst []byte, v uint64) []byte {
 func AppendFloat(dst []byte, v float64, bits int) ([]byte, error) {
 	if bits != 32 {
 		bits = 64
+	}
+	// Numbers decoded from JSON into an interface arrive as float64 even when
+	// they are identifiers, and the shortest-representation algorithm is
+	// expensive. Any value that is exactly an integer of at most fifteen
+	// digits prints the same either way, so print it as one.
+	// float32 is excluded: its shortest representation is computed at 32 bit
+	// precision, so an integral value does not necessarily print as that
+	// integer.
+	if bits == 64 && v > -1e15 && v < 1e15 {
+		if i := int64(v); float64(i) == v && (i != 0 || !math.Signbit(v)) {
+			return strconv.AppendInt(dst, i, 10), nil
+		}
 	}
 	if math.IsInf(v, 0) || math.IsNaN(v) {
 		return dst, errors.New("json: unsupported value: " + strconv.FormatFloat(v, 'g', -1, bits))
@@ -325,7 +337,19 @@ func appendCompact(dst, src []byte, escapeHTML bool) []byte {
 // and the remaining built-in scalar types are encoded directly; anything else
 // falls back to encoding/json and therefore to reflection.
 func AppendAny(dst []byte, v any, escapeHTML bool) ([]byte, error) {
-	out, err := appendAny(dst, v, escapeHTML, 0)
+	m := ModePlain
+	if escapeHTML {
+		m = ModeHTML
+	}
+	return AppendAnyMode(dst, v, m)
+}
+
+// AppendAnyMode is [AppendAny] under an explicit [StringMode]. Generated code
+// uses it so that a dynamic value inside a struct is escaped by the same rules
+// as the struct's static fields — in particular so that a value destined for a
+// jsontext.Encoder does not pay for UTF-8 validation the encoder repeats.
+func AppendAnyMode(dst []byte, v any, m StringMode) ([]byte, error) {
+	out, err := appendAny(dst, v, m, 0)
 	if err != nil {
 		return dst, err
 	}
@@ -335,9 +359,9 @@ func AppendAny(dst []byte, v any, escapeHTML bool) ([]byte, error) {
 // appendAny is [AppendAny] with a recursion depth, so that self-referential
 // values are handed to encoding/json (which detects cycles) instead of
 // overflowing the stack.
-func appendAny(dst []byte, v any, escapeHTML bool, depth int) ([]byte, error) {
+func appendAny(dst []byte, v any, m StringMode, depth int) ([]byte, error) {
 	if depth >= MaxDepth {
-		return appendAnyReflect(dst, v, escapeHTML)
+		return appendAnyReflect(dst, v, m.EscapeHTML())
 	}
 	switch x := v.(type) {
 	case nil:
@@ -345,7 +369,7 @@ func appendAny(dst []byte, v any, escapeHTML bool, depth int) ([]byte, error) {
 	case bool:
 		return AppendBool(dst, x), nil
 	case string:
-		return AppendString(dst, x, escapeHTML), nil
+		return AppendStringMode(dst, x, m), nil
 	case float64:
 		return AppendFloat(dst, x, 64)
 	case float32:
@@ -375,7 +399,7 @@ func appendAny(dst []byte, v any, escapeHTML bool, depth int) ([]byte, error) {
 	case json.Number:
 		return AppendNumber(dst, string(x))
 	case json.RawMessage:
-		return AppendRaw(dst, x, escapeHTML)
+		return AppendRaw(dst, x, m.EscapeHTML())
 	case []byte:
 		return AppendBase64(dst, x), nil
 	case []any:
@@ -388,7 +412,7 @@ func appendAny(dst []byte, v any, escapeHTML bool, depth int) ([]byte, error) {
 				dst = append(dst, ',')
 			}
 			var err error
-			if dst, err = appendAny(dst, elem, escapeHTML, depth+1); err != nil {
+			if dst, err = appendAny(dst, elem, m, depth+1); err != nil {
 				return dst, err
 			}
 		}
@@ -396,6 +420,26 @@ func appendAny(dst []byte, v any, escapeHTML bool, depth int) ([]byte, error) {
 	case map[string]any:
 		if x == nil {
 			return append(dst, "null"...), nil
+		}
+		if m == ModeStream {
+			// encoding/json/v2 writes object members in map iteration order;
+			// only encoding/json sorts them. Skipping the sort is both the
+			// matching semantics and one less allocation per object.
+			dst = append(dst, '{')
+			first := true
+			for k, elem := range x {
+				if !first {
+					dst = append(dst, ',')
+				}
+				first = false
+				dst = AppendStringMode(dst, k, m)
+				dst = append(dst, ':')
+				var err error
+				if dst, err = appendAny(dst, elem, m, depth+1); err != nil {
+					return dst, err
+				}
+			}
+			return append(dst, '}'), nil
 		}
 		keys := make([]string, 0, len(x))
 		for k := range x {
@@ -407,16 +451,16 @@ func appendAny(dst []byte, v any, escapeHTML bool, depth int) ([]byte, error) {
 			if i > 0 {
 				dst = append(dst, ',')
 			}
-			dst = AppendString(dst, k, escapeHTML)
+			dst = AppendStringMode(dst, k, m)
 			dst = append(dst, ':')
 			var err error
-			if dst, err = appendAny(dst, x[k], escapeHTML, depth+1); err != nil {
+			if dst, err = appendAny(dst, x[k], m, depth+1); err != nil {
 				return dst, err
 			}
 		}
 		return append(dst, '}'), nil
 	default:
-		return appendAnyReflect(dst, v, escapeHTML)
+		return appendAnyReflect(dst, v, m.EscapeHTML())
 	}
 }
 
