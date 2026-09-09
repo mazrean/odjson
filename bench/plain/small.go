@@ -62,3 +62,6 @@ var author = Author{
 }
 
 var data = []byte(`{"id":12125925,"ids":[-2147483648,2147483647],"title":"未来简史-从智人到智神","titles":["hello","world"],"price":40.8,"prices":[-0.1,0.1],"hot":true,"hots":[true,true,true],"author":{"name":"json","age":99,"male":true},"authors":[{"name":"json","age":99,"male":true},{"name":"json","age":99,"male":true},{"name":"json","age":99,"male":true}],"weights":[]}`)
+// SmallPayload returns the small fixture document, for benchmarks in other
+// packages of this module.
+func SmallPayload() []byte { return data }
