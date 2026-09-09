@@ -6,6 +6,7 @@ import (
 	"encoding/json/jsontext"
 	"strconv"
 	"sync"
+	"unicode/utf8"
 )
 
 // This file holds the helpers behind the generated UnmarshalJSONFrom methods,
@@ -92,7 +93,16 @@ func ErrKindFrom(dec *jsontext.Decoder, goType string) error {
 // a decoder that lacks one allocates a string per member where json/v2 does
 // not. The cache is a direct mapped table keyed by a hash of the string's
 // first and last bytes, so a lookup costs the same for every length.
-type StringCache [256]string
+type StringCache struct {
+	s [stringCacheSize]string
+	// valid marks the entries known to be UTF-8, which is what
+	// [StringCache.MakeUTF8] stores and what it can then skip checking. An
+	// entry [StringCache.Make] stored is not marked: a decoder run with
+	// jsontext.AllowInvalidUTF8 hands it bytes nobody has validated.
+	valid [stringCacheSize / 64]uint64
+}
+
+const stringCacheSize = 256
 
 var stringCachePool sync.Pool
 
@@ -114,12 +124,57 @@ func PutStringCache(c *StringCache) {
 // Make returns b as a string, reusing an earlier result when the cache holds
 // an equal string. A nil cache simply allocates.
 func (c *StringCache) Make(b []byte) string {
+	i, ok := c.slot(b)
+	if !ok {
+		return string(b)
+	}
+	if s := c.s[i]; s == string(b) {
+		return s
+	}
+	s := string(b)
+	c.s[i] = s
+	c.valid[i/64] &^= 1 << (i % 64)
+	return s
+}
+
+// MakeUTF8 is [Make] for bytes that have to be valid UTF-8 and have not been
+// checked yet. A hit on an entry this method stored is known to be valid, so
+// it settles the question without a second pass; a miss pays for the
+// validation once. ok is false when b is not UTF-8, and nothing is stored.
+func (c *StringCache) MakeUTF8(b []byte) (s string, ok bool) {
+	i, cacheable := c.slot(b)
+	if cacheable {
+		if s := c.s[i]; s == string(b) {
+			if c.valid[i/64]&(1<<(i%64)) != 0 {
+				return s, true
+			}
+			if !utf8.Valid(b) {
+				return "", false
+			}
+			c.valid[i/64] |= 1 << (i % 64)
+			return s, true
+		}
+	}
+	if !utf8.Valid(b) {
+		return "", false
+	}
+	s = string(b)
+	if cacheable {
+		c.s[i] = s
+		c.valid[i/64] |= 1 << (i % 64)
+	}
+	return s, true
+}
+
+// slot returns the table index for b, or false when b is not cached: a nil
+// cache, a string too short to be worth it or too long to keep.
+func (c *StringCache) slot(b []byte) (uint64, bool) {
 	const (
 		minCached = 2   // one byte strings are interned by the runtime already
 		maxCached = 256 // long enough for identifiers, hashes and URLs
 	)
 	if c == nil || len(b) < minCached || len(b) > maxCached {
-		return string(b)
+		return 0, false
 	}
 	var h uint64
 	switch {
@@ -131,13 +186,7 @@ func (c *StringCache) Make(b []byte) string {
 		h = uint64(binary.LittleEndian.Uint16(b)) ^ uint64(binary.LittleEndian.Uint16(b[len(b)-2:]))*0x9e3779b97f4a7c15
 	}
 	h ^= uint64(len(b)) * 0xff51afd7ed558ccd
-	i := (h >> 32) % uint64(len(c))
-	if s := c[i]; s == string(b) {
-		return s
-	}
-	s := string(b)
-	c[i] = s
-	return s
+	return (h >> 32) % stringCacheSize, true
 }
 
 // ParseStringValue decodes the complete JSON value val, as returned by

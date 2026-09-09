@@ -179,6 +179,30 @@ func TestUnmarshalScalars(t *testing.T) {
 		`{`,
 		`{"a":1} trailing`,
 		`{"float64":1e400}`,
+		// Member names spelled in ways the raw byte match cannot see, and
+		// shapes around the colon.
+		`{"i\u006et":7,"b\u006fol":true}`,
+		`{"int" : 7 , "bool"\t:\nfalse}`,
+		`{"int"x:7}`,
+		`{"int"}`,
+		`{"int":`,
+		`{"in":7,"ints":8,"intx":9}`,
+		`{"INT":7,"Int8":-1}`,
+		`{"":1,"int":2}`,
+		// Scalars the inline fast paths decline, and their neighbours.
+		`{"bool":tru}`,
+		`{"bool":truex}`,
+		`{"int":-0,"int8":-128,"int8":127,"uint8":255,"uint8":256}`,
+		`{"int32":2147483647,"int32":2147483648}`,
+		`{"int32":-2147483648,"int32":-2147483649}`,
+		`{"uint32":4294967295,"uint32":4294967296}`,
+		`{"int64":9223372036854775807,"uint64":9223372036854775808}`,
+		`{"int":1234567890123456789012}`,
+		`{"float64":-0,"float64":0.1,"float64":40.8,"float32":0.1,"float32":16777216.5}`,
+		`{"float64":1.,"float64":1}`,
+		`{"float64":01}`,
+		`{"float64":123456789012345678901.5e-3}`,
+		`{"string":"\u00e9","string":"\ud83d","string":"a\/b"}`,
 	}
 	for _, in := range inputs {
 		unmarshalParity(t, "scalars", in, UnmarshalScalars)

@@ -1,6 +1,9 @@
 package odjsonrt
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"math/bits"
+)
 
 // inlineDepth is the number of nesting levels the scanner can track without
 // touching the heap.
@@ -23,10 +26,16 @@ func SkipSpace(data []byte, p int) int {
 func skipSpaceSlow(data []byte, p int) int {
 	for p < len(data) && spaceSet[data[p]] {
 		p++
-		// An indented document is mostly a newline followed by a long run of
-		// spaces, so consume those a word at a time.
-		for p+8 <= len(data) && binary.NativeEndian.Uint64(data[p:]) == allSpaces {
-			p += 8
+		// An indented document is mostly a newline followed by a run of
+		// spaces, so consume those a word at a time: the lowest lane that
+		// differs from a space is the first non-space byte, exactly, and a
+		// word of nothing but spaces reports eight.
+		for p+8 <= len(data) {
+			n := bits.TrailingZeros64(binary.LittleEndian.Uint64(data[p:])^allSpaces) / 8
+			p += n
+			if n < 8 {
+				break
+			}
 		}
 	}
 	return p

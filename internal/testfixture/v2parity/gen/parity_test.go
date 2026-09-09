@@ -298,6 +298,12 @@ func TestDuplicateNamesRejectedLikeJSONV2(t *testing.T) {
 		`{"int":1,"int":2}`,
 		`{"nested":{"id":1,"id":2}}`,
 		`{"unknown":{"a":1,"b":2},"int":1}`,
+		// The same name spelled two ways, so one match is raw and the
+		// other decoded; and the raw match followed by whitespace.
+		`{"int":1,"i\u006et":2}`,
+		`{"i\u006et":1,"int":2}`,
+		`{"int" : 1, "int":2}`,
+		`{"Int":1,"int":2}`,
 	} {
 		var g gen.Zoo
 		var p plain.Zoo

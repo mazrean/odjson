@@ -80,8 +80,9 @@ func (v *Fallbacks) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, err
 }
 
 // odjsonParse decodes the JSON object starting at p into v and
-// returns the offset just past it.
-func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
+// returns the offset just past it. Strings are interned through
+// sc, which may be nil.
+func (v *Fallbacks) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, error) {
 	var err error
 	_ = err
 	p = odjsonrt.SkipSpace(data, p)
@@ -99,57 +100,104 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
-		key, _, p, err = odjsonrt.ParseKey(data, p)
-		if err != nil {
-			return p, err
-		}
 		idx := -1
-		switch string(key) {
-		case "generic":
-			idx = 0
-		case "generic_ptr":
-			idx = 1
-		case "anon":
-			idx = 2
-		case "int_map":
-			idx = 3
-		case "custom":
-			idx = 4
-		case "custom_ptr":
-			idx = 5
-		case "text":
-			idx = 6
-		case "text_ptr":
-			idx = 7
-		case "plain":
-			idx = 8
+		if rest := data[p:]; len(rest) > 1 {
+			switch rest[1] {
+			case 'g':
+				switch {
+				case len(rest) >= 9 && string(rest[:9]) == "\"generic\"":
+					idx, p = 0, p+9
+				case len(rest) >= 13 && string(rest[:13]) == "\"generic_ptr\"":
+					idx, p = 1, p+13
+				}
+			case 'a':
+				switch {
+				case len(rest) >= 6 && string(rest[:6]) == "\"anon\"":
+					idx, p = 2, p+6
+				}
+			case 'i':
+				switch {
+				case len(rest) >= 9 && string(rest[:9]) == "\"int_map\"":
+					idx, p = 3, p+9
+				}
+			case 'c':
+				switch {
+				case len(rest) >= 8 && string(rest[:8]) == "\"custom\"":
+					idx, p = 4, p+8
+				case len(rest) >= 12 && string(rest[:12]) == "\"custom_ptr\"":
+					idx, p = 5, p+12
+				}
+			case 't':
+				switch {
+				case len(rest) >= 6 && string(rest[:6]) == "\"text\"":
+					idx, p = 6, p+6
+				case len(rest) >= 10 && string(rest[:10]) == "\"text_ptr\"":
+					idx, p = 7, p+10
+				}
+			case 'p':
+				switch {
+				case len(rest) >= 7 && string(rest[:7]) == "\"plain\"":
+					idx, p = 8, p+7
+				}
+			}
 		}
-		if idx < 0 {
-			fold := !odjsonrt.ASCII(key)
-			switch {
-			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "generic"):
+		if idx >= 0 {
+			if p < len(data) && data[p] == ':' {
+				p = odjsonrt.SkipSpace(data, p+1)
+			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
+				return p, err
+			}
+		} else {
+			key, _, p, err = odjsonrt.ParseKey(data, p)
+			if err != nil {
+				return p, err
+			}
+			switch string(key) {
+			case "generic":
 				idx = 0
-			case (len(key) == 11 || fold) && odjsonrt.EqualFold(key, "generic_ptr"):
+			case "generic_ptr":
 				idx = 1
-			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "anon"):
+			case "anon":
 				idx = 2
-			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "int_map"):
+			case "int_map":
 				idx = 3
-			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "custom"):
+			case "custom":
 				idx = 4
-			case (len(key) == 10 || fold) && odjsonrt.EqualFold(key, "custom_ptr"):
+			case "custom_ptr":
 				idx = 5
-			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "text"):
+			case "text":
 				idx = 6
-			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "text_ptr"):
+			case "text_ptr":
 				idx = 7
-			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "plain"):
+			case "plain":
 				idx = 8
+			}
+			if idx < 0 {
+				fold := !odjsonrt.ASCII(key)
+				switch {
+				case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "generic"):
+					idx = 0
+				case (len(key) == 11 || fold) && odjsonrt.EqualFold(key, "generic_ptr"):
+					idx = 1
+				case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "anon"):
+					idx = 2
+				case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "int_map"):
+					idx = 3
+				case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "custom"):
+					idx = 4
+				case (len(key) == 10 || fold) && odjsonrt.EqualFold(key, "custom_ptr"):
+					idx = 5
+				case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "text"):
+					idx = 6
+				case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "text_ptr"):
+					idx = 7
+				case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "plain"):
+					idx = 8
+				}
 			}
 		}
 		switch idx {
 		case 0:
-			p = odjsonrt.SkipSpace(data, p)
 			if np1, ok2 := odjsonrt.ParseNull(data, p); ok2 {
 				p = np1
 			} else {
@@ -159,7 +207,6 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 				}
 			}
 		case 1:
-			p = odjsonrt.SkipSpace(data, p)
 			if np3, ok4 := odjsonrt.ParseNull(data, p); ok4 {
 				v.GenericPtr = nil
 				p = np3
@@ -178,7 +225,6 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 				}
 			}
 		case 2:
-			p = odjsonrt.SkipSpace(data, p)
 			if np7, ok8 := odjsonrt.ParseNull(data, p); ok8 {
 				p = np7
 			} else {
@@ -188,7 +234,6 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 				}
 			}
 		case 3:
-			p = odjsonrt.SkipSpace(data, p)
 			if np9, ok10 := odjsonrt.ParseNull(data, p); ok10 {
 				p = np9
 			} else {
@@ -203,7 +248,6 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 				return p, err
 			}
 		case 5:
-			p = odjsonrt.SkipSpace(data, p)
 			if np11, ok12 := odjsonrt.ParseNull(data, p); ok12 {
 				v.CustomPtr = nil
 				p = np11
@@ -217,7 +261,6 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 				}
 			}
 		case 6:
-			p = odjsonrt.SkipSpace(data, p)
 			if np13, ok14 := odjsonrt.ParseNull(data, p); ok14 {
 				p = np13
 			} else {
@@ -227,7 +270,6 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 				}
 			}
 		case 7:
-			p = odjsonrt.SkipSpace(data, p)
 			if np15, ok16 := odjsonrt.ParseNull(data, p); ok16 {
 				v.TextPtr = nil
 				p = np15
@@ -246,12 +288,11 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 				}
 			}
 		case 8:
-			p = odjsonrt.SkipSpace(data, p)
 			if np19, ok20 := odjsonrt.ParseNull(data, p); ok20 {
 				p = np19
 			} else {
 				var x21 string
-				x21, p, err = odjsonrt.ParseString(data, p)
+				x21, p, err = odjsonrt.ParseStringCached(data, p, sc)
 				if err != nil {
 					return p, err
 				}
@@ -299,7 +340,11 @@ func MarshalFallbacks(v *Fallbacks) ([]byte, error) {
 
 // UnmarshalFallbacks decodes the JSON document data into v.
 func UnmarshalFallbacks(data []byte, v *Fallbacks) error {
-	p, err := v.odjsonParse(data, odjsonrt.SkipSpace(data, 0))
+	// The cache plays the part of encoding/json/v2's string cache: a
+	// value that recurs in the document is allocated once.
+	sc := odjsonrt.GetStringCache()
+	p, err := v.odjsonParse(data, odjsonrt.SkipSpace(data, 0), sc)
+	odjsonrt.PutStringCache(sc)
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package codegen
 import (
 	"fmt"
 	"strconv"
+	"unicode/utf8"
 
 	"github.com/mazrean/odjson/internal/analyzer"
 )
@@ -50,38 +51,51 @@ func (g *generator) decodeStruct(s *analyzer.StructInfo, c ctx) {
 	g.pf("\t\tp = odjsonrt.SkipSpace(data, p)")
 	if c.strict {
 		g.pf("\t\tkp := p")
-		g.pf("\t\tkey, p, err = odjsonrt.ParseKeyV2(data, p, strict)")
-	} else {
-		g.pf("\t\tkey, _, p, err = odjsonrt.ParseKey(data, p)")
 	}
-	g.pf("\t\tif err != nil {")
-	g.pf("\t\t\treturn p, err")
-	g.pf("\t\t}")
 	g.pf("\t\tidx := -1")
+	g.rawKeys(s, c, 2)
+	g.pf("\t\tif idx >= 0 {")
+	// A compact document has the colon right after the name; anything
+	// else (whitespace, or an error) is AfterKey's.
+	g.pf("\t\t\tif p < len(data) && data[p] == ':' {")
+	g.pf("\t\t\t\tp = odjsonrt.SkipSpace(data, p+1)")
+	g.pf("\t\t\t} else if p, err = odjsonrt.AfterKey(data, p); err != nil {")
+	g.pf("\t\t\t\treturn p, err")
+	g.pf("\t\t\t}")
+	g.pf("\t\t} else {")
+	if c.strict {
+		g.pf("\t\t\tkey, p, err = odjsonrt.ParseKeyV2(data, p, strict)")
+	} else {
+		g.pf("\t\t\tkey, _, p, err = odjsonrt.ParseKey(data, p)")
+	}
+	g.pf("\t\t\tif err != nil {")
+	g.pf("\t\t\t\treturn p, err")
+	g.pf("\t\t\t}")
 	if len(s.Fields) > 0 {
-		g.pf("\t\tswitch string(key) {")
+		g.pf("\t\t\tswitch string(key) {")
 		for i, f := range s.Fields {
-			g.pf("\t\tcase %s:", strconv.Quote(f.JSONName))
-			g.pf("\t\t\tidx = %d", i)
+			g.pf("\t\t\tcase %s:", strconv.Quote(f.JSONName))
+			g.pf("\t\t\t\tidx = %d", i)
 		}
-		g.pf("\t\t}")
+		g.pf("\t\t\t}")
 		if g.opts.CaseInsensitive && !c.v2 {
 			// An unmatched name is compared case-insensitively against every
 			// field. Guarding each comparison by length keeps that from being
 			// a call per field: only a non-ASCII name can fold to a name of a
 			// different byte length.
-			g.pf("\t\tif idx < 0 {")
-			g.pf("\t\t\tfold := !odjsonrt.ASCII(key)")
-			g.pf("\t\t\tswitch {")
+			g.pf("\t\t\tif idx < 0 {")
+			g.pf("\t\t\t\tfold := !odjsonrt.ASCII(key)")
+			g.pf("\t\t\t\tswitch {")
 			for i, f := range s.Fields {
-				g.pf("\t\t\tcase (len(key) == %d || fold) && odjsonrt.EqualFold(key, %s):",
+				g.pf("\t\t\t\tcase (len(key) == %d || fold) && odjsonrt.EqualFold(key, %s):",
 					len(f.JSONName), strconv.Quote(f.JSONName))
-				g.pf("\t\t\t\tidx = %d", i)
+				g.pf("\t\t\t\t\tidx = %d", i)
 			}
+			g.pf("\t\t\t\t}")
 			g.pf("\t\t\t}")
-			g.pf("\t\t}")
 		}
 	}
+	g.pf("\t\t}")
 	g.pf("\t\tswitch idx {")
 	for i, f := range s.Fields {
 		g.pf("\t\tcase %d:", i)
@@ -95,7 +109,10 @@ func (g *generator) decodeStruct(s *analyzer.StructInfo, c ctx) {
 		if f.AsString {
 			g.decodeQuoted(f.Type, selector(f), c, 3)
 		} else {
-			g.decode(f.Type, selector(f), c, 3)
+			// Both key paths leave p on the value's first byte.
+			mc := c
+			mc.trimmed = true
+			g.decode(f.Type, selector(f), mc, 3)
 		}
 	}
 	g.pf("\t\tdefault:")
@@ -131,6 +148,72 @@ func (g *generator) decodeStruct(s *analyzer.StructInfo, c ctx) {
 	g.pf("\t\t\treturn p, odjsonrt.ErrSyntax(data, p, \"after object key:value pair\")")
 	g.pf("\t\t}")
 	g.pf("\t}")
+}
+
+// rawKeys emits the fast path of member name matching: every field whose
+// name can appear verbatim in a document is compared, quotes included,
+// against the bytes at p, dispatched on the name's first byte. A hit sets
+// idx (and key, where the strict path needs it for its duplicate error) and
+// moves p past the closing quote, having scanned nothing;
+// anything else (an escaped or folded spelling, an unknown name, a
+// malformed key) leaves idx at -1 for the general path. The comparisons are
+// against constants of a few bytes, which the compiler turns into word
+// loads, so a known name costs one byte switch and one or two compares.
+func (g *generator) rawKeys(s *analyzer.StructInfo, c ctx, n int) {
+	type cand struct {
+		idx  int
+		name string
+	}
+	var order []byte
+	groups := map[byte][]cand{}
+	for i, f := range s.Fields {
+		if !rawKeyable(f.JSONName) {
+			continue
+		}
+		b := f.JSONName[0]
+		if _, ok := groups[b]; !ok {
+			order = append(order, b)
+		}
+		groups[b] = append(groups[b], cand{i, f.JSONName})
+	}
+	if len(order) == 0 {
+		return
+	}
+	g.pf("%sif rest := data[p:]; len(rest) > 1 {", ind(n))
+	g.pf("%sswitch rest[1] {", ind(n+1))
+	for _, b := range order {
+		g.pf("%scase %s:", ind(n+1), strconv.QuoteRune(rune(b)))
+		g.pf("%sswitch {", ind(n+2))
+		for _, k := range groups[b] {
+			lit := strconv.Quote(`"` + k.name + `"`)
+			l := len(k.name) + 2
+			g.pf("%scase len(rest) >= %d && string(rest[:%d]) == %s:", ind(n+2), l, l, lit)
+			if c.strict {
+				g.pf("%sidx, key, p = %d, rest[1:%d], p+%d", ind(n+3), k.idx, l-1, l)
+			} else {
+				g.pf("%sidx, p = %d, p+%d", ind(n+3), k.idx, l)
+			}
+		}
+		g.pf("%s}", ind(n+2))
+	}
+	g.pf("%s}", ind(n+1))
+	g.pf("%s}", ind(n))
+}
+
+// rawKeyable reports whether name can be compared against a document's
+// bytes without decoding: it must be non-empty, valid UTF-8, and free of
+// the bytes a JSON string literal cannot hold verbatim. A name that fails
+// still decodes correctly; it just always takes the general path.
+func rawKeyable(name string) bool {
+	if name == "" || !utf8.ValidString(name) {
+		return false
+	}
+	for i := 0; i < len(name); i++ {
+		if c := name[i]; c < 0x20 || c == '"' || c == '\\' {
+			return false
+		}
+	}
+	return true
 }
 
 // allocSteps materialises the embedded pointers on the path to f.
@@ -230,9 +313,9 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 		case c.v2:
 			g.pf("%s%s, err = %sParseV2(%s, %s, %s, %s, %s)", ind(n), c.pos, t.Struct.Helper, c.data, addr(target), c.pos, cacheExpr(c), strictExpr(c))
 		case t.Struct.Local:
-			g.pf("%s%s, err = %s.odjsonParse(%s, %s)", ind(n), c.pos, target, c.data, c.pos)
+			g.pf("%s%s, err = %s.odjsonParse(%s, %s, %s)", ind(n), c.pos, target, c.data, c.pos, cacheExpr(c))
 		default:
-			g.pf("%s%s, err = %sParse(%s, %s, %s)", ind(n), c.pos, t.Struct.Helper, c.data, addr(target), c.pos)
+			g.pf("%s%s, err = %sParse(%s, %s, %s, %s)", ind(n), c.pos, t.Struct.Helper, c.data, addr(target), c.pos, cacheExpr(c))
 		}
 		g.decErr(c, n)
 		return
@@ -303,24 +386,65 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 	g.pf("%s} else {", ind(n))
 	body := n + 1
 
+	// The scalar kinds test for the common spelling inline, so that a
+	// well-formed value costs no call at all; the runtime parser behind the
+	// else branch handles everything else, errors included.
 	switch t.Kind {
 	case analyzer.KindBool:
-		g.parseInto(c, body, target, t.Expr, "bool", "odjsonrt.ParseBool(%s, %s)")
+		g.pf("%sif %s+4 <= len(%s) && string(%s[%s:%s+4]) == \"true\" {", ind(body), c.pos, c.data, c.data, c.pos, c.pos)
+		g.pf("%s%s = true", ind(body+1), target)
+		g.pf("%s%s += 4", ind(body+1), c.pos)
+		g.pf("%s} else if %s+5 <= len(%s) && string(%s[%s:%s+5]) == \"false\" {", ind(body), c.pos, c.data, c.data, c.pos, c.pos)
+		g.pf("%s%s = false", ind(body+1), target)
+		g.pf("%s%s += 5", ind(body+1), c.pos)
+		g.pf("%s} else {", ind(body))
+		g.parseInto(c, body+1, target, t.Expr, "bool", "odjsonrt.ParseBool(%s, %s)")
+		g.pf("%s}", ind(body))
 	case analyzer.KindInt:
-		g.parseInto(c, body, target, t.Expr, "int64", fmt.Sprintf("odjsonrt.ParseInt(%%s, %%s, %d)", t.Bits))
+		x, np, ok := g.tmp("x"), g.tmp("np"), g.tmp("ok")
+		fits := ""
+		if t.Bits < 64 {
+			fits = fmt.Sprintf(" && %s >= %d && %s <= %d", x, -1<<(t.Bits-1), x, 1<<(t.Bits-1)-1)
+		}
+		g.pf("%sif %s, %s, %s := odjsonrt.ParseDecimal(%s, %s); %s%s {", ind(body), x, np, ok, c.data, c.pos, ok, fits)
+		g.pf("%s%s = %s", ind(body+1), target, convert(t.Expr, x))
+		g.pf("%s%s = %s", ind(body+1), c.pos, np)
+		g.pf("%s} else {", ind(body))
+		g.parseInto(c, body+1, target, t.Expr, "int64", fmt.Sprintf("odjsonrt.ParseInt(%%s, %%s, %d)", t.Bits))
+		g.pf("%s}", ind(body))
 	case analyzer.KindUint:
-		g.parseInto(c, body, target, t.Expr, "uint64", fmt.Sprintf("odjsonrt.ParseUint(%%s, %%s, %d)", t.Bits))
+		x, np, ok := g.tmp("x"), g.tmp("np"), g.tmp("ok")
+		fits := ""
+		if t.Bits < 64 {
+			fits = fmt.Sprintf(" && %s <= %d", x, uint64(1)<<t.Bits-1)
+		}
+		// ParseDecimal reads at most eighteen digits, so a non-negative
+		// result always fits a uint64; the sign is the only other check.
+		g.pf("%sif %s, %s, %s := odjsonrt.ParseDecimal(%s, %s); %s && %s[%s] != '-'%s {", ind(body), x, np, ok, c.data, c.pos, ok, c.data, c.pos, fits)
+		g.pf("%s%s = %s", ind(body+1), target, convert(t.Expr, x))
+		g.pf("%s%s = %s", ind(body+1), c.pos, np)
+		g.pf("%s} else {", ind(body))
+		g.parseInto(c, body+1, target, t.Expr, "uint64", fmt.Sprintf("odjsonrt.ParseUint(%%s, %%s, %d)", t.Bits))
+		g.pf("%s}", ind(body))
 	case analyzer.KindFloat:
-		g.parseInto(c, body, target, t.Expr, "float64", fmt.Sprintf("odjsonrt.ParseFloat(%%s, %%s, %d)", t.Bits))
+		x, np, ok := g.tmp("x"), g.tmp("np"), g.tmp("ok")
+		g.pf("%sif %s, %s, %s := odjsonrt.ParseSimpleFloat(%s, %s, %d); %s {", ind(body), x, np, ok, c.data, c.pos, t.Bits, ok)
+		g.pf("%s%s = %s", ind(body+1), target, convert(t.Expr, x))
+		g.pf("%s%s = %s", ind(body+1), c.pos, np)
+		g.pf("%s} else {", ind(body))
+		g.parseInto(c, body+1, target, t.Expr, "float64", fmt.Sprintf("odjsonrt.ParseFloat(%%s, %%s, %d)", t.Bits))
+		g.pf("%s}", ind(body))
 	case analyzer.KindString:
 		call := "odjsonrt.ParseString(%s, %s)"
 		switch {
 		case c.strict:
 			call = "odjsonrt.ParseStringV2(%s, %s, " + cacheExpr(c) + ", strict)"
-		case c.cache != "":
+		case c.trusted && c.cache != "":
 			call = "odjsonrt.ParseStringWith(%s, %s, " + c.cache + ")"
 		case c.trusted:
 			call = "odjsonrt.ParseStringTrusted(%s, %s)"
+		case c.cache != "":
+			call = "odjsonrt.ParseStringCached(%s, %s, " + c.cache + ")"
 		}
 		g.parseInto(c, body, target, t.Expr, "string", call)
 	case analyzer.KindNumber:
@@ -343,8 +467,10 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 			switch {
 			case c.strict:
 				g.pf("%s%s, %s, err = odjsonrt.ParseAnyV2(%s, %s, %s, strict)", ind(body), a, c.pos, c.data, c.pos, cacheExpr(c))
-			case c.cache != "":
+			case c.trusted && c.cache != "":
 				g.pf("%s%s, %s, err = odjsonrt.ParseAnyWith(%s, %s, %s)", ind(body), a, c.pos, c.data, c.pos, c.cache)
+			case c.cache != "":
+				g.pf("%s%s, %s, err = odjsonrt.ParseAnyCached(%s, %s, %s)", ind(body), a, c.pos, c.data, c.pos, c.cache)
 			default:
 				g.pf("%s%s, %s, err = odjsonrt.ParseAny(%s, %s)", ind(body), a, c.pos, c.data, c.pos)
 			}

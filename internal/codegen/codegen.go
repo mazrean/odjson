@@ -169,14 +169,16 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 	g.pf("")
 	if s.Local {
 		g.pf("// odjsonParse decodes the JSON object starting at p into v and")
-		g.pf("// returns the offset just past it.")
-		g.pf("func (v *%s) odjsonParse(data []byte, p int) (int, error) {", s.Expr)
+		g.pf("// returns the offset just past it. Strings are interned through")
+		g.pf("// %s, which may be nil.", cache)
+		g.pf("func (v *%s) odjsonParse(data []byte, p int, %s *odjsonrt.StringCache) (int, error) {", s.Expr, cache)
 	} else {
 		g.pf("// %sParse decodes the JSON object starting at p into v and", s.Helper)
-		g.pf("// returns the offset just past it.")
-		g.pf("func %sParse(data []byte, v *%s, p int) (int, error) {", s.Helper, s.Expr)
+		g.pf("// returns the offset just past it. Strings are interned through")
+		g.pf("// %s, which may be nil.", cache)
+		g.pf("func %sParse(data []byte, v *%s, p int, %s *odjsonrt.StringCache) (int, error) {", s.Helper, s.Expr, cache)
 	}
-	g.decodeStruct(s, ctx{data: "data", pos: "p", ret: "p"})
+	g.decodeStruct(s, ctx{data: "data", pos: "p", ret: "p", cache: cache})
 	g.pf("}")
 
 	if g.opts.Methods && g.opts.JSONV2 {
@@ -239,7 +241,11 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 	g.pf("")
 	g.pf("// Unmarshal%s decodes the JSON document data into v.", name)
 	g.pf("func Unmarshal%s(data []byte, v *%s) error {", name, s.Expr)
-	g.pf("\tp, err := v.odjsonParse(data, odjsonrt.SkipSpace(data, 0))")
+	g.pf("\t// The cache plays the part of encoding/json/v2's string cache: a")
+	g.pf("\t// value that recurs in the document is allocated once.")
+	g.pf("\t%s := odjsonrt.GetStringCache()", cache)
+	g.pf("\tp, err := v.odjsonParse(data, odjsonrt.SkipSpace(data, 0), %s)", cache)
+	g.pf("\todjsonrt.PutStringCache(%s)", cache)
 	g.pf("\tif err != nil {")
 	g.pf("\t\treturn err")
 	g.pf("\t}")

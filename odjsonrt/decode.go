@@ -1,6 +1,7 @@
 package odjsonrt
 
 import (
+	"bytes"
 	"encoding"
 	"encoding/base64"
 	"encoding/json"
@@ -18,6 +19,36 @@ func ParseString(data []byte, p int) (string, int, error) {
 		return "", next, err
 	}
 	return adoptString(b, aliased), next, nil
+}
+
+// ParseStringCached is [ParseString] with a string cache: a literal that
+// needed no unescaping is interned through c, which may be nil.
+func ParseStringCached(data []byte, p int, c *StringCache) (string, int, error) {
+	if p >= len(data) {
+		return "", p, errUnexpectedEnd(p)
+	}
+	if data[p] != '"' {
+		return "", p, ErrType(data, p, "string")
+	}
+	end, hasEscape, nonASCII, err := scanString(data, p)
+	if err != nil {
+		return "", end, err
+	}
+	body := data[p+1 : end-1]
+	if !hasEscape {
+		if !nonASCII {
+			return c.Make(body), end, nil
+		}
+		// Invalid UTF-8 becomes U+FFFD below, which is unquote's job.
+		if s, ok := c.MakeUTF8(body); ok {
+			return s, end, nil
+		}
+	}
+	out, ok := unquote(body, false)
+	if !ok {
+		return "", p, ErrSyntax(data, p, "invalid string literal")
+	}
+	return adoptString(out, false), end, nil
 }
 
 // adoptString turns the result of [ParseStringBytes] into a string. When the
@@ -97,16 +128,46 @@ func ParseKey(data []byte, p int) (key []byte, aliased bool, next int, err error
 	return key, aliased, SkipSpace(data, next+1), nil
 }
 
+// AfterKey consumes the colon that follows an object member name ending
+// just before p, with any whitespace around it, and returns the index of the
+// member value's first byte. Generated decoders call it after matching a
+// name against the document's raw bytes; the errors are [ParseKey]'s.
+func AfterKey(data []byte, p int) (int, error) {
+	// A compact document has the colon right there, and the value right
+	// after it; keeping that shape inlinable is what the raw match buys.
+	if p < len(data) && data[p] == ':' {
+		return SkipSpace(data, p+1), nil
+	}
+	return afterKeySlow(data, p)
+}
+
+func afterKeySlow(data []byte, p int) (int, error) {
+	p = SkipSpace(data, p)
+	if p >= len(data) {
+		return p, errUnexpectedEnd(p)
+	}
+	if data[p] != ':' {
+		return p, errChar(data, p, "after object key")
+	}
+	return SkipSpace(data, p+1), nil
+}
+
 // ParseInt parses the JSON number at p into a signed integer of the given bit
 // size (8, 16, 32 or 64). A literal with a fraction or exponent, or one that
 // does not fit, produces a [TypeError], matching encoding/json.
 func ParseInt(data []byte, p int, bits int) (int64, int, error) {
-	if v, end, ok := parseDecimal(data, p); ok {
-		if bits < 64 && (v < -1<<(bits-1) || v > 1<<(bits-1)-1) {
-			return 0, p, &TypeError{Value: "number", Type: intTypeName(bits), Offset: int64(p)}
-		}
+	// bits is a constant at every generated call site, so once this is
+	// inlined the range test folds away for int64 and the slow path is the
+	// only call left.
+	if v, end, ok := ParseDecimal(data, p); ok && (bits == 64 || (v >= -1<<(bits-1) && v <= 1<<(bits-1)-1)) {
 		return v, end, nil
 	}
+	return parseIntSlow(data, p, bits)
+}
+
+// parseIntSlow is [ParseInt] for the literals ParseDecimal declines and the
+// ones that do not fit: strconv settles both and produces the error.
+func parseIntSlow(data []byte, p int, bits int) (int64, int, error) {
 	end, err := numberLiteral(data, p, intTypeName(bits))
 	if err != nil {
 		return 0, p, err
@@ -118,13 +179,13 @@ func ParseInt(data []byte, p int, bits int) (int64, int, error) {
 	return v, end, nil
 }
 
-// parseDecimal reads the integer literal at p in one pass, accumulating the
+// ParseDecimal reads the integer literal at p in one pass, accumulating the
 // digits while it scans for the end of the number. It handles the common
 // shape, an optional minus sign and up to eighteen digits with nothing after
 // them, which can neither overflow nor need strconv's range checks. Anything
 // else, including a fraction, an exponent or a leading zero followed by more
 // digits, is left to the general path, which also produces the right error.
-func parseDecimal(data []byte, p int) (v int64, end int, ok bool) {
+func ParseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 	i := p
 	neg := i < len(data) && data[i] == '-'
 	if neg {
@@ -159,12 +220,15 @@ func parseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 func ParseUint(data []byte, p int, bits int) (uint64, int, error) {
 	// A minus sign is rejected by strconv even before a zero, so "-0" has to
 	// take the general path to produce that error.
-	if v, end, ok := parseDecimal(data, p); ok && data[p] != '-' {
-		if bits < 64 && v > 1<<bits-1 {
-			return 0, p, &TypeError{Value: "number", Type: uintTypeName(bits), Offset: int64(p)}
-		}
+	if v, end, ok := ParseDecimal(data, p); ok && data[p] != '-' && (bits == 64 || v <= 1<<bits-1) {
 		return uint64(v), end, nil
 	}
+	return parseUintSlow(data, p, bits)
+}
+
+// parseUintSlow is [ParseUint] for the literals ParseDecimal declines and the
+// ones that do not fit.
+func parseUintSlow(data []byte, p int, bits int) (uint64, int, error) {
 	end, err := numberLiteral(data, p, uintTypeName(bits))
 	if err != nil {
 		return 0, p, err
@@ -180,6 +244,9 @@ func ParseUint(data []byte, p int, bits int) (uint64, int, error) {
 // (32 or 64). Literals outside the representable range produce a [TypeError],
 // matching encoding/json.
 func ParseFloat(data []byte, p int, bits int) (float64, int, error) {
+	if v, end, ok := ParseSimpleFloat(data, p, bits); ok {
+		return v, end, nil
+	}
 	end, err := numberLiteral(data, p, floatTypeName(bits))
 	if err != nil {
 		return 0, p, err
@@ -189,6 +256,81 @@ func ParseFloat(data []byte, p int, bits int) (float64, int, error) {
 		return 0, p, &TypeError{Value: "number", Type: floatTypeName(bits), Offset: int64(p)}
 	}
 	return v, end, nil
+}
+
+// pow10 holds the powers of ten a float64 represents exactly.
+var pow10 = [...]float64{
+	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11,
+	1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
+}
+
+// pow10f32 holds the powers of ten a float32 represents exactly.
+var pow10f32 = [...]float32{1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10}
+
+// ParseSimpleFloat reads the number at p in one pass when it has the shape
+// almost every real document uses, an optional sign, digits and an optional
+// fraction with no exponent, and its digits fit the mantissa exactly. Then
+// the value is one correctly rounded division of two exact floats (Clinger's
+// fast path, the same one strconv takes after its own scan), so the result
+// is bit for bit strconv.ParseFloat's. Everything else, including every
+// malformed literal, is declined and left to the general path.
+func ParseSimpleFloat(data []byte, p int, bits int) (float64, int, bool) {
+	i := p
+	neg := i < len(data) && data[i] == '-'
+	if neg {
+		i++
+	}
+	start := i
+	var m uint64
+	for i < len(data) {
+		c := data[i] - '0'
+		if c > 9 {
+			break
+		}
+		m = m*10 + uint64(c)
+		i++
+	}
+	digits := i - start
+	if digits == 0 || (data[start] == '0' && digits > 1) {
+		return 0, p, false
+	}
+	frac := 0
+	if i < len(data) && data[i] == '.' {
+		i++
+		fs := i
+		for i < len(data) {
+			c := data[i] - '0'
+			if c > 9 {
+				break
+			}
+			m = m*10 + uint64(c)
+			i++
+		}
+		frac = i - fs
+		if frac == 0 {
+			return 0, p, false
+		}
+		digits += frac
+	}
+	if digits > 19 || i < len(data) && (data[i] == 'e' || data[i] == 'E') {
+		return 0, p, false
+	}
+	var f float64
+	if bits == 32 {
+		if m >= 1<<24 || frac >= len(pow10f32) {
+			return 0, p, false
+		}
+		f = float64(float32(m) / pow10f32[frac])
+	} else {
+		if m >= 1<<53 || frac >= len(pow10) {
+			return 0, p, false
+		}
+		f = float64(m) / pow10[frac]
+	}
+	if neg {
+		f = -f
+	}
+	return f, i, true
 }
 
 // ParseNumberString parses the value at p into a json.Number. A JSON number is
@@ -230,6 +372,18 @@ func numberLiteral(data []byte, p int, goType string) (int, error) {
 
 // ParseBool parses a JSON boolean at p.
 func ParseBool(data []byte, p int) (bool, int, error) {
+	// Each literal is one word compare once this is inlined; only the
+	// errors need a call.
+	if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+		return true, p + 4, nil
+	}
+	if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+		return false, p + 5, nil
+	}
+	return parseBoolSlow(data, p)
+}
+
+func parseBoolSlow(data []byte, p int) (bool, int, error) {
 	if p >= len(data) {
 		return false, p, errUnexpectedEnd(p)
 	}
@@ -348,6 +502,12 @@ func ParseAny(data []byte, p int) (any, int, error) {
 	return parseAny(data, p, nil, parseLegacy)
 }
 
+// ParseAnyCached is [ParseAny] with a string cache for the member names and
+// string values it produces; c may be nil.
+func ParseAnyCached(data []byte, p int, c *StringCache) (any, int, error) {
+	return parseAny(data, p, c, parseLegacy)
+}
+
 // parseMode says which rules a byte oriented parser applies to strings and
 // object names.
 type parseMode uint8
@@ -415,7 +575,7 @@ func parseAny(data []byte, p int, sc *StringCache, mode parseMode) (any, int, er
 			case parseStrict:
 				s, next, err = ParseStringStrict(data, p, sc)
 			default:
-				s, next, err = ParseString(data, p)
+				s, next, err = ParseStringCached(data, p, sc)
 			}
 			if err != nil {
 				return nil, next, err
@@ -521,84 +681,88 @@ func parseKeyString(data []byte, p int, c *StringCache, mode parseMode) (string,
 // encoding/json's unquoteBytes: escapes are expanded, unpaired surrogates and
 // invalid UTF-8 become U+FFFD. Under strict an unpaired surrogate is instead
 // an error, as it is for encoding/json/v2.
+//
+// The runs between escapes are copied whole: a run that is valid UTF-8, which
+// is nearly every one, costs one validation pass and one copy instead of a
+// decode and an encode per rune.
 func unquote(s []byte, strict bool) ([]byte, bool) {
-	b := make([]byte, len(s)+2*utf8.UTFMax)
-	w := 0
+	b := make([]byte, 0, len(s)+2*utf8.UTFMax)
 	r := 0
 	for r < len(s) {
-		if w >= len(b)-2*utf8.UTFMax {
-			grown := make([]byte, (len(b)+utf8.UTFMax)*2)
-			copy(grown, b[:w])
-			b = grown
+		n := bytes.IndexByte(s[r:], '\\')
+		if n < 0 {
+			n = len(s) - r
 		}
-		switch c := s[r]; {
-		case c == '\\':
+		if run := s[r : r+n]; utf8.Valid(run) {
+			b = append(b, run...)
+		} else {
+			b = appendReplacing(b, run)
+		}
+		r += n
+		if r >= len(s) {
+			break
+		}
+		// s[r] is a backslash.
+		r++
+		if r >= len(s) {
+			return nil, false
+		}
+		switch s[r] {
+		case '"', '\\', '/':
+			b = append(b, s[r])
 			r++
-			if r >= len(s) {
+		case 'b':
+			b = append(b, '\b')
+			r++
+		case 'f':
+			b = append(b, '\f')
+			r++
+		case 'n':
+			b = append(b, '\n')
+			r++
+		case 'r':
+			b = append(b, '\r')
+			r++
+		case 't':
+			b = append(b, '\t')
+			r++
+		case 'u':
+			r--
+			rr := getu4(s[r:])
+			if rr < 0 {
 				return nil, false
 			}
-			switch s[r] {
-			case '"', '\\', '/':
-				b[w] = s[r]
-				r++
-				w++
-			case 'b':
-				b[w] = '\b'
-				r++
-				w++
-			case 'f':
-				b[w] = '\f'
-				r++
-				w++
-			case 'n':
-				b[w] = '\n'
-				r++
-				w++
-			case 'r':
-				b[w] = '\r'
-				r++
-				w++
-			case 't':
-				b[w] = '\t'
-				r++
-				w++
-			case 'u':
-				r--
-				rr := getu4(s[r:])
-				if rr < 0 {
+			r += 6
+			if utf16.IsSurrogate(rr) {
+				rr1 := getu4(s[r:])
+				if dec := utf16.DecodeRune(rr, rr1); dec != utf8.RuneError {
+					// A valid surrogate pair; consume the second escape.
+					r += 6
+					b = utf8.AppendRune(b, dec)
+					break
+				}
+				if strict {
 					return nil, false
 				}
-				r += 6
-				if utf16.IsSurrogate(rr) {
-					rr1 := getu4(s[r:])
-					if dec := utf16.DecodeRune(rr, rr1); dec != utf8.RuneError {
-						// A valid surrogate pair; consume the second escape.
-						r += 6
-						w += utf8.EncodeRune(b[w:], dec)
-						break
-					}
-					if strict {
-						return nil, false
-					}
-					rr = utf8.RuneError
-				}
-				w += utf8.EncodeRune(b[w:], rr)
-			default:
-				return nil, false
+				rr = utf8.RuneError
 			}
-		case c == '"', c < ' ':
-			return nil, false
-		case c < utf8.RuneSelf:
-			b[w] = c
-			r++
-			w++
+			b = utf8.AppendRune(b, rr)
 		default:
-			rr, size := utf8.DecodeRune(s[r:])
-			r += size
-			w += utf8.EncodeRune(b[w:], rr)
+			return nil, false
 		}
 	}
-	return b[:w], true
+	return b, true
+}
+
+// appendReplacing appends run to b with every invalid UTF-8 byte replaced by
+// U+FFFD, as encoding/json does.
+func appendReplacing(b, run []byte) []byte {
+	for len(run) > 0 {
+		rr, size := utf8.DecodeRune(run)
+		b = utf8.AppendRune(b, rr)
+		run = run[size:]
+	}
+	return b
 }
 
 // getu4 decodes the 4 hexadecimal digits of a \uXXXX escape at the start of s,

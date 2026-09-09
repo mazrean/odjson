@@ -65,14 +65,36 @@ func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next in
 // an unpaired surrogate escape are errors rather than U+FFFD. The result is
 // interned through c when it is not nil.
 func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) {
-	b, aliased, next, err := parseStringBytesStrict(data, p)
+	if p >= len(data) {
+		return "", p, errUnexpectedEnd(p)
+	}
+	if data[p] != '"' {
+		return "", p, ErrType(data, p, "string")
+	}
+	end, hasEscape, nonASCII, err := scanString(data, p)
 	if err != nil {
-		return "", next, err
+		return "", end, err
 	}
-	if aliased {
-		return c.Make(b), next, nil
+	body := data[p+1 : end-1]
+	if !hasEscape && !nonASCII {
+		return c.Make(body), end, nil
 	}
-	return adoptString(b, false), next, nil
+	if !hasEscape {
+		// A cache hit is known to be valid UTF-8; only a miss is checked.
+		s, ok := c.MakeUTF8(body)
+		if !ok {
+			return "", p, errInvalidUTF8(data, p)
+		}
+		return s, end, nil
+	}
+	if nonASCII && !utf8.Valid(body) {
+		return "", p, errInvalidUTF8(data, p)
+	}
+	out, ok := unquote(body, true)
+	if !ok {
+		return "", p, ErrSyntax(data, p, "invalid string literal")
+	}
+	return adoptString(out, false), end, nil
 }
 
 // ParseStringInnerStrict is [ParseStringInner] under json/v2's rules.
