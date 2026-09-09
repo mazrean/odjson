@@ -18,14 +18,6 @@ type Options struct {
 	// CaseInsensitive enables encoding/json's fallback that matches an
 	// object member to a field name ignoring case.
 	CaseInsensitive bool
-	// JSONV2 additionally emits the encoding/json/v2 marshaler and
-	// unmarshaler methods.
-	JSONV2 bool
-	// Methods emits MarshalJSON and UnmarshalJSON (and their v2
-	// counterparts) on the generated types. Turning it off keeps the
-	// package's existing encoding/json behaviour untouched and exposes the
-	// direct Marshal/Unmarshal functions only.
-	Methods bool
 	// Command is recorded in the file header.
 	Command string
 }
@@ -182,43 +174,41 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 			func(b *block) { g.decodeStruct(b, s, parseCtx) })
 	}
 
-	if g.opts.Methods && g.opts.JSONV2 {
-		g.pkg.Imports.Add(analyzer.JSONTextPath, "jsontext")
-		v2Doc := func(name, base string) []string {
-			return []string{
-				"// " + name + " is " + base + " under encoding/json/v2's semantics, for",
-				"// input a jsontext.Decoder has already validated when strict is false,",
-				"// and for bytes nobody has looked at when it is true.",
-			}
+	g.pkg.Imports.Add(analyzer.JSONTextPath, "jsontext")
+	v2Doc := func(name, base string) []string {
+		return []string{
+			"// " + name + " is " + base + " under encoding/json/v2's semantics, for",
+			"// input a jsontext.Decoder has already validated when strict is false,",
+			"// and for bytes nobody has looked at when it is true.",
 		}
-		v2Ctx := ctx{data: "data", pos: "p", ret: "p", v2: true, cache: cache, strict: true}
-		strict := field("strict", id("bool"))
-		if s.Local {
-			g.funcDecl(v2Doc("odjsonParseV2", "odjsonParse"), receiver(s, false), "odjsonParseV2",
-				signature([]*ast.Field{field("data", sliceType(id("byte"))), field("p", id("int")), cacheParam, strict}, id("int"), id("error")),
-				func(b *block) { g.decodeStruct(b, s, v2Ctx) })
-		} else {
-			g.funcDecl(v2Doc(s.Helper+"ParseV2", s.Helper+"Parse"), nil, s.Helper+"ParseV2",
-				signature([]*ast.Field{field("data", sliceType(id("byte"))), receiver(s, false), field("p", id("int")), cacheParam, strict}, id("int"), id("error")),
-				func(b *block) { g.decodeStruct(b, s, v2Ctx) })
+	}
+	v2Ctx := ctx{data: "data", pos: "p", ret: "p", v2: true, cache: cache, strict: true}
+	strict := field("strict", id("bool"))
+	if s.Local {
+		g.funcDecl(v2Doc("odjsonParseV2", "odjsonParse"), receiver(s, false), "odjsonParseV2",
+			signature([]*ast.Field{field("data", sliceType(id("byte"))), field("p", id("int")), cacheParam, strict}, id("int"), id("error")),
+			func(b *block) { g.decodeStruct(b, s, v2Ctx) })
+	} else {
+		g.funcDecl(v2Doc(s.Helper+"ParseV2", s.Helper+"Parse"), nil, s.Helper+"ParseV2",
+			signature([]*ast.Field{field("data", sliceType(id("byte"))), receiver(s, false), field("p", id("int")), cacheParam, strict}, id("int"), id("error")),
+			func(b *block) { g.decodeStruct(b, s, v2Ctx) })
+	}
+	fromDoc := func(name string) []string {
+		return []string{
+			"// " + name + " decodes the next value in dec into v,",
+			"// driving the decoder token by token so the document is",
+			"// parsed once rather than twice.",
 		}
-		fromDoc := func(name string) []string {
-			return []string{
-				"// " + name + " decodes the next value in dec into v,",
-				"// driving the decoder token by token so the document is",
-				"// parsed once rather than twice.",
-			}
-		}
-		dec := field("dec", ptr(sel(id("jsontext"), "Decoder")))
-		if s.Local {
-			g.funcDecl(fromDoc("odjsonParseFrom"), receiver(s, false), "odjsonParseFrom",
-				signature([]*ast.Field{dec, cacheParam}, id("error")),
-				func(b *block) { g.decodeStructFrom(b, s) })
-		} else {
-			g.funcDecl(fromDoc(s.Helper+"ParseFrom"), nil, s.Helper+"ParseFrom",
-				signature([]*ast.Field{dec, receiver(s, false), cacheParam}, id("error")),
-				func(b *block) { g.decodeStructFrom(b, s) })
-		}
+	}
+	dec := field("dec", ptr(sel(id("jsontext"), "Decoder")))
+	if s.Local {
+		g.funcDecl(fromDoc("odjsonParseFrom"), receiver(s, false), "odjsonParseFrom",
+			signature([]*ast.Field{dec, cacheParam}, id("error")),
+			func(b *block) { g.decodeStructFrom(b, s) })
+	} else {
+		g.funcDecl(fromDoc(s.Helper+"ParseFrom"), nil, s.Helper+"ParseFrom",
+			signature([]*ast.Field{dec, receiver(s, false), cacheParam}, id("error")),
+			func(b *block) { g.decodeStructFrom(b, s) })
 	}
 
 	if !s.Local {
@@ -227,19 +217,14 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 
 	name := s.Name
 	size := id("odjsonSize" + name)
-	g.funcDecl([]string{"// Append" + name + " appends the JSON encoding of v to dst."},
-		nil, "Append"+name,
-		signature([]*ast.Field{field("dst", sliceType(id("byte"))), receiver(s, false)}, sliceType(id("byte")), id("error")),
-		func(b *block) {
-			g.emit(b, ret(call(sel(v, "odjsonAppend"), dst, g.v1Mode())))
-		})
+	sc := id(cache)
 
-	g.varDeclTop([]string{"// odjsonSize" + name + " sizes the buffer Marshal" + name + " allocates."},
+	g.varDeclTop([]string{"// odjsonSize" + name + " sizes the buffer the encoders allocate."},
 		"odjsonSize"+name, rt("SizeHint"))
 
-	g.funcDecl([]string{"// Marshal" + name + " returns the JSON encoding of v."},
-		nil, "Marshal"+name,
-		signature([]*ast.Field{receiver(s, false)}, sliceType(id("byte")), id("error")),
+	g.funcDecl([]string{"// MarshalJSON implements encoding/json.Marshaler."},
+		receiver(s, true), "MarshalJSON",
+		signature(nil, sliceType(id("byte")), id("error")),
 		func(b *block) {
 			buf := id("buf")
 			g.emit(b, assignN(token.DEFINE, []ast.Expr{buf, errV},
@@ -251,10 +236,9 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 			g.emit(b, ret(buf, nilV))
 		})
 
-	sc := id(cache)
-	g.funcDecl([]string{"// Unmarshal" + name + " decodes the JSON document data into v."},
-		nil, "Unmarshal"+name,
-		signature([]*ast.Field{field("data", sliceType(id("byte"))), receiver(s, false)}, id("error")),
+	g.funcDecl([]string{"// UnmarshalJSON implements encoding/json.Unmarshaler."},
+		receiver(s, false), "UnmarshalJSON",
+		signature([]*ast.Field{field("data", sliceType(id("byte")))}, id("error")),
 		func(b *block) {
 			g.comment(b,
 				"// The cache plays the part of encoding/json/v2's string cache: a",
@@ -269,30 +253,7 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 			g.emit(b, ret(callRT("EndOfDocument", data, p)))
 		})
 
-	if !g.opts.Methods {
-		return
-	}
-
-	g.funcDecl([]string{"// MarshalJSON implements encoding/json.Marshaler."},
-		receiver(s, true), "MarshalJSON",
-		signature(nil, sliceType(id("byte")), id("error")),
-		func(b *block) {
-			g.emit(b, ret(call(id("Marshal"+name), ref(v))))
-		})
-
-	g.funcDecl([]string{"// UnmarshalJSON implements encoding/json.Unmarshaler."},
-		receiver(s, false), "UnmarshalJSON",
-		signature([]*ast.Field{field("data", sliceType(id("byte")))}, id("error")),
-		func(b *block) {
-			g.emit(b, ret(call(id("Unmarshal"+name), data, v)))
-		})
-
-	if !g.opts.JSONV2 {
-		return
-	}
-	g.pkg.Imports.Add(analyzer.JSONTextPath, "jsontext")
-
-	enc, dec := id("enc"), id("dec")
+	enc, decV := id("enc"), id("dec")
 	g.funcDecl([]string{"// MarshalJSONTo implements encoding/json/v2.MarshalerTo."},
 		receiver(s, true), "MarshalJSONTo",
 		signature([]*ast.Field{field("enc", ptr(sel(id("jsontext"), "Encoder")))}, id("error")),
@@ -350,7 +311,7 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 				"// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects",
 				"// what jsontext would have.")
 			s := g.ifStmt(b,
-				assignN(token.DEFINE, []ast.Expr{data, id("ok")}, callRT("BeginDirectDecode", dec)),
+				assignN(token.DEFINE, []ast.Expr{data, id("ok")}, callRT("BeginDirectDecode", decV)),
 				id("ok"),
 				func(b *block) {
 					end := id("end")
@@ -360,11 +321,11 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 							call(sel(v, "odjsonParseV2"), data, num(0), sc, id("true"))),
 						bin(errV, token.EQL, nilV),
 						func(b *block) {
-							g.emit(b, expr(callRT("EndDirectDecode", dec, end)))
+							g.emit(b, expr(callRT("EndDirectDecode", decV, end)))
 						})
 				})
 			g.elseBlock(s, func(b *block) {
-				g.emit(b, assign(errV, call(sel(v, "odjsonParseFrom"), dec, sc)))
+				g.emit(b, assign(errV, call(sel(v, "odjsonParseFrom"), decV, sc)))
 			})
 			g.emit(b, expr(callRT("PutStringCache", sc)))
 			g.emit(b, ret(errV))

@@ -7,10 +7,20 @@ import (
 	"testing"
 )
 
+// plainFallbacks is Fallbacks without the generated methods, so encoding/json
+// reflects over it the way it did before odjson ran. None of the field types
+// carries a generated codec of its own — Custom and Textual carry hand written
+// ones, which the oracle is meant to use — so a defined type is enough here;
+// no separate package is needed.
+type plainFallbacks Fallbacks
+
+// marshalParity compares the generated MarshalJSON against encoding/json. The
+// method is called directly because json.Marshal prefers MarshalJSONTo, which
+// follows json/v2's semantics instead.
 func marshalParity(t *testing.T, name string, v Fallbacks) {
 	t.Helper()
-	want, wantErr := json.Marshal(v)
-	got, gotErr := AppendFallbacks(nil, &v)
+	want, wantErr := json.Marshal(plainFallbacks(v))
+	got, gotErr := v.MarshalJSON()
 	if (wantErr != nil) != (gotErr != nil) {
 		t.Errorf("%s: error mismatch: encoding/json=%v odjson=%v", name, wantErr, gotErr)
 		return
@@ -26,8 +36,8 @@ func marshalParity(t *testing.T, name string, v Fallbacks) {
 func unmarshalParity(t *testing.T, in string) {
 	t.Helper()
 	var a, b Fallbacks
-	errA := json.Unmarshal([]byte(in), &a)
-	errB := UnmarshalFallbacks([]byte(in), &b)
+	errA := json.Unmarshal([]byte(in), (*plainFallbacks)(&a))
+	errB := b.UnmarshalJSON([]byte(in))
 	if (errA != nil) != (errB != nil) {
 		t.Errorf("error mismatch for %s: encoding/json=%v odjson=%v", in, errA, errB)
 		return

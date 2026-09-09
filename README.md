@@ -4,8 +4,10 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/mazrean/odjson.svg)](https://pkg.go.dev/github.com/mazrean/odjson)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-**odjson** is a CLI code generator that makes JSON encoding and decoding in Go
-faster, alongside whichever JSON library you already use.
+**odjson** is a CLI code generator that makes `encoding/json/v2` and
+`encoding/json` faster. It is bolted on, not swapped in: you keep the standard
+library, your call sites do not change, and deleting one generated file undoes
+all of it.
 
 ## Why
 
@@ -26,32 +28,37 @@ each one.
   It streams the input straight into the struct's fields: no reflection, no
   intermediate `map[string]any`, no per-field name lookup at runtime.
 
-## It sits alongside your JSON library
+## It bolts onto the standard library
 
-odjson does not replace your JSON library — it gives you a faster entry point
-for the types that matter. For each struct `T` it emits `MarshalT`,
-`AppendT` and `UnmarshalT`, ordinary functions you call at the boundary where
-JSON enters and leaves your program. Everything else keeps going through the
-library you already have.
+odjson does not replace `encoding/json/v2`. For each struct it implements the
+four standard marshaling interfaces:
 
-With `-methods` it additionally emits the standard marshaling interfaces, which
-every major library honours:
+| Interface                                | Package                                                   |
+| ---------------------------------------- | --------------------------------------------------------- |
+| `MarshalJSONTo` / `UnmarshalJSONFrom`    | [`encoding/json/v2`](https://pkg.go.dev/encoding/json/v2)  |
+| `MarshalJSON` / `UnmarshalJSON`          | [`encoding/json`](https://pkg.go.dev/encoding/json)        |
 
-| Library                                                           | Interfaces implemented                |
-| ----------------------------------------------------------------- | ------------------------------------- |
-| [`encoding/json`](https://pkg.go.dev/encoding/json)                | `json.Marshaler` / `json.Unmarshaler` |
-| [`encoding/json/v2`](https://pkg.go.dev/encoding/json/v2)          | `MarshalJSONTo` / `UnmarshalJSONFrom` |
-| [`github.com/bytedance/sonic`](https://github.com/bytedance/sonic) | `json.Marshaler` / `json.Unmarshaler` |
-| [`github.com/goccy/go-json`](https://github.com/goccy/go-json)     | `json.Marshaler` / `json.Unmarshaler` |
+Every `json.Marshal(v)` and `json.Unmarshal(b, &v)` you already wrote then
+dispatches into the generated code. There is no odjson symbol to call, no
+wrapper type, no configuration object — nothing in your program refers to
+odjson at all.
 
-Then an unchanged `json.Marshal(v)` — whichever `json` that is — dispatches into
-the generated code. That is convenient, but on sonic and go-json it is **not**
-the fast path for encoding: their interface contract makes them re-scan and
-copy what the generated codec produces, and on large documents the same charge
-sinks decoding too. `encoding/json` gains on three of four measurements and
-`encoding/json/v2` gains a lot, through the [direct path](#the-direct-path).
-`-methods` is off by default because that recommendation is not uniform; the
-[benchmarks](#benchmarks) show each case.
+Two consequences follow, and they are the whole pitch:
+
+- **You keep the standard library.** Its options, its error types, its
+  streaming decoders and everything else in your program that touches those
+  types keeps working, because odjson only supplies the two methods the
+  library was already looking for.
+- **It comes off whenever you want.** `rm odjson_gen.go`, rebuild, and the
+  package is back to plain reflection. There is no migration to undo and no
+  API to unpick — which is what makes it cheap to try, and cheap to abandon if
+  a future standard library closes the gap.
+
+What you get for that is [1.5×–3.1× on `encoding/json/v2`](#benchmarks), which
+puts it ahead of [`goccy/go-json`](https://github.com/goccy/go-json) on three
+of the four measurements and within 1.2×–1.4× of
+[`bytedance/sonic`](https://github.com/bytedance/sonic)'s JIT-compiled SIMD
+codec — while still being the standard library.
 
 ## Install
 
@@ -132,25 +139,21 @@ go generate ./...
 odjson writes `odjson_gen.go` beside the source, containing the codec for each
 type. Commit it; it is ordinary Go code with no build tags required.
 
-Then call the generated functions where the JSON crosses your program's
-boundary:
+That is the whole integration. The call sites stay as they were:
 
 ```go
 func handler(w http.ResponseWriter, r *http.Request) {
 	var u model.User
-	if err := model.UnmarshalUser(body, &u); err != nil {
+	if err := json.Unmarshal(body, &u); err != nil {
 		// ...
 	}
 
-	b, err := model.MarshalUser(&u)
-	// ... or append into a buffer you already own:
-	buf, err = model.AppendUser(buf, &u)
+	b, err := json.Marshal(&u)
+	// ...
 }
 ```
 
-If you cannot change the call sites, `-methods` additionally emits
-`MarshalJSON`/`UnmarshalJSON`, which every JSON library honours — but measure
-first: see [Benchmarks](#benchmarks) for why that is not the default.
+To take it back off, delete `odjson_gen.go` and rebuild.
 
 ### Flags
 
@@ -165,28 +168,35 @@ directory, which is what `//go:generate` needs.
 | ------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------- |
 | `-type`             | all              | Comma-separated struct type names. The default is every exported struct declared in the package.               |
 | `-output`           | `odjson_gen.go`  | File name written into each matched package directory. A name, not a path.                                     |
-| `-methods`          | `false`          | Also emit `MarshalJSON`/`UnmarshalJSON`, so unchanged call sites route through the generated codec. Off by default — see [Benchmarks](#benchmarks). |
-| `-jsonv2`           | `true`           | With `-methods`, also emit the `encoding/json/v2` methods (`MarshalJSONTo` / `UnmarshalJSONFrom`).             |
 | `-recursive`        | `true`           | Also generate codecs for struct types reachable from the selected ones, so nested values skip reflection too.  |
 | `-escape-html`      | `true`           | Escape `<`, `>` and `&` in strings, matching `encoding/json`'s default.                                        |
-| `-case-insensitive` | `true`           | Match member names case-insensitively when decoding, matching `encoding/json` v1.                              |
+| `-case-insensitive` | `false`          | In `UnmarshalJSON`, fall back to a case-insensitive member match the way `encoding/json` v1 does. Off by default, matching `encoding/json/v2`. |
 | `-version`          |                  | Print the version and exit.                                                                                    |
 
 ### What is generated
 
-For a type `T`, odjson emits:
+For a type `T`, odjson emits exactly the four interface methods, plus the
+unexported codecs behind them:
 
-| Symbol                               | Purpose                                                                 |
-| ------------------------------------ | ----------------------------------------------------------------------- |
-| `MarshalT(v *T) ([]byte, error)`     | Direct encoder. The fastest path: nothing re-validates its output.       |
-| `AppendT(dst []byte, v *T) ([]byte, error)` | Appends into a caller-owned buffer; allocation-free when reused.  |
-| `UnmarshalT(data []byte, v *T) error`| Direct decoder.                                                          |
-| `(T).MarshalJSON` / `(*T).UnmarshalJSON` | With `-methods`: routes unchanged call sites through the generated codec.  |
-| `(T).MarshalJSONTo` / `(*T).UnmarshalJSONFrom` | With `-methods -jsonv2`: the streaming `encoding/json/v2` interfaces. |
+| Symbol                                          | Purpose                                                          |
+| ----------------------------------------------- | ---------------------------------------------------------------- |
+| `(T).MarshalJSONTo` / `(*T).UnmarshalJSONFrom`  | `encoding/json/v2`'s streaming interfaces. The fast path.        |
+| `(T).MarshalJSON` / `(*T).UnmarshalJSON`        | `encoding/json` v1's interfaces, following v1's rules.           |
+
+Nothing is exported beyond those, and nothing in your package has to name
+odjson for the generated codec to run.
 
 Types that already implement `json.Marshaler`, `json.Unmarshaler`,
 `encoding.TextMarshaler` or `encoding.TextUnmarshaler` are left alone — odjson
 calls their existing methods instead of generating a conflicting one.
+
+> **One thing to know about embedding.** A struct that embeds a generated type
+> and does not get a codec of its own inherits the embedded type's
+> `MarshalJSON`, and would then encode as only that embedded part. The default
+> — every exported struct in the package, plus everything `-recursive` reaches
+> — covers this within a package. Take care when you narrow it with `-type`, or
+> when another module embeds one of your generated types without running odjson
+> over its own.
 
 ## Generated code and the runtime package
 
@@ -197,8 +207,10 @@ add.
 
 ## Correctness
 
-odjson's contract is that generated code behaves exactly like `encoding/json`
-on the same type. That is enforced, not asserted:
+odjson's contract has two halves, one per interface: `MarshalJSON` /
+`UnmarshalJSON` behave exactly like `encoding/json` v1 on the same type, and
+`MarshalJSONTo` / `UnmarshalJSONFrom` behave exactly like `encoding/json/v2`.
+Each half is enforced by its own fixtures, not asserted:
 
 - **Parity fixtures.** Fixture packages under `internal/testfixture/` cover
   every field shape the generator knows — all integer and float widths,
@@ -206,9 +218,13 @@ on the same type. That is enforced, not asserted:
   `json.RawMessage`, `json.Number`, `time.Time`, embedded structs by value and
   by pointer, `omitempty`, `omitzero`, `,string`, `-`, unexported fields,
   self-referential types, cross-package types, generics and other fallbacks.
-  Each is marshaled with both `encoding/json` and the generated code and
-  compared **byte for byte**, and unmarshaled with both and compared for both
-  acceptance and decoded value.
+  Each is marshaled with both `encoding/json` and the generated `MarshalJSON`
+  and compared **byte for byte**, and unmarshaled with both and compared for
+  both acceptance and decoded value. Because the generated methods are what
+  `encoding/json` now calls, the reference side reads the same value as an
+  identically declared twin type that odjson was never run on, so reflection
+  is still what produces the expected answer. `internal/testfixture/v2parity`
+  does the same for the v2 half, against `encoding/json/v2`.
 - **`encoding/json`'s field promotion rules**, reimplemented on `go/types`:
   depth wins, a tagged field beats an untagged one at the same depth, a tie is
   dropped entirely. Tested against `encoding/json` on a struct built to hit all
@@ -232,6 +248,15 @@ package documentation of
 [`odjsonrt`](https://pkg.go.dev/github.com/mazrean/odjson/odjsonrt) for the
 exact list. Under `GOEXPERIMENT=nojsonv2` those three cases would differ.
 
+**Which method a call site reaches follows from that.** `encoding/json/v2`
+prefers `MarshalJSONTo` / `UnmarshalJSONFrom` over the v1 pair when a type has
+both — and on this toolchain `encoding/json` *is* `encoding/json/v2`, so a
+`json.Marshal` from either package reaches the v2 methods and, with them,
+[`json/v2`'s semantics](#which-semantics-a-generated-method-follows) for the
+generated types. `MarshalJSON` / `UnmarshalJSON` keep `encoding/json` v1's own
+rules and are what a `GOEXPERIMENT=nojsonv2` build, and any library that only
+knows the v1 interfaces, sees.
+
 ## Benchmarks
 
 The suite lives in the [`bench/`](./bench) module — a module of its own so that
@@ -250,73 +275,77 @@ Payloads are sonic's own fixtures: `twitter` (616 KiB, `TwitterStruct` — deepl
 nested and full of `interface{}` fields) and `small` (340 B, `Book` — fully
 typed, the per-call overhead case).
 
+The two standard libraries are the subject; `sonic` and `go-json` are there as
+the yardstick — third-party codecs that people leave the standard library for.
+odjson does not make *them* faster (see
+[The two third-party libraries](#the-two-third-party-libraries)), so they
+appear at their own speed only.
+
 #### Marshal — `twitter`
 
-| library | baseline | with generated methods | change |
+| library | on its own | with odjson | change |
 | --- | --- | --- | --- |
-| encoding/json | 404 µs | 429 µs | 1.06× slower |
-| encoding/json/v2 | 390 µs | **147 µs** | **2.66× faster** |
-| sonic | 111 µs | 315 µs | 2.84× slower |
-| go-json | 239 µs | 536 µs | 2.24× slower |
-| **odjson direct** | — | **198 µs** — 296 KiB, 105 allocs | **2.04× faster than encoding/json** |
+| **encoding/json/v2** | 390 µs | **147 µs** | **2.66× faster** |
+| **encoding/json** | 404 µs | 429 µs | 1.06× slower |
+| sonic | 111 µs | — | |
+| go-json | 239 µs | — | |
 
 #### Marshal — `small`
 
-| library | baseline | with generated methods | change |
+| library | on its own | with odjson | change |
 | --- | --- | --- | --- |
-| encoding/json | 1.02 µs | 934 ns | 1.10× faster |
-| encoding/json/v2 | 1.03 µs | **363 ns** | **2.83× faster** |
-| sonic | 302 ns | 731 ns | 2.42× slower |
-| go-json | 376 ns | 1.03 µs | 2.73× slower |
-| **odjson direct** | — | **266 ns** — 416 B, 1 allocs | **3.85× faster than encoding/json** |
+| **encoding/json/v2** | 1.03 µs | **363 ns** | **2.83× faster** |
+| **encoding/json** | 1.02 µs | 934 ns | 1.10× faster |
+| sonic | 302 ns | — | |
+| go-json | 376 ns | — | |
 
 #### Unmarshal — `twitter`
 
-| library | baseline | with generated methods | change |
+| library | on its own | with odjson | change |
 | --- | --- | --- | --- |
-| encoding/json | 1.45 ms | 1.23 ms | 1.18× faster |
-| encoding/json/v2 | 1.07 ms | **695 µs** | **1.54× faster** |
-| sonic | 491 µs | 854 µs | 1.74× slower |
-| go-json | 655 µs | 1.04 ms | 1.59× slower |
-| **odjson direct** | — | **520 µs** — 391 KiB, 2977 allocs | **2.80× faster than encoding/json** |
+| **encoding/json/v2** | 1.07 ms | **695 µs** | **1.54× faster** |
+| **encoding/json** | 1.45 ms | 1.23 ms | 1.18× faster |
+| sonic | 491 µs | — | |
+| go-json | 655 µs | — | |
 
 #### Unmarshal — `small`
 
-| library | baseline | with generated methods | change |
+| library | on its own | with odjson | change |
 | --- | --- | --- | --- |
-| encoding/json | 2.30 µs | 1.49 µs | 1.54× faster |
-| encoding/json/v2 | 1.90 µs | **609 ns** | **3.11× faster** |
-| sonic | 986 ns | **891 ns** | **1.11× faster** |
-| go-json | 766 ns | **762 ns** | **1.01× faster** |
-| **odjson direct** | — | **402 ns** — 484 B, 6 allocs | **5.71× faster than encoding/json** |
-
-#### The same comparison at matching semantics
-
-`sonic.Marshal`'s default configuration neither escapes HTML nor validates
-UTF-8, so its output is not `encoding/json`'s and the rows above are not
-comparing equal work. `sonic.ConfigStd` does both, which is what odjson's
-generated codec produces:
-
-| | odjson direct | sonic (default) | sonic (`ConfigStd`) |
-| --- | --- | --- | --- |
-| Marshal `twitter` | 198 µs | 111 µs | 123 µs |
-| Marshal `small` | **266 ns** | 302 ns | 359 ns |
-| Unmarshal `twitter` | **520 µs** | 491 µs | 560 µs |
-| Unmarshal `small` | **402 ns** | 986 ns | 1.09 µs |
-
-Against `goccy/go-json` the direct functions win all four outright (198 vs
-239 µs, 266 vs 376 ns, 520 vs 655 µs, 402 vs 766 ns).
+| **encoding/json/v2** | 1.90 µs | **609 ns** | **3.11× faster** |
+| **encoding/json** | 2.30 µs | 1.49 µs | 1.54× faster |
+| sonic | 986 ns | — | |
+| go-json | 766 ns | — | |
 
 ### How to read this
 
-**Call the generated functions directly.** `MarshalT` / `UnmarshalT` /
-`AppendT` are 2.0×–5.7× faster than `encoding/json`, faster than `goccy/go-json`
-on all four measurements, and faster than `sonic` on the small payload in both
-directions. That is odjson's core contribution and it needs no interfaces.
+**`encoding/json/v2` gains on all four measurements, 1.5×–3.1×**, and the
+generated file is the only thing that changed. `encoding/json` gains on three
+of the four; its `twitter` encode is 6% behind, and that loss is structural
+(it configures its coders with v1's flags, which sends the encode down the
+slower of the two paths described below).
 
-**`-methods` on `encoding/json/v2`: all four rows, 1.5×–3.1×.** On
-`encoding/json`: three of four, and the loss is structural. The
-ratios quoted in this section come from `bench/ab`, which measures the
+**Against the libraries people leave the standard library for**, that puts
+`encoding/json/v2` + odjson:
+
+| | vs go-json | vs sonic |
+| --- | --- | --- |
+| Marshal `twitter` | **1.63× faster** (147 vs 239 µs) | 1.32× slower (147 vs 111 µs) |
+| Marshal `small` | **1.04× faster** (363 vs 376 ns) | 1.20× slower (363 vs 302 ns) |
+| Unmarshal `twitter` | 1.06× slower (695 vs 655 µs) | 1.42× slower (695 vs 491 µs) |
+| Unmarshal `small` | **1.26× faster** (609 vs 766 ns) | **1.62× faster** (609 vs 986 ns) |
+
+Ahead of `go-json` on three of four, and behind by 6% on the fourth. Against
+`sonic`'s JIT-compiled SIMD codec, ahead on the small decode and within
+1.2×–1.4× everywhere else — and `sonic.Marshal`'s default configuration
+neither escapes HTML nor validates UTF-8, so its encode rows are not doing
+equal work; `sonic.ConfigStd`, which does both, measures 123 µs and 359 ns.
+
+The point is not that odjson wins every row. It is that this is the standard
+library, with no dependency added, no call site changed and one file to delete
+to get back.
+
+The ratios in the prose below come from `bench/ab`, which measures the
 generated codec, the reflection baseline and the interface floor in a single
 process — comparing them across processes moves the small differences by more
 than their size. The tables above are the absolute figures from `bench/gen`
@@ -363,41 +392,26 @@ what turned the row from a loss into a win.
 `TestDuplicateNamesRejectedLikeJSONV2` in `internal/testfixture/v2parity` is the
 guard on that equivalence.
 
-**`-methods` pays off on `encoding/json` too.** On Go 1.27 `encoding/json` is
-implemented on top of `encoding/json/v2`, so it picks up the generated
-`MarshalJSONTo` / `UnmarshalJSONFrom` — and with those tuned for the streaming
-contract (see below) an unchanged `json.Marshal` / `json.Unmarshal` call site is
+**`encoding/json` gains too.** On Go 1.27 `encoding/json` is implemented on top
+of `encoding/json/v2`, so it picks up the generated `MarshalJSONTo` /
+`UnmarshalJSONFrom` — and with those tuned for the streaming contract (see
+below) an unchanged `json.Marshal` / `json.Unmarshal` call site is
 **1.12×–1.6× faster** on three of the four measurements, and 3% behind on the
 fourth. `encoding/json` configures its coders with its own flags (HTML
 escaping, legacy error reporting), which the direct path declines, so those
-rows measure the public API path.
-
-**On sonic and go-json it pays off for decoding small documents, and nowhere
-else.** For encoding they call `MarshalJSON`, get a `[]byte` back, and
-re-validate it; their own encoders are reflection-free already, so the round
-trip costs more than it saves, and setting `NoValidateJSONMarshaler` narrows
-the gap without closing it. For decoding they first skip and validate the
-value, then hand it to `UnmarshalJSON`; on `small` that charge is under half
-of what their own decoders cost, and the generated decoder fits in the rest
-with room to spare, so both rows are wins. On `twitter` the same charge is
-more than half, and no pure Go decoder fits in what is left — see
-[Can `-methods` beat sonic or go-json?](#can--methods-beat-sonic-or-go-json)
-for the arithmetic. On sonic and go-json, call the generated functions
-directly.
-
-`-methods` stays off by default because that recommendation is not uniform: a
-generator should not decide for you that your library is one of the two where
-it pays.
+rows measure the public API path — which is the whole of the difference
+between the two standard library columns above.
 
 **sonic is still ahead on `twitter`'s encode.** That payload is dominated by
 `interface{}` fields, which no amount of code generation can turn into static
 field access — odjson falls back to a hand-written `any` encoder there, while
-sonic runs JIT-compiled SIMD. On the decode side the two are within a few
-percent of each other (520 vs 491 µs): what is left of odjson's profile is
-whitespace (a fifth of the document is indentation), the string scanner, and
-the 176 KiB `retweeted_status` member the struct does not declare, which
-still has to be validated. On the fully typed `small` payload odjson takes
-both directions outright.
+sonic runs JIT-compiled SIMD. On the decode side the generated byte oriented
+decoder itself runs at 520 µs against sonic's 491, within 6%; what remains of
+its profile is whitespace (a fifth of the document is indentation), the string
+scanner, and the 176 KiB `retweeted_status` member the struct does not
+declare, which still has to be validated. The 695 µs the `json/v2` row
+measures is that decoder plus what `jsontext` charges around it. On the fully
+typed `small` payload odjson takes the decode outright.
 
 ### What the drop-in path costs, and what was removed
 
@@ -414,7 +428,7 @@ came out of that, all measured:
 | the escape scan is **word-at-a-time** (SWAR over eight bytes) | 14% of the encode was a byte-at-a-time table loop; this cut ~6% off the large payload |
 | `UnmarshalJSONFrom` **drives the decoder token by token** on large documents instead of `ReadValue` + reparse | the document was being parsed twice; now it is parsed once, and strings skip odjson's UTF-8 pass because `jsontext` has already made it |
 
-Together those took `encoding/json` + `-methods` from 1.17–1.20× *slower* to
+Together those took `encoding/json` from 1.17–1.20× *slower* to
 1.08–1.17× *faster*, and `json/v2` from 1.38–1.48× slower to parity on small
 documents.
 
@@ -482,7 +496,7 @@ it for the process; `odjsonrt.DirectEnabled` reports the outcome, and building
 with `-tags odjson_safe` compiles it out. The generated code carries the
 public API path in every case, so disabling costs speed and nothing else.
 
-What it is worth (`bench/ab`, medians of 5): `json/v2` + `-methods` goes from
+What it is worth (`bench/ab`, medians of 5): `json/v2` goes from
 0.87× / 0.93× / 1.03× / 1.36× to **2.73× / 2.61× / 1.43× / 2.31×** on
 Marshal `twitter` / Marshal `small` / Unmarshal `twitter` / Unmarshal `small`,
 with one allocation per encode.
@@ -514,14 +528,14 @@ What was left to odjson was measured and cut, all through `bench/ab`:
 | a **string cache** shared by the whole decode, as `json/v2`'s reflection decoder has | a name or value that recurs is allocated once: 13 → 6 allocations on `small`, 4551 → 2977 on `twitter` |
 | scalars are parsed **straight from the `ReadValue` bytes**: integers in one pass over the digits, strings with a single `IndexByte` for the escape check | jsontext has already established the grammar, so re-scanning it was pure overhead |
 
-Those took `json/v2` + `-methods` from parity to **1.36× faster** on the small
-decode and to 1.03× on `twitter`, and `encoding/json` + `-methods` from 1.19×
+Those took `json/v2` from parity to **1.36× faster** on the small
+decode and to 1.03× on `twitter`, and `encoding/json` from 1.19×
 to **1.45×** on the small decode. The ceiling on `twitter` is set by the 65%
 above: with odjson's own share at zero, the row would read about 1.35×, and
 with its share halved again, which is what remains realistic, about 1.1×.
 
-The byte oriented decoder itself — the one behind `UnmarshalT`,
-`UnmarshalJSON`, the direct path and the whole-value path, so every row above
+The byte oriented decoder itself — the one behind `UnmarshalJSON`,
+the direct path and the whole-value path, so every row above
 — was then profiled on `small` and reworked. Its cost was spread thin: a call
 per member name, a call per scalar, an allocation per string, and the same
 whitespace test several times per value. What was cut, all measured on
@@ -535,14 +549,14 @@ whitespace test several times per value. What was cut, all measured on
 | the leading whitespace test is emitted once per member instead of once per fragment; runs of indentation are counted a word at a time (`TrailingZeros64` of the word XOR eight spaces) | one fewer branch per value, and 9% off the whitespace skip on the indented `twitter` document |
 | `unquote` copies the runs between escapes whole, validating each run once | an escaped string used to be decoded and re-encoded a rune at a time |
 
-Together those took the direct decoder from 625 ns to **402 ns** on `small`
-and from 553 to 520 µs on `twitter`, and every `-methods` unmarshal row with
+Together those took that decoder from 625 ns to **402 ns** on `small`
+and from 553 to 520 µs on `twitter`, and every unmarshal row with
 it: `json/v2` from 1.36× to **3.1×** on `small` and to **1.5×** on `twitter`,
 `encoding/json` to **1.6×** and **1.2×**, and sonic and go-json from losses
 to **1.08×** and **1.02×** on `small` in the same process.
 
-The whole-value path and the direct path are the reason a struct with
-`-methods` carries two decoders besides the `encoding/json` one:
+The whole-value path and the direct path are the reason a generated struct
+carries two decoders besides the `encoding/json` one:
 `odjsonParseFrom`, which drives the decoder, and `odjsonParseV2`, which parses
 bytes under json/v2's rules and rejects what `jsontext` would have. Which one
 runs is decided at runtime, per value, by the direct path's checks and then
@@ -552,26 +566,36 @@ ends in a bracket, so it is driven token by token and keeps its memory bounded;
 when a chunk does end in a bracket, `ReadValue` fetches the rest of that value,
 which is correct, only buffered rather than streamed.
 
-### `-methods` follows each library's semantics
+### Which semantics a generated method follows
 
-Because the generated methods define what the host library produces, they follow
-that library's rules rather than imposing one set:
+Each method follows the rules of the interface it implements, rather than
+imposing one set on both:
 
-| | `MarshalJSON` (encoding/json) | `MarshalJSONTo` (encoding/json/v2) |
+| | `MarshalJSON` / `UnmarshalJSON` | `MarshalJSONTo` / `UnmarshalJSONFrom` |
 | --- | --- | --- |
 | nil slice / map / `[]byte` | `null` | `[]` / `{}` / `""` |
 | `omitempty` on `0` or `false` | omitted | kept |
 | HTML characters, U+2028/9 | escaped | not escaped |
 | array length mismatch (decode) | padded or truncated | rejected |
-| case-insensitive member match (decode) | yes | no |
+| case-insensitive member match (decode) | opt-in (`-case-insensitive`) | no |
 | `null` into a scalar, struct, `time.Time` or `,string` field (decode) | left untouched | zeroed |
 | map member order | sorted by name | map iteration order |
+
+**Which column a call site lands in is the host library's choice, not
+odjson's.** `encoding/json/v2` prefers `MarshalJSONTo` when a type offers
+both, and on Go 1.27 `encoding/json` is `encoding/json/v2` — so both standard
+library packages take the right-hand column for generated types. The left-hand
+column is what a `GOEXPERIMENT=nojsonv2` build sees, and what any library that
+only knows `json.Marshaler` gets. If your `encoding/json` call sites depend on
+v1's spellings — `null` for a nil slice, a zero dropped by `omitempty`, a
+case-insensitive member match — that is the one thing generating a codec does
+change, and `-case-insensitive` covers the last of the three.
 
 The map row is the one that costs something: `encoding/json/v2` does not sort
 map members, so neither does the generated `MarshalJSONTo`. Its output for a
 document containing maps is therefore no more byte-stable than `json/v2`'s own
-— which is the point of following the host library's rules rather than
-imposing `encoding/json`'s.
+— which is the point of following the interface's rules rather than imposing
+`encoding/json`'s.
 
 This is verified, not asserted: `internal/testfixture/v2parity` decodes the same
 documents into a generated type and an identical reflection-only type and
@@ -579,19 +603,21 @@ requires `json/v2` to produce the same bytes for both, and the JSON Test Suite
 runs through the generated `UnmarshalJSONFrom` against `json/v2`'s own decoder
 for all 318 cases.
 
-### Can `-methods` beat sonic or go-json?
+### The two third-party libraries
 
-For encoding, no, and this is provable rather than a matter of tuning. For
-decoding, only where the document is small enough that the library's own
-charge for the interface stays below half of its own decode.
+sonic and go-json honour `json.Marshaler` and `json.Unmarshaler` too, so the
+generated methods do reach them — the file compiles and behaves correctly
+under both. They are in this README as the **yardstick**, not as targets:
+odjson does not make them faster, and the reason is arithmetic rather than
+tuning, which is why their "with odjson" columns are absent from the tables
+above rather than merely unflattering.
 
-`bench/floor` measures what a host library charges for routing through
-`json.Marshaler` / `json.Unmarshaler` at all: its marshaler returns an already
-encoded document and its unmarshaler discards its input, so the generated codec
-behind the interface costs **nothing**. That is a lower bound for any possible
-implementation.
+`bench/floor` measures what a library charges for routing through those
+interfaces at all: its marshaler returns an already encoded document and its
+unmarshaler discards its input, so the codec behind the interface costs
+**nothing**. That is a lower bound for any possible implementation.
 
-| `twitter` / `small` | interface floor | the library's own path | room left for a codec | odjson's direct codec |
+| `twitter` / `small` | interface floor | the library's own path | room left for a codec | odjson's own codec |
 | --- | --- | --- | --- | --- |
 | sonic Marshal | 105 µs / 392 ns | 111 µs / 302 ns | 6 µs / **none** | 198 µs / 266 ns |
 | go-json Marshal | 338 µs / 674 ns | 239 µs / 376 ns | **none** / **none** | 198 µs / 266 ns |
@@ -606,29 +632,28 @@ not to; go-json compacts them unconditionally). No amount of code generation
 changes that, and the 6 µs sonic leaves on `twitter` is a twentieth of what
 its own JIT encoder spends.
 
-The unmarshal measurements are where the byte oriented decoder's rework
-(above) landed. On `small` it now fits inside the room with a margin on both
-libraries, and `bench/ab` confirms the rows in one process: sonic 928 → 856
-ns, go-json 762 → 747 ns. On `twitter` it would have to be 2.5× and 2.8×
-faster than it is, which is 2.4× faster than sonic's own JIT-compiled SIMD
-decoder over a 616 KiB document — not a tuning target for a pure Go decoder
-that already runs within 6% of sonic's.
+Decoding is the one place they gain, and only on small documents: on `small`
+odjson's decoder fits inside the room left with a margin, and `bench/ab`
+confirms it in one process — sonic 928 → 856 ns, go-json 762 → 747 ns. On
+`twitter` the decoder would have to be 2.5× and 2.8× faster than it is, which
+is 2.4× faster than sonic's own JIT-compiled SIMD decoder over a 616 KiB
+document; not a tuning target for a pure Go decoder that already runs within
+6% of sonic's.
 
-The model is not a guess: `gen = direct + floor` holds to within a few percent
-on every row. sonic's marshal of `twitter` measures 315 µs against a direct
-encode of 198 µs and a floor of 105 µs; go-json's 536 µs against 198 µs and
-338 µs; sonic's unmarshal 854 µs against 520 µs and 284 µs. The floor is real,
-and it is additive.
+The model is not a guess: `library + odjson = odjson's own codec + floor`
+holds to within a few percent on every row. sonic's marshal of `twitter`
+measures 315 µs against an encode of 198 µs and a floor of 105 µs; go-json's
+536 µs against 198 µs and 338 µs; sonic's unmarshal 854 µs against 520 µs and
+284 µs. The floor is real, and it is additive.
 
-So the recommendation for sonic and go-json users is still **do not use
-`-methods`; call `MarshalT` / `UnmarshalT` directly**, where odjson is 1.2×
-faster than go-json's marshal, 1.3× faster than its unmarshal, faster than
-both on the small payload in both directions, and within 6% of sonic on the
-large decode. `-methods` is only worth keeping on for those libraries when the
-call sites cannot change and the documents are small.
+So if you are on sonic or go-json, this is the honest summary: odjson has
+nothing to offer you but a small-document decode. What the tables above say
+instead is that `encoding/json/v2` **with** odjson lands in the same
+neighbourhood as those libraries without them — which is the case for not
+taking on a third-party codec in the first place.
 
-If you must keep `-methods` on for those libraries, sonic can at least be told
-that a `json.Marshaler`'s output needs no re-validation:
+If you nonetheless run generated types through sonic, tell it that a
+`json.Marshaler`'s output needs no re-validation:
 
 ```go
 var api = sonic.Config{
@@ -637,7 +662,7 @@ var api = sonic.Config{
 }.Froze()
 ```
 
-| sonic + `-methods` | default config | trusting config |
+| sonic over generated types | default config | trusting config |
 | --- | --- | --- |
 | Marshal `twitter` | 315 µs | **227 µs** |
 | Marshal `small` | 731 ns | **383 ns** |
@@ -650,15 +675,15 @@ always-compact output, but it measures 1.6× *slower* (482 µs vs 303 µs on
 
 Numbers in the tables are medians of three runs on an AMD Ryzen 9 7950X,
 Linux, Go 1.27.1, and the `bench/ab` figures medians of five. The tables come
-from two separate processes — `bench/plain` and
-`bench/gen` — which is fine for the absolute figures but not for the small
-differences between a drop-in row and its baseline: those are of the same order
-as the drift between two runs, and their sign moves with `GOMAXPROCS`. For that
-comparison use `bench/ab`, which measures both sides in a single process; its
-verdict is that `-methods` wins every unmarshal row on `encoding/json` and
-`encoding/json/v2`, the `small` unmarshal rows on sonic and go-json, and
-`encoding/json`'s small marshal, and loses the `twitter` unmarshal rows on
-sonic and go-json and the three remaining marshal rows. Compare your own with
+from two separate processes — `bench/plain` and `bench/gen` — which is fine
+for the absolute figures but not for the small differences between a generated
+row and its baseline: those are of the same order as the drift between two
+runs, and their sign moves with `GOMAXPROCS`. For that comparison use
+`bench/ab`, which measures both sides in a single process; its verdict is that
+odjson wins every unmarshal row on `encoding/json` and `encoding/json/v2`, the
+`small` unmarshal rows on sonic and go-json, and `encoding/json`'s small
+marshal, and loses the `twitter` unmarshal rows on sonic and go-json and the
+three remaining marshal rows. Compare your own with
 [`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) rather than
 trusting a single run.
 

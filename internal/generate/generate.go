@@ -22,12 +22,10 @@ type Config struct {
 	// Recursive also generates codecs for struct types reachable from the
 	// selected ones.
 	Recursive bool
-	// EscapeHTML, CaseInsensitive, JSONV2 and Methods are passed through to
-	// the code generator.
+	// EscapeHTML and CaseInsensitive are passed through to the code
+	// generator.
 	EscapeHTML      bool
 	CaseInsensitive bool
-	JSONV2          bool
-	Methods         bool
 	// Command is recorded in the generated file's header.
 	Command string
 }
@@ -59,8 +57,6 @@ func Source(dir string, cfg Config) ([]byte, error) {
 	return codegen.Generate(pkg, codegen.Options{
 		EscapeHTML:      cfg.EscapeHTML,
 		CaseInsensitive: cfg.CaseInsensitive,
-		JSONV2:          cfg.JSONV2,
-		Methods:         cfg.Methods,
 		Command:         cfg.Command,
 	})
 }

@@ -9,6 +9,11 @@ import (
 	"github.com/mazrean/odjson/internal/testfixture/other"
 )
 
+// plainHolder is Holder without the generated methods, so encoding/json
+// reflects over it. Every field's type lives in package other, which odjson
+// never ran on, so a defined type is all the oracle needs.
+type plainHolder Holder
+
 func TestMarshalHolder(t *testing.T) {
 	cases := map[string]Holder{
 		"zero": {},
@@ -22,11 +27,11 @@ func TestMarshalHolder(t *testing.T) {
 		},
 	}
 	for name, v := range cases {
-		want, err := json.Marshal(v)
+		want, err := json.Marshal(plainHolder(v))
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		got, err := AppendHolder(nil, &v)
+		got, err := v.MarshalJSON()
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -47,8 +52,8 @@ func TestUnmarshalHolder(t *testing.T) {
 		`{"thing":"nope"}`,
 	} {
 		var a, b Holder
-		errA := json.Unmarshal([]byte(in), &a)
-		errB := UnmarshalHolder([]byte(in), &b)
+		errA := json.Unmarshal([]byte(in), (*plainHolder)(&a))
+		errB := b.UnmarshalJSON([]byte(in))
 		if (errA != nil) != (errB != nil) {
 			t.Errorf("error mismatch for %s: encoding/json=%v odjson=%v", in, errA, errB)
 			continue

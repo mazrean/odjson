@@ -7,7 +7,29 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/mazrean/odjson/internal/testfixture/plainref"
+	"github.com/mazrean/odjson/internal/testfixture/suite/plain"
 )
+
+// The generated methods stand between encoding/json and these types, so
+// package plain's identical declarations are what the suite is measured
+// against. TestSameLayout keeps the two in step.
+func TestSameLayout(t *testing.T) {
+	cases := []struct {
+		name string
+		a, b reflect.Type
+	}{
+		{"Raw", reflect.TypeFor[Raw](), reflect.TypeFor[plain.Raw]()},
+		{"Value", reflect.TypeFor[Value](), reflect.TypeFor[plain.Value]()},
+		{"Typed", reflect.TypeFor[Typed](), reflect.TypeFor[plain.Typed]()},
+	}
+	for _, tc := range cases {
+		if err := plainref.SameLayout(tc.a, tc.b); err != nil {
+			t.Errorf("%s: %v", tc.name, err)
+		}
+	}
+}
 
 // suitePath is the JSON Test Suite fixture vendored from sonic, shared with
 // the odjsonrt scanner tests.
@@ -50,18 +72,18 @@ func TestSuiteThroughGeneratedDecoders(t *testing.T) {
 	}{
 		{
 			name: "RawMessage",
-			run:  func(b []byte) (any, error) { var v Raw; return &v, UnmarshalRaw(b, &v) },
-			ref:  func(b []byte) (any, error) { var v Raw; return &v, json.Unmarshal(b, &v) },
+			run:  func(b []byte) (any, error) { var v Raw; return &v, v.UnmarshalJSON(b) },
+			ref:  func(b []byte) (any, error) { var v Raw; return &v, json.Unmarshal(b, plainref.Of[Raw, plain.Raw](&v)) },
 		},
 		{
 			name: "any",
-			run:  func(b []byte) (any, error) { var v Value; return &v, UnmarshalValue(b, &v) },
-			ref:  func(b []byte) (any, error) { var v Value; return &v, json.Unmarshal(b, &v) },
+			run:  func(b []byte) (any, error) { var v Value; return &v, v.UnmarshalJSON(b) },
+			ref:  func(b []byte) (any, error) { var v Value; return &v, json.Unmarshal(b, plainref.Of[Value, plain.Value](&v)) },
 		},
 		{
 			name: "typed",
-			run:  func(b []byte) (any, error) { var v Typed; return &v, UnmarshalTyped(b, &v) },
-			ref:  func(b []byte) (any, error) { var v Typed; return &v, json.Unmarshal(b, &v) },
+			run:  func(b []byte) (any, error) { var v Typed; return &v, v.UnmarshalJSON(b) },
+			ref:  func(b []byte) (any, error) { var v Typed; return &v, json.Unmarshal(b, plainref.Of[Typed, plain.Typed](&v)) },
 		},
 	}
 
@@ -98,15 +120,15 @@ func TestSuiteRoundTripsThroughGeneratedEncoder(t *testing.T) {
 		wrapped := append(append([]byte(`{"x":`), text...), '}')
 
 		var v Value
-		if err := UnmarshalValue(wrapped, &v); err != nil {
+		if err := v.UnmarshalJSON(wrapped); err != nil {
 			continue
 		}
-		got, err := AppendValue(nil, &v)
+		got, err := v.MarshalJSON()
 		if err != nil {
 			t.Errorf("%s: re-encode: %v", name, err)
 			continue
 		}
-		want, err := json.Marshal(v)
+		want, err := json.Marshal(plainref.Of[Value, plain.Value](&v))
 		if err != nil {
 			t.Errorf("%s: encoding/json re-encode: %v", name, err)
 			continue

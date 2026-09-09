@@ -7,14 +7,49 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/mazrean/odjson/internal/testfixture/plain"
+	"github.com/mazrean/odjson/internal/testfixture/plainref"
 )
 
-// marshalParity asserts the generated encoder is byte-for-byte identical to
-// encoding/json for v.
-func marshalParity[T any](t *testing.T, name string, v T, appendFn func([]byte, *T) ([]byte, error)) {
+// The generated methods are what json.Marshal and json.Unmarshal call for
+// these types, so package plain's identical declarations are what reflection
+// is left to work on. TestSameLayout keeps the two in step.
+var (
+	scalarsRef    = plainref.Of[Scalars, plain.Scalars]
+	compositesRef = plainref.Of[Composites, plain.Composites]
+	recursiveRef  = plainref.Of[Recursive, plain.Recursive]
+)
+
+func TestSameLayout(t *testing.T) {
+	cases := []struct {
+		name string
+		a, b reflect.Type
+	}{
+		{"Scalars", reflect.TypeFor[Scalars](), reflect.TypeFor[plain.Scalars]()},
+		{"Composites", reflect.TypeFor[Composites](), reflect.TypeFor[plain.Composites]()},
+		{"Recursive", reflect.TypeFor[Recursive](), reflect.TypeFor[plain.Recursive]()},
+	}
+	for _, tc := range cases {
+		if err := plainref.SameLayout(tc.a, tc.b); err != nil {
+			t.Errorf("%s: %v", tc.name, err)
+		}
+	}
+}
+
+// marshalParity asserts the generated MarshalJSON is byte-for-byte identical
+// to encoding/json for v. ref reads v as the twin encoding/json still reflects
+// over.
+//
+// The method is called directly rather than through json.Marshal: with the
+// json/v2 experiment on, encoding/json prefers MarshalJSONTo when a type has
+// both, and that method deliberately follows json/v2's semantics. MarshalJSON
+// is what sonic, go-json and a nojsonv2 build reach, and encoding/json's rules
+// are what it has to keep.
+func marshalParity[T, R any](t *testing.T, name string, v T, ref func(*T) *R) {
 	t.Helper()
-	want, wantErr := json.Marshal(v)
-	got, gotErr := appendFn(nil, &v)
+	want, wantErr := json.Marshal(ref(&v))
+	got, gotErr := any(v).(json.Marshaler).MarshalJSON()
 	if (wantErr != nil) != (gotErr != nil) {
 		t.Errorf("%s: error mismatch: encoding/json=%v odjson=%v", name, wantErr, gotErr)
 		return
@@ -27,13 +62,14 @@ func marshalParity[T any](t *testing.T, name string, v T, appendFn func([]byte, 
 	}
 }
 
-// unmarshalParity asserts the generated decoder agrees with encoding/json both
-// on the decoded value and on whether the input was rejected.
-func unmarshalParity[T any](t *testing.T, name, in string, unmarshalFn func([]byte, *T) error) {
+// unmarshalParity asserts the generated UnmarshalJSON agrees with
+// encoding/json both on the decoded value and on whether the input was
+// rejected. It calls the method directly, for the reason marshalParity gives.
+func unmarshalParity[T, R any](t *testing.T, name, in string, ref func(*T) *R) {
 	t.Helper()
 	var a, b T
-	errA := json.Unmarshal([]byte(in), &a)
-	errB := unmarshalFn([]byte(in), &b)
+	errA := json.Unmarshal([]byte(in), ref(&a))
+	errB := any(&b).(json.Unmarshaler).UnmarshalJSON([]byte(in))
 	if (errA != nil) != (errB != nil) {
 		t.Errorf("%s: error mismatch for %s: encoding/json=%v odjson=%v", name, in, errA, errB)
 		return
@@ -99,7 +135,7 @@ func scalarCases() map[string]Scalars {
 
 func TestMarshalScalars(t *testing.T) {
 	for name, v := range scalarCases() {
-		marshalParity(t, name, v, AppendScalars)
+		marshalParity(t, name, v, scalarsRef)
 	}
 }
 
@@ -143,7 +179,7 @@ func TestMarshalComposites(t *testing.T) {
 		},
 	}
 	for name, v := range cases {
-		marshalParity(t, name, v, AppendComposites)
+		marshalParity(t, name, v, compositesRef)
 	}
 }
 
@@ -152,8 +188,8 @@ func TestMarshalRecursive(t *testing.T) {
 		{Name: "a"},
 		{Name: "b", Children: []*Recursive{{Name: "c"}}},
 	}}
-	marshalParity(t, "tree", v, AppendRecursive)
-	marshalParity(t, "leaf", Recursive{Name: "leaf"}, AppendRecursive)
+	marshalParity(t, "tree", v, recursiveRef)
+	marshalParity(t, "leaf", Recursive{Name: "leaf"}, recursiveRef)
 }
 
 func TestUnmarshalScalars(t *testing.T) {
@@ -205,7 +241,7 @@ func TestUnmarshalScalars(t *testing.T) {
 		`{"string":"\u00e9","string":"\ud83d","string":"a\/b"}`,
 	}
 	for _, in := range inputs {
-		unmarshalParity(t, "scalars", in, UnmarshalScalars)
+		unmarshalParity(t, "scalars", in, scalarsRef)
 	}
 }
 
@@ -230,7 +266,7 @@ func TestUnmarshalComposites(t *testing.T) {
 		`{"color_map":{"red":"x"}}`,
 	}
 	for _, in := range inputs {
-		unmarshalParity(t, "composites", in, UnmarshalComposites)
+		unmarshalParity(t, "composites", in, compositesRef)
 	}
 }
 
@@ -243,10 +279,10 @@ func TestUnmarshalReusesExistingValue(t *testing.T) {
 	}
 	seed(&a)
 	seed(&b)
-	if err := json.Unmarshal(in, &a); err != nil {
+	if err := json.Unmarshal(in, compositesRef(&a)); err != nil {
 		t.Fatal(err)
 	}
-	if err := UnmarshalComposites(in, &b); err != nil {
+	if err := b.UnmarshalJSON(in); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(a, b) {
@@ -255,17 +291,17 @@ func TestUnmarshalReusesExistingValue(t *testing.T) {
 }
 
 func TestUnmarshalRecursive(t *testing.T) {
-	unmarshalParity(t, "recursive", `{"name":"r","children":[{"name":"a"},{"name":"b","children":[{"name":"c"}]}]}`, UnmarshalRecursive)
+	unmarshalParity(t, "recursive", `{"name":"r","children":[{"name":"a"},{"name":"b","children":[{"name":"c"}]}]}`, recursiveRef)
 }
 
 func TestRoundTrip(t *testing.T) {
 	for name, v := range scalarCases() {
-		b, err := MarshalScalars(&v)
+		b, err := v.MarshalJSON()
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		var got Scalars
-		if err := UnmarshalScalars(b, &got); err != nil {
+		if err := got.UnmarshalJSON(b); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		v.Skipped = ""

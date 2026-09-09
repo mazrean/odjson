@@ -60,38 +60,25 @@ var codecs = []codec{
 		marshal:   sonic.ConfigStd.Marshal,
 		unmarshal: sonic.ConfigStd.Unmarshal,
 	},
-	{
-		// odjson's own entry points, bypassing every host library. This
-		// is the ceiling: the host libraries all re-validate the bytes a
-		// MarshalJSON method hands back, and this path does not.
-		name:      "odjson-direct",
-		marshal:   marshalDirect,
-		unmarshal: unmarshalDirect,
-	},
 }
 
-// marshalDirect dispatches to the generated package level encoder.
-func marshalDirect(v any) ([]byte, error) {
-	switch t := v.(type) {
-	case *TwitterStruct:
-		return MarshalTwitterStruct(t)
-	case *Book:
-		return MarshalBook(t)
-	default:
-		return nil, fmt.Errorf("odjson: no generated encoder for %T", v)
+// marshalV1 calls the generated MarshalJSON directly, which is the exact byte
+// stream sonic and go-json receive from it.
+func marshalV1(v any) ([]byte, error) {
+	m, ok := v.(jsonv1.Marshaler)
+	if !ok {
+		return nil, fmt.Errorf("odjson: %T has no generated MarshalJSON", v)
 	}
+	return m.MarshalJSON()
 }
 
-// unmarshalDirect dispatches to the generated package level decoder.
-func unmarshalDirect(data []byte, v any) error {
-	switch t := v.(type) {
-	case *TwitterStruct:
-		return UnmarshalTwitterStruct(data, t)
-	case *Book:
-		return UnmarshalBook(data, t)
-	default:
-		return fmt.Errorf("odjson: no generated decoder for %T", v)
+// unmarshalV1 calls the generated UnmarshalJSON directly.
+func unmarshalV1(data []byte, v any) error {
+	u, ok := v.(jsonv1.Unmarshaler)
+	if !ok {
+		return fmt.Errorf("odjson: %T has no generated UnmarshalJSON", v)
 	}
+	return u.UnmarshalJSON(data)
 }
 
 // sonicTrusting skips the validation sonic otherwise performs on the bytes a
@@ -172,7 +159,7 @@ func payloads(tb testing.TB) []payload {
 func TestGeneratedMatchesReflection(t *testing.T) {
 	for _, p := range payloads(t) {
 		t.Run(p.name, func(t *testing.T) {
-			direct, err := marshalDirect(p.decoded)
+			direct, err := marshalV1(p.decoded)
 			if err != nil {
 				t.Fatalf("odjson marshal: %v", err)
 			}
@@ -188,18 +175,15 @@ func TestGeneratedMatchesReflection(t *testing.T) {
 				t.Fatalf("fixture is not valid JSON: %v", err)
 			}
 
-			// The premise of -methods: every host library honours the
-			// generated codec. sonic and go-json call MarshalJSON, so their
-			// bytes must equal the direct encoder's exactly. encoding/json
-			// and encoding/json/v2 are both json/v2 on this toolchain and
-			// call MarshalJSONTo, which deliberately follows json/v2's own
-			// semantics (nil slices encode as [], not null), so for those the
-			// check is that the value survives a round trip through the
-			// generated pair.
+			// odjson's premise: every host library honours the generated
+			// codec. sonic and go-json call MarshalJSON, so their bytes must
+			// equal that method's exactly. encoding/json and encoding/json/v2
+			// are both json/v2 on this toolchain and call MarshalJSONTo, which
+			// deliberately follows json/v2's own semantics (nil slices encode
+			// as [], not null), so for those the check is that the value
+			// survives a round trip through the generated pair.
 			for _, c := range codecs {
 				switch c.name {
-				case "odjson-direct":
-					continue
 				case "encoding-json", "json-v2":
 					viaHost, err := c.marshal(p.decoded)
 					if err != nil {
@@ -240,10 +224,10 @@ func TestGeneratedMatchesReflection(t *testing.T) {
 			}
 
 			fresh := p.newValue()
-			if err := unmarshalDirect(p.data, fresh); err != nil {
+			if err := unmarshalV1(p.data, fresh); err != nil {
 				t.Fatalf("odjson unmarshal: %v", err)
 			}
-			roundTripped, err := marshalDirect(fresh)
+			roundTripped, err := marshalV1(fresh)
 			if err != nil {
 				t.Fatalf("odjson re-marshal: %v", err)
 			}
