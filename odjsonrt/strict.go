@@ -46,14 +46,11 @@ func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next in
 	if data[p] != '"' {
 		return nil, false, p, ErrType(data, p, "string")
 	}
-	end, hasEscape, nonASCII, err := scanString(data, p)
+	end, hasEscape, _, err := scanStringStrict(data, p)
 	if err != nil {
 		return nil, false, end, err
 	}
 	body := data[p+1 : end-1]
-	if nonASCII && !utf8.Valid(body) {
-		return nil, false, p, errInvalidUTF8(data, p)
-	}
 	if !hasEscape {
 		return body, true, end, nil
 	}
@@ -70,18 +67,81 @@ func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next in
 // [SkipValueStrict] uses, so a skipped string with escapes is checked in
 // place instead of being unescaped into a buffer nobody reads.
 func skipStringStrict(data []byte, p int) (int, error) {
-	end, hasEscape, nonASCII, err := scanString(data, p)
+	end, hasEscape, _, err := scanStringStrict(data, p)
 	if err != nil {
 		return end, err
 	}
-	body := data[p+1 : end-1]
-	if nonASCII && !utf8.Valid(body) {
-		return p, errInvalidUTF8(data, p)
-	}
-	if hasEscape && !validEscapes(body) {
+	if hasEscape && !validEscapes(data[p+1:end-1]) {
 		return p, ErrSyntax(data, p, "invalid string literal")
 	}
 	return end, nil
+}
+
+// scanStringStrict is [scanString] under json/v2's rules: the literal's
+// non-ASCII bytes are validated as UTF-8 in the same pass, by skipNonASCII,
+// instead of by a second pass over the body. err is [errInvalidUTF8], at p,
+// for a body that is not UTF-8.
+func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, err error) {
+	i := p + 1
+	for i < len(data) {
+		// The run of ordinary ASCII is consumed a word at a time; the mask
+		// also stops at the first non-ASCII byte, which starts a run for
+		// skipNonASCII.
+		for i+8 <= len(data) {
+			w := binary.LittleEndian.Uint64(data[i:])
+			if m := swarStringStop(w) | w&swarHi; m != 0 {
+				i += swarIndex(m)
+				break
+			}
+			i += 8
+		}
+		if i >= len(data) {
+			break
+		}
+		switch c := data[i]; {
+		case c == '"':
+			return i + 1, hasEscape, nonASCII, nil
+		case c == '\\':
+			hasEscape = true
+			i++
+			if i >= len(data) {
+				return i, hasEscape, nonASCII, errUnexpectedEnd(i)
+			}
+			switch data[i] {
+			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
+				i++
+			case 'u':
+				if i+4 >= len(data) {
+					return len(data), hasEscape, nonASCII, errUnexpectedEnd(len(data))
+				}
+				for k := 1; k <= 4; k++ {
+					if !isHex(data[i+k]) {
+						return i + k, hasEscape, nonASCII,
+							errChar(data, i+k, "in \\u hexadecimal character escape")
+					}
+				}
+				i += 5
+			default:
+				return i, hasEscape, nonASCII, errChar(data, i, "in string escape code")
+			}
+		case c < 0x20:
+			return i, hasEscape, nonASCII, errChar(data, i, "in string literal")
+		case c >= utf8.RuneSelf:
+			nonASCII = true
+			if next := skipNonASCII(data, i); next >= 0 {
+				i = next
+			} else if bytes.IndexByte(data[i:], '"') < 0 {
+				// The sequence is cut off by the end of the input, not
+				// malformed: no closing quote follows it.
+				return len(data), hasEscape, nonASCII, errUnexpectedEnd(len(data))
+			} else {
+				return p, hasEscape, nonASCII, errInvalidUTF8(data, p)
+			}
+		default:
+			i++
+		}
+	}
+	return i, hasEscape, nonASCII, errUnexpectedEnd(i)
 }
 
 // validEscapes reports whether every \u escape in a string body that
@@ -126,24 +186,18 @@ func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) 
 	if data[p] != '"' {
 		return "", p, ErrType(data, p, "string")
 	}
-	end, hasEscape, nonASCII, err := scanString(data, p)
+	end, hasEscape, nonASCII, err := scanStringStrict(data, p)
 	if err != nil {
 		return "", end, err
 	}
 	body := data[p+1 : end-1]
-	if !hasEscape && !nonASCII {
-		return c.Make(body), end, nil
-	}
 	if !hasEscape {
-		// A cache hit is known to be valid UTF-8; only a miss is checked.
-		s, ok := c.MakeUTF8(body)
-		if !ok {
-			return "", p, errInvalidUTF8(data, p)
+		if !nonASCII {
+			return c.Make(body), end, nil
 		}
-		return s, end, nil
-	}
-	if nonASCII && !utf8.Valid(body) {
-		return "", p, errInvalidUTF8(data, p)
+		// The scan has validated the body, so the entry can be marked
+		// for the callers that would otherwise check it again.
+		return c.MakeValid(body), end, nil
 	}
 	out, ok := unquote(body, true)
 	if !ok {

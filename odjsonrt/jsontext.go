@@ -166,6 +166,24 @@ func (c *StringCache) MakeUTF8(b []byte) (s string, ok bool) {
 	return s, true
 }
 
+// MakeValid is [Make] for bytes the caller has already validated as UTF-8:
+// the entry is marked valid, so a later [StringCache.MakeUTF8] hit on it
+// settles without a check of its own.
+func (c *StringCache) MakeValid(b []byte) string {
+	i, ok := c.slot(b)
+	if !ok {
+		return string(b)
+	}
+	if s := c.s[i]; s == string(b) {
+		c.valid[i/64] |= 1 << (i % 64)
+		return s
+	}
+	s := string(b)
+	c.s[i] = s
+	c.valid[i/64] |= 1 << (i % 64)
+	return s
+}
+
 // slot returns the table index for b, or false when b is not cached: a nil
 // cache, a string too short to be worth it or too long to keep.
 func (c *StringCache) slot(b []byte) (uint64, bool) {
