@@ -3,7 +3,10 @@ package gen_test
 import (
 	"bytes"
 	jsonv2 "encoding/json/v2"
+	"fmt"
+	"io"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mazrean/odjson/internal/testfixture/v2parity/gen"
@@ -25,6 +28,113 @@ var documents = []string{
 	`{"omit_bool":false,"omit_int":0,"omit_float":0,"omit_string":"","omit_slice":[],"omit_map":{},"omit_ptr":null}`,
 	`{"omit_bool":true,"omit_int":3,"omit_float":1.5,"omit_string":"s","omit_slice":[1],"omit_map":{"a":1},"omit_ptr":4}`,
 	`{"ptr":7,"any":null}`,
+	`{"quoted":"42"}`,
+}
+
+// filled is a document that sets every field, so that decoding something else
+// into the resulting value shows what the second decode leaves alone.
+const filled = `{"bool":true,"int":-7,"uint64":18446744073709551615,"float64":1.5,"string":"héllo","named":"red",` +
+	`"slice":[1,2,3],"strings":["a","b"],"bytes":"AAEC","named_bag":"aGk=","array":[1,2,3],"map":{"a":1},"str_map":{"k":"v"},` +
+	`"nested":{"id":1,"note":"n"},"nested_ptr":{"id":2},"nesteds":[{"id":3}],"nested_map":{"k":{"id":5}},` +
+	`"any":{"a":1},"anys":[1],"raw":{"x":1},"number":"12","time":"2023-11-14T22:13:20Z","ptr":7,"quoted":"42",` +
+	`"omit_bool":true,"omit_int":3,"omit_float":1.5,"omit_string":"s","omit_slice":[1],"omit_map":{"a":1},"omit_ptr":4,` +
+	`"zero_time":"2024-01-02T03:04:05Z","zero_nested":{"id":9}}`
+
+// sameValue decodes doc into both copies of the type, after optionally filling
+// them from filled, and requires json/v2 to see the same value in both.
+func sameValue(t *testing.T, doc string, fill bool, decode func([]byte, any) error) {
+	t.Helper()
+	var g gen.Zoo
+	var p plain.Zoo
+	if fill {
+		if err := jsonv2.Unmarshal([]byte(filled), &g); err != nil {
+			t.Fatalf("fill odjson: %v", err)
+		}
+		if err := jsonv2.Unmarshal([]byte(filled), &p); err != nil {
+			t.Fatalf("fill json/v2: %v", err)
+		}
+	}
+	errGot := decode([]byte(doc), &g)
+	errWant := decode([]byte(doc), &p)
+	if (errGot != nil) != (errWant != nil) {
+		t.Errorf("%s: acceptance mismatch: json/v2=%v odjson=%v", doc, errWant, errGot)
+		return
+	}
+	if errWant != nil {
+		return
+	}
+	got, err := jsonv2.Marshal(g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := jsonv2.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !equivalent(t, got, want) {
+		t.Errorf("%s: decoded to different values:\n json/v2: %s\n odjson:  %s", doc, want, got)
+	}
+}
+
+// TestNullZeroesLikeJSONV2 checks the semantics that differ most from
+// encoding/json: json/v2 stores the zero value for a null whatever the
+// target, where encoding/json leaves scalars untouched. The decode starts from
+// a fully populated value so that "untouched" would be visible.
+func TestNullZeroesLikeJSONV2(t *testing.T) {
+	for _, doc := range []string{
+		`{"bool":null,"int":null,"uint64":null,"float64":null,"string":null,"named":null}`,
+		`{"slice":null,"strings":null,"bytes":null,"named_bag":null,"array":null,"map":null,"str_map":null}`,
+		`{"nested":null,"nested_ptr":null,"nesteds":null,"nested_map":null}`,
+		`{"any":null,"anys":null,"raw":null,"number":null,"time":null,"ptr":null,"quoted":null}`,
+		`{"nesteds":[null],"nested_map":{"k":null},"anys":[null,[null]],"strings":[null],"slice":[null]}`,
+		`null`,
+		`{"int":1}`,
+	} {
+		sameValue(t, doc, true, func(b []byte, v any) error { return jsonv2.Unmarshal(b, v) })
+	}
+}
+
+// chunkReader hands out its bytes n at a time, so that a streaming decoder's
+// buffer boundaries fall in the middle of tokens.
+type chunkReader struct {
+	b []byte
+	n int
+}
+
+func (r *chunkReader) Read(p []byte) (int, error) {
+	if len(r.b) == 0 {
+		return 0, io.EOF
+	}
+	n := min(r.n, len(p), len(r.b))
+	copy(p, r.b[:n])
+	r.b = r.b[n:]
+	return n, nil
+}
+
+// TestStreamingDecodeMatchesJSONV2 drives the generated decoder from an
+// io.Reader that delivers a few bytes per call. The generated code peeks at
+// the decoder's unread buffer and reads small values whole, and both of those
+// have to behave when the buffer is a partial chunk of the document.
+func TestStreamingDecodeMatchesJSONV2(t *testing.T) {
+	// A document larger than the size below which values are read whole.
+	var big strings.Builder
+	big.WriteString(`{"int":1,"nesteds":[`)
+	for i := range 400 {
+		if i > 0 {
+			big.WriteString(",")
+		}
+		fmt.Fprintf(&big, `{"id":%d,"note":"note %d"}`, i, i)
+	}
+	big.WriteString(`],"strings":["after","the","big","one"],"nested":{"id":9}}`)
+
+	docs := append([]string{big.String(), filled}, documents...)
+	for _, n := range []int{1, 7, 64, 4096, 1 << 20} {
+		for _, doc := range docs {
+			sameValue(t, doc, false, func(b []byte, v any) error {
+				return jsonv2.UnmarshalRead(&chunkReader{b: b, n: n}, v)
+			})
+		}
+	}
 }
 
 // TestMarshalMatchesJSONV2 decodes the same document into both copies of the

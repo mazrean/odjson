@@ -117,24 +117,116 @@ func (v *Address) odjsonParse(data []byte, p int) (int, error) {
 	}
 }
 
+// odjsonParseV2 is odjsonParse under encoding/json/v2's semantics, for
+// input a jsontext.Decoder has already validated.
+func (v *Address) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, error) {
+	var err error
+	_ = err
+	p = odjsonrt.SkipSpace(data, p)
+	if np, ok := odjsonrt.ParseNull(data, p); ok {
+		*v = Address{}
+		return np, nil
+	}
+	if p >= len(data) || data[p] != '{' {
+		return p, odjsonrt.ErrType(data, p, "Address")
+	}
+	p++
+	p = odjsonrt.SkipSpace(data, p)
+	if p < len(data) && data[p] == '}' {
+		return p + 1, nil
+	}
+	for {
+		var key []byte
+		p = odjsonrt.SkipSpace(data, p)
+		key, _, p, err = odjsonrt.ParseKey(data, p)
+		if err != nil {
+			return p, err
+		}
+		idx := -1
+		switch string(key) {
+		case "street":
+			idx = 0
+		case "city":
+			idx = 1
+		}
+		switch idx {
+		case 0:
+			p = odjsonrt.SkipSpace(data, p)
+			if np7, ok8 := odjsonrt.ParseNull(data, p); ok8 {
+				p = np7
+				v.Street = ""
+			} else {
+				var x9 string
+				x9, p, err = odjsonrt.ParseStringWith(data, p, sc)
+				if err != nil {
+					return p, err
+				}
+				v.Street = x9
+			}
+		case 1:
+			p = odjsonrt.SkipSpace(data, p)
+			if np10, ok11 := odjsonrt.ParseNull(data, p); ok11 {
+				p = np10
+				v.City = ""
+			} else {
+				var x12 string
+				x12, p, err = odjsonrt.ParseStringWith(data, p, sc)
+				if err != nil {
+					return p, err
+				}
+				v.City = x12
+			}
+		default:
+			p = odjsonrt.SkipSpace(data, p)
+			p, err = odjsonrt.SkipValue(data, p)
+			if err != nil {
+				return p, err
+			}
+		}
+		p = odjsonrt.SkipSpace(data, p)
+		if p >= len(data) {
+			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
+		}
+		switch data[p] {
+		case ',':
+			p++
+		case '}':
+			return p + 1, nil
+		default:
+			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
+		}
+	}
+}
+
 // odjsonParseFrom decodes the next value in dec into v,
 // driving the decoder token by token so the document is
 // parsed once rather than twice.
-func (v *Address) odjsonParseFrom(dec *jsontext.Decoder) error {
+func (v *Address) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) error {
 	var err error
 	_ = err
-	switch k := dec.PeekKind(); k {
-	case 'n':
-		_, err = dec.ReadToken()
+	if odjsonrt.WholeValue(dec) {
+		var val jsontext.Value
+		if val, err = dec.ReadValue(); err != nil {
+			return err
+		}
+		_, err = v.odjsonParseV2(val, 0, sc)
 		return err
+	}
+	switch odjsonrt.NextKind(dec) {
+	case 'n':
+		if _, err = dec.ReadToken(); err != nil {
+			return err
+		}
+		*v = Address{}
+		return nil
 	case '{':
 	default:
-		return odjsonrt.ErrKind(byte(k), "Address")
+		return odjsonrt.ErrKindFrom(dec, "Address")
 	}
 	if _, err = dec.ReadToken(); err != nil {
 		return err
 	}
-	for dec.PeekKind() != '}' {
+	for odjsonrt.NextKind(dec) != '}' {
 		var key jsontext.Value
 		key, err = dec.ReadValue()
 		if err != nil {
@@ -159,41 +251,37 @@ func (v *Address) odjsonParseFrom(dec *jsontext.Decoder) error {
 		}
 		switch idx {
 		case 0:
-			var val7 jsontext.Value
-			val7, err = dec.ReadValue()
+			var val13 jsontext.Value
+			val13, err = dec.ReadValue()
 			if err != nil {
 				return err
 			}
-			vp8 := 0
-			if np9, ok10 := odjsonrt.ParseNull(val7, vp8); ok10 {
-				vp8 = np9
+			if val13[0] == 'n' {
+				v.Street = ""
 			} else {
-				var x11 string
-				x11, vp8, err = odjsonrt.ParseStringTrusted(val7, vp8)
+				var x14 string
+				x14, err = odjsonrt.ParseStringValue(val13, sc)
 				if err != nil {
 					return err
 				}
-				v.Street = x11
+				v.Street = x14
 			}
-			_ = vp8
 		case 1:
-			var val12 jsontext.Value
-			val12, err = dec.ReadValue()
+			var val15 jsontext.Value
+			val15, err = dec.ReadValue()
 			if err != nil {
 				return err
 			}
-			vp13 := 0
-			if np14, ok15 := odjsonrt.ParseNull(val12, vp13); ok15 {
-				vp13 = np14
+			if val15[0] == 'n' {
+				v.City = ""
 			} else {
 				var x16 string
-				x16, vp13, err = odjsonrt.ParseStringTrusted(val12, vp13)
+				x16, err = odjsonrt.ParseStringValue(val15, sc)
 				if err != nil {
 					return err
 				}
 				v.City = x16
 			}
-			_ = vp13
 		default:
 			if _, err = dec.ReadValue(); err != nil {
 				return err
@@ -259,7 +347,12 @@ func (v Address) MarshalJSONTo(enc *jsontext.Encoder) error {
 
 // UnmarshalJSONFrom implements encoding/json/v2.UnmarshalerFrom.
 func (v *Address) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	return v.odjsonParseFrom(dec)
+	// The cache plays the part of json/v2's own string cache: a value
+	// that recurs in the document is allocated once.
+	sc := odjsonrt.GetStringCache()
+	err := v.odjsonParseFrom(dec, sc)
+	odjsonrt.PutStringCache(sc)
+	return err
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
@@ -485,24 +578,202 @@ func (v *Person) odjsonParse(data []byte, p int) (int, error) {
 	}
 }
 
+// odjsonParseV2 is odjsonParse under encoding/json/v2's semantics, for
+// input a jsontext.Decoder has already validated.
+func (v *Person) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, error) {
+	var err error
+	_ = err
+	p = odjsonrt.SkipSpace(data, p)
+	if np, ok := odjsonrt.ParseNull(data, p); ok {
+		*v = Person{}
+		return np, nil
+	}
+	if p >= len(data) || data[p] != '{' {
+		return p, odjsonrt.ErrType(data, p, "Person")
+	}
+	p++
+	p = odjsonrt.SkipSpace(data, p)
+	if p < len(data) && data[p] == '}' {
+		return p + 1, nil
+	}
+	for {
+		var key []byte
+		p = odjsonrt.SkipSpace(data, p)
+		key, _, p, err = odjsonrt.ParseKey(data, p)
+		if err != nil {
+			return p, err
+		}
+		idx := -1
+		switch string(key) {
+		case "name":
+			idx = 0
+		case "age":
+			idx = 1
+		case "email":
+			idx = 2
+		case "tags":
+			idx = 3
+		case "address":
+			idx = 4
+		}
+		switch idx {
+		case 0:
+			p = odjsonrt.SkipSpace(data, p)
+			if np36, ok37 := odjsonrt.ParseNull(data, p); ok37 {
+				p = np36
+				v.Name = ""
+			} else {
+				var x38 string
+				x38, p, err = odjsonrt.ParseStringWith(data, p, sc)
+				if err != nil {
+					return p, err
+				}
+				v.Name = x38
+			}
+		case 1:
+			p = odjsonrt.SkipSpace(data, p)
+			if np39, ok40 := odjsonrt.ParseNull(data, p); ok40 {
+				p = np39
+				v.Age = 0
+			} else {
+				var x41 int64
+				x41, p, err = odjsonrt.ParseInt(data, p, 64)
+				if err != nil {
+					return p, err
+				}
+				v.Age = int(x41)
+			}
+		case 2:
+			p = odjsonrt.SkipSpace(data, p)
+			if np42, ok43 := odjsonrt.ParseNull(data, p); ok43 {
+				v.Email = nil
+				p = np42
+			} else {
+				if v.Email == nil {
+					v.Email = new(string)
+				}
+				p = odjsonrt.SkipSpace(data, p)
+				if np44, ok45 := odjsonrt.ParseNull(data, p); ok45 {
+					p = np44
+					(*v.Email) = ""
+				} else {
+					var x46 string
+					x46, p, err = odjsonrt.ParseStringWith(data, p, sc)
+					if err != nil {
+						return p, err
+					}
+					(*v.Email) = x46
+				}
+			}
+		case 3:
+			p = odjsonrt.SkipSpace(data, p)
+			if np47, ok48 := odjsonrt.ParseNull(data, p); ok48 {
+				p = np47
+				v.Tags = nil
+			} else {
+				if p >= len(data) || data[p] != '[' {
+					return p, odjsonrt.ErrType(data, p, "[]string")
+				}
+				p++
+				s49 := v.Tags[:0]
+				p = odjsonrt.SkipSpace(data, p)
+				if p < len(data) && data[p] == ']' {
+					p++
+				} else {
+					if cap(s49) == 0 {
+						s49 = make([]string, 0, 4)
+					}
+					for {
+						var e50 string
+						p = odjsonrt.SkipSpace(data, p)
+						if np51, ok52 := odjsonrt.ParseNull(data, p); ok52 {
+							p = np51
+							e50 = ""
+						} else {
+							var x53 string
+							x53, p, err = odjsonrt.ParseStringWith(data, p, sc)
+							if err != nil {
+								return p, err
+							}
+							e50 = x53
+						}
+						s49 = append(s49, e50)
+						p = odjsonrt.SkipSpace(data, p)
+						if p >= len(data) {
+							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
+						}
+						if data[p] == ',' {
+							p++
+							continue
+						}
+						if data[p] == ']' {
+							p++
+							break
+						}
+						return p, odjsonrt.ErrSyntax(data, p, "after array element")
+					}
+				}
+				if s49 == nil {
+					s49 = []string{}
+				}
+				v.Tags = s49
+			}
+		case 4:
+			p, err = v.Address.odjsonParseV2(data, p, sc)
+			if err != nil {
+				return p, err
+			}
+		default:
+			p = odjsonrt.SkipSpace(data, p)
+			p, err = odjsonrt.SkipValue(data, p)
+			if err != nil {
+				return p, err
+			}
+		}
+		p = odjsonrt.SkipSpace(data, p)
+		if p >= len(data) {
+			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
+		}
+		switch data[p] {
+		case ',':
+			p++
+		case '}':
+			return p + 1, nil
+		default:
+			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
+		}
+	}
+}
+
 // odjsonParseFrom decodes the next value in dec into v,
 // driving the decoder token by token so the document is
 // parsed once rather than twice.
-func (v *Person) odjsonParseFrom(dec *jsontext.Decoder) error {
+func (v *Person) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) error {
 	var err error
 	_ = err
-	switch k := dec.PeekKind(); k {
-	case 'n':
-		_, err = dec.ReadToken()
+	if odjsonrt.WholeValue(dec) {
+		var val jsontext.Value
+		if val, err = dec.ReadValue(); err != nil {
+			return err
+		}
+		_, err = v.odjsonParseV2(val, 0, sc)
 		return err
+	}
+	switch odjsonrt.NextKind(dec) {
+	case 'n':
+		if _, err = dec.ReadToken(); err != nil {
+			return err
+		}
+		*v = Person{}
+		return nil
 	case '{':
 	default:
-		return odjsonrt.ErrKind(byte(k), "Person")
+		return odjsonrt.ErrKindFrom(dec, "Person")
 	}
 	if _, err = dec.ReadToken(); err != nil {
 		return err
 	}
-	for dec.PeekKind() != '}' {
+	for odjsonrt.NextKind(dec) != '}' {
 		var key jsontext.Value
 		key, err = dec.ReadValue()
 		if err != nil {
@@ -539,117 +810,126 @@ func (v *Person) odjsonParseFrom(dec *jsontext.Decoder) error {
 		}
 		switch idx {
 		case 0:
-			var val36 jsontext.Value
-			val36, err = dec.ReadValue()
+			var val54 jsontext.Value
+			val54, err = dec.ReadValue()
 			if err != nil {
 				return err
 			}
-			vp37 := 0
-			if np38, ok39 := odjsonrt.ParseNull(val36, vp37); ok39 {
-				vp37 = np38
+			if val54[0] == 'n' {
+				v.Name = ""
 			} else {
-				var x40 string
-				x40, vp37, err = odjsonrt.ParseStringTrusted(val36, vp37)
+				var x55 string
+				x55, err = odjsonrt.ParseStringValue(val54, sc)
 				if err != nil {
 					return err
 				}
-				v.Name = x40
+				v.Name = x55
 			}
-			_ = vp37
 		case 1:
-			var val41 jsontext.Value
-			val41, err = dec.ReadValue()
+			var val56 jsontext.Value
+			val56, err = dec.ReadValue()
 			if err != nil {
 				return err
 			}
-			vp42 := 0
-			if np43, ok44 := odjsonrt.ParseNull(val41, vp42); ok44 {
-				vp42 = np43
+			if val56[0] == 'n' {
+				v.Age = 0
 			} else {
-				var x45 int64
-				x45, vp42, err = odjsonrt.ParseInt(val41, vp42, 64)
+				var x57 int64
+				x57, _, err = odjsonrt.ParseInt(val56, 0, 64)
 				if err != nil {
 					return err
 				}
-				v.Age = int(x45)
+				v.Age = int(x57)
 			}
-			_ = vp42
 		case 2:
-			if dec.PeekKind() == 'n' {
-				if _, err = dec.ReadToken(); err != nil {
-					return err
-				}
+			var val58 jsontext.Value
+			val58, err = dec.ReadValue()
+			if err != nil {
+				return err
+			}
+			vp59 := 0
+			if np60, ok61 := odjsonrt.ParseNull(val58, vp59); ok61 {
 				v.Email = nil
+				vp59 = np60
 			} else {
 				if v.Email == nil {
 					v.Email = new(string)
 				}
-				var val46 jsontext.Value
-				val46, err = dec.ReadValue()
-				if err != nil {
-					return err
-				}
-				vp47 := 0
-				if np48, ok49 := odjsonrt.ParseNull(val46, vp47); ok49 {
-					vp47 = np48
+				vp59 = odjsonrt.SkipSpace(val58, vp59)
+				if np62, ok63 := odjsonrt.ParseNull(val58, vp59); ok63 {
+					vp59 = np62
+					(*v.Email) = ""
 				} else {
-					var x50 string
-					x50, vp47, err = odjsonrt.ParseStringTrusted(val46, vp47)
+					var x64 string
+					x64, vp59, err = odjsonrt.ParseStringWith(val58, vp59, sc)
 					if err != nil {
 						return err
 					}
-					(*v.Email) = x50
+					(*v.Email) = x64
 				}
-				_ = vp47
 			}
+			_ = vp59
 		case 3:
-			switch k := dec.PeekKind(); k {
-			case 'n':
-				if _, err = dec.ReadToken(); err != nil {
-					return err
-				}
-				v.Tags = nil
-			case '[':
-				if _, err = dec.ReadToken(); err != nil {
-					return err
-				}
-				s51 := v.Tags[:0]
-				if dec.PeekKind() != ']' && cap(s51) == 0 {
-					s51 = make([]string, 0, 4)
-				}
-				for dec.PeekKind() != ']' {
-					var e52 string
-					var val53 jsontext.Value
-					val53, err = dec.ReadValue()
-					if err != nil {
-						return err
-					}
-					vp54 := 0
-					if np55, ok56 := odjsonrt.ParseNull(val53, vp54); ok56 {
-						vp54 = np55
-					} else {
-						var x57 string
-						x57, vp54, err = odjsonrt.ParseStringTrusted(val53, vp54)
-						if err != nil {
-							return err
-						}
-						e52 = x57
-					}
-					_ = vp54
-					s51 = append(s51, e52)
-				}
-				if _, err = dec.ReadToken(); err != nil {
-					return err
-				}
-				if s51 == nil {
-					s51 = []string{}
-				}
-				v.Tags = s51
-			default:
-				return odjsonrt.ErrKind(byte(k), "[]string")
+			var val65 jsontext.Value
+			val65, err = dec.ReadValue()
+			if err != nil {
+				return err
 			}
+			vp66 := 0
+			if np67, ok68 := odjsonrt.ParseNull(val65, vp66); ok68 {
+				vp66 = np67
+				v.Tags = nil
+			} else {
+				if vp66 >= len(val65) || val65[vp66] != '[' {
+					return odjsonrt.ErrType(val65, vp66, "[]string")
+				}
+				vp66++
+				s69 := v.Tags[:0]
+				vp66 = odjsonrt.SkipSpace(val65, vp66)
+				if vp66 < len(val65) && val65[vp66] == ']' {
+					vp66++
+				} else {
+					if cap(s69) == 0 {
+						s69 = make([]string, 0, 4)
+					}
+					for {
+						var e70 string
+						vp66 = odjsonrt.SkipSpace(val65, vp66)
+						if np71, ok72 := odjsonrt.ParseNull(val65, vp66); ok72 {
+							vp66 = np71
+							e70 = ""
+						} else {
+							var x73 string
+							x73, vp66, err = odjsonrt.ParseStringWith(val65, vp66, sc)
+							if err != nil {
+								return err
+							}
+							e70 = x73
+						}
+						s69 = append(s69, e70)
+						vp66 = odjsonrt.SkipSpace(val65, vp66)
+						if vp66 >= len(val65) {
+							return odjsonrt.ErrSyntax(val65, vp66, "unexpected end of JSON input")
+						}
+						if val65[vp66] == ',' {
+							vp66++
+							continue
+						}
+						if val65[vp66] == ']' {
+							vp66++
+							break
+						}
+						return odjsonrt.ErrSyntax(val65, vp66, "after array element")
+					}
+				}
+				if s69 == nil {
+					s69 = []string{}
+				}
+				v.Tags = s69
+			}
+			_ = vp66
 		case 4:
-			if err = v.Address.odjsonParseFrom(dec); err != nil {
+			if err = v.Address.odjsonParseFrom(dec, sc); err != nil {
 				return err
 			}
 		default:
@@ -717,5 +997,10 @@ func (v Person) MarshalJSONTo(enc *jsontext.Encoder) error {
 
 // UnmarshalJSONFrom implements encoding/json/v2.UnmarshalerFrom.
 func (v *Person) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	return v.odjsonParseFrom(dec)
+	// The cache plays the part of json/v2's own string cache: a value
+	// that recurs in the document is allocated once.
+	sc := odjsonrt.GetStringCache()
+	err := v.odjsonParseFrom(dec, sc)
+	odjsonrt.PutStringCache(sc)
+	return err
 }

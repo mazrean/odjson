@@ -13,12 +13,17 @@ func (g *generator) decErr(c ctx, n int) {
 	g.pf("%s}", ind(n))
 }
 
-func (g *generator) decodeStruct(s *analyzer.StructInfo) {
-	c := ctx{data: "data", pos: "p", ret: "p"}
+// decodeStruct writes the body of a struct's byte oriented decoder. Under
+// c.v2 it follows encoding/json/v2: a null zeroes the struct and member names
+// match case-sensitively.
+func (g *generator) decodeStruct(s *analyzer.StructInfo, c ctx) {
 	g.pf("\tvar err error")
 	g.pf("\t_ = err")
 	g.pf("\tp = odjsonrt.SkipSpace(data, p)")
 	g.pf("\tif np, ok := odjsonrt.ParseNull(data, p); ok {")
+	if c.v2 {
+		g.pf("\t\t*v = %s{}", s.Expr)
+	}
 	g.pf("\t\treturn np, nil")
 	g.pf("\t}")
 	g.pf("\tif p >= len(data) || data[p] != '{' {")
@@ -44,7 +49,7 @@ func (g *generator) decodeStruct(s *analyzer.StructInfo) {
 			g.pf("\t\t\tidx = %d", i)
 		}
 		g.pf("\t\t}")
-		if g.opts.CaseInsensitive {
+		if g.opts.CaseInsensitive && !c.v2 {
 			// An unmatched name is compared case-insensitively against every
 			// field. Guarding each comparison by length keeps that from being
 			// a call per field: only a non-ASCII name can fold to a name of a
@@ -127,12 +132,16 @@ func (g *generator) decodeQuoted(t *analyzer.Type, target string, c ctx, n int) 
 	g.pf("%s%s = odjsonrt.SkipSpace(%s, %s)", ind(n), c.pos, c.data, c.pos)
 	g.pf("%sif %s, %s := odjsonrt.ParseNull(%s, %s); %s {", ind(n), np, ok, c.data, c.pos, ok)
 	g.pf("%s%s = %s", ind(n+1), c.pos, np)
+	if c.v2 {
+		g.pf("%s%s = %s", ind(n+1), target, zeroLit(t))
+	}
 	g.pf("%s} else {", ind(n))
 	g.pf("%svar %s []byte", ind(n+1), inner)
 	g.pf("%s%s, %s, err = odjsonrt.ParseStringInner(%s, %s)", ind(n+1), inner, c.pos, c.data, c.pos)
 	g.decErr(c, n+1)
 	g.pf("%s%s := 0", ind(n+1), sp)
-	sub := ctx{data: inner, pos: sp, ret: c.ret}
+	sub := c
+	sub.data, sub.pos, sub.trusted, sub.trimmed, sub.cache = inner, sp, false, false, ""
 	g.decode(t, target, sub, n+1)
 	g.pf("%sif err = odjsonrt.EndOfDocument(%s, %s); err != nil {", ind(n+1), inner, sp)
 	g.pf("%s%s", ind(n+2), c.fail("err"))
@@ -179,9 +188,14 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 		// The struct's own decoder skips leading whitespace and handles a
 		// null itself, so wrapping the call in another of each is wasted
 		// work on every nested object.
-		if t.Struct.Local {
+		switch {
+		case c.v2 && t.Struct.Local:
+			g.pf("%s%s, err = %s.odjsonParseV2(%s, %s, %s)", ind(n), c.pos, target, c.data, c.pos, c.cache)
+		case c.v2:
+			g.pf("%s%s, err = %sParseV2(%s, %s, %s, %s)", ind(n), c.pos, t.Struct.Helper, c.data, addr(target), c.pos, c.cache)
+		case t.Struct.Local:
 			g.pf("%s%s, err = %s.odjsonParse(%s, %s)", ind(n), c.pos, target, c.data, c.pos)
-		} else {
+		default:
 			g.pf("%s%s, err = %sParse(%s, %s, %s)", ind(n), c.pos, t.Struct.Helper, c.data, addr(target), c.pos)
 		}
 		g.decErr(c, n)
@@ -204,6 +218,21 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 	if !t.Interface {
 		switch {
 		case t.Unmarshaler || t.PtrUnmarshaler:
+			if c.v2 && t.Expr == "time.Time" {
+				// json/v2 does not call time.Time's UnmarshalJSON; it has
+				// its own codec for it, and that one zeroes on null where
+				// the method leaves the value alone.
+				np, ok := g.tmp("np"), g.tmp("ok")
+				lead()
+				g.pf("%sif %s, %s := odjsonrt.ParseNull(%s, %s); %s {", ind(n), np, ok, c.data, c.pos, ok)
+				g.pf("%s%s = %s", ind(n+1), c.pos, np)
+				g.pf("%s%s = time.Time{}", ind(n+1), target)
+				g.pf("%s} else {", ind(n))
+				g.pf("%s%s, err = odjsonrt.ParseUnmarshaler(%s, %s, %s)", ind(n+1), c.pos, c.data, c.pos, addr(target))
+				g.decErr(c, n+1)
+				g.pf("%s}", ind(n))
+				return
+			}
 			g.pf("%s%s, err = odjsonrt.ParseUnmarshaler(%s, %s, %s)", ind(n), c.pos, c.data, c.pos, addr(target))
 			g.decErr(c, n)
 			return
@@ -215,6 +244,9 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 			lead()
 			g.pf("%sif %s, %s := odjsonrt.ParseNull(%s, %s); %s {", ind(n), np, ok, c.data, c.pos, ok)
 			g.pf("%s%s = %s", ind(n+1), c.pos, np)
+			if c.v2 {
+				g.pf("%s%s = %s", ind(n+1), target, zeroLit(t))
+			}
 			g.pf("%s} else {", ind(n))
 			g.pf("%s%s, err = odjsonrt.ParseTextUnmarshaler(%s, %s, %s)", ind(n+1), c.pos, c.data, c.pos, addr(target))
 			g.decErr(c, n+1)
@@ -227,7 +259,9 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 	np, ok := g.tmp("np"), g.tmp("ok")
 	g.pf("%sif %s, %s := odjsonrt.ParseNull(%s, %s); %s {", ind(n), np, ok, c.data, c.pos, ok)
 	g.pf("%s%s = %s", ind(n+1), c.pos, np)
-	if nullZero(t) {
+	if c.v2 {
+		g.pf("%s%s = %s", ind(n+1), target, zeroLit(t))
+	} else if nullZero(t) {
 		g.pf("%s%s = nil", ind(n+1), target)
 	}
 	g.pf("%s} else {", ind(n))
@@ -244,7 +278,10 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 		g.parseInto(c, body, target, t.Expr, "float64", fmt.Sprintf("odjsonrt.ParseFloat(%%s, %%s, %d)", t.Bits))
 	case analyzer.KindString:
 		call := "odjsonrt.ParseString(%s, %s)"
-		if c.trusted {
+		switch {
+		case c.cache != "":
+			call = "odjsonrt.ParseStringWith(%s, %s, " + c.cache + ")"
+		case c.trusted:
 			call = "odjsonrt.ParseStringTrusted(%s, %s)"
 		}
 		g.parseInto(c, body, target, t.Expr, "string", call)
@@ -265,7 +302,11 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 			// per field.
 			a := g.tmp("a")
 			g.pf("%svar %s any", ind(body), a)
-			g.pf("%s%s, %s, err = odjsonrt.ParseAny(%s, %s)", ind(body), a, c.pos, c.data, c.pos)
+			if c.cache != "" {
+				g.pf("%s%s, %s, err = odjsonrt.ParseAnyWith(%s, %s, %s)", ind(body), a, c.pos, c.data, c.pos, c.cache)
+			} else {
+				g.pf("%s%s, %s, err = odjsonrt.ParseAny(%s, %s)", ind(body), a, c.pos, c.data, c.pos)
+			}
 			g.decErr(c, body)
 			g.pf("%s%s = %s", ind(body), target, a)
 			break
@@ -353,18 +394,30 @@ func (g *generator) decodeArray(t *analyzer.Type, target string, c ctx, n int) {
 	g.pf("%sif %s < %d {", ind(n+2), i, t.Len)
 	g.decode(t.Elem, fmt.Sprintf("%s[%s]", target, i), c, n+3)
 	g.pf("%s} else {", ind(n+2))
-	g.pf("%s%s = odjsonrt.SkipSpace(%s, %s)", ind(n+3), c.pos, c.data, c.pos)
-	g.pf("%s%s, err = odjsonrt.SkipValue(%s, %s)", ind(n+3), c.pos, c.data, c.pos)
-	g.decErr(c, n+3)
+	if c.v2 {
+		// json/v2 rejects an array whose length does not match the Go
+		// array, where encoding/json silently pads or truncates.
+		g.pf("%s%s", ind(n+3), c.fail(fmt.Sprintf("odjsonrt.ErrArrayLength(%s, true)", strconv.Quote(t.Expr))))
+	} else {
+		g.pf("%s%s = odjsonrt.SkipSpace(%s, %s)", ind(n+3), c.pos, c.data, c.pos)
+		g.pf("%s%s, err = odjsonrt.SkipValue(%s, %s)", ind(n+3), c.pos, c.data, c.pos)
+		g.decErr(c, n+3)
+	}
 	g.pf("%s}", ind(n+2))
 	g.pf("%s%s++", ind(n+2), i)
 	g.separator(c, n+2, ']', "after array element")
 	g.pf("%s}", ind(n+1))
 	g.pf("%s}", ind(n))
-	g.pf("%sfor ; %s < %d; %s++ {", ind(n), i, t.Len, i)
-	g.pf("%svar %s %s", ind(n+1), z, t.Elem.Expr)
-	g.pf("%s%s[%s] = %s", ind(n+1), target, i, z)
-	g.pf("%s}", ind(n))
+	if c.v2 {
+		g.pf("%sif %s != %d {", ind(n), i, t.Len)
+		g.pf("%s%s", ind(n+1), c.fail(fmt.Sprintf("odjsonrt.ErrArrayLength(%s, false)", strconv.Quote(t.Expr))))
+		g.pf("%s}", ind(n))
+	} else {
+		g.pf("%sfor ; %s < %d; %s++ {", ind(n), i, t.Len, i)
+		g.pf("%svar %s %s", ind(n+1), z, t.Elem.Expr)
+		g.pf("%s%s[%s] = %s", ind(n+1), target, i, z)
+		g.pf("%s}", ind(n))
+	}
 }
 
 func (g *generator) decodeMap(t *analyzer.Type, target string, c ctx, n int) {
@@ -385,7 +438,11 @@ func (g *generator) decodeMap(t *analyzer.Type, target string, c ctx, n int) {
 	g.decErr(c, n+2)
 	g.pf("%svar %s %s", ind(n+2), mv, t.Elem.Expr)
 	g.decode(t.Elem, mv, c, n+2)
-	g.pf("%s%s[%s] = %s", ind(n+2), m, convert(t.Key.Expr, "string("+k+")"), mv)
+	key := "string(" + k + ")"
+	if c.cache != "" {
+		key = c.cache + ".Make(" + k + ")"
+	}
+	g.pf("%s%s[%s] = %s", ind(n+2), m, convert(t.Key.Expr, key), mv)
 	g.separator(c, n+2, '}', "after object key:value pair")
 	g.pf("%s}", ind(n+1))
 	g.pf("%s}", ind(n))

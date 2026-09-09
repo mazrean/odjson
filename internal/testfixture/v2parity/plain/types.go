@@ -49,6 +49,7 @@ type Zoo struct {
 	Number json.Number     `json:"number"`
 	Time   time.Time       `json:"time"`
 	Ptr    *int            `json:"ptr"`
+	Quoted int             `json:"quoted,string"`
 
 	OmitBool   bool           `json:"omit_bool,omitempty"`
 	OmitInt    int            `json:"omit_int,omitempty"`

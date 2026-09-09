@@ -101,6 +101,12 @@ func ParseKey(data []byte, p int) (key []byte, aliased bool, next int, err error
 // size (8, 16, 32 or 64). A literal with a fraction or exponent, or one that
 // does not fit, produces a [TypeError], matching encoding/json.
 func ParseInt(data []byte, p int, bits int) (int64, int, error) {
+	if v, end, ok := parseDecimal(data, p); ok {
+		if bits < 64 && (v < -1<<(bits-1) || v > 1<<(bits-1)-1) {
+			return 0, p, &TypeError{Value: "number", Type: intTypeName(bits), Offset: int64(p)}
+		}
+		return v, end, nil
+	}
 	end, err := numberLiteral(data, p, intTypeName(bits))
 	if err != nil {
 		return 0, p, err
@@ -112,10 +118,53 @@ func ParseInt(data []byte, p int, bits int) (int64, int, error) {
 	return v, end, nil
 }
 
+// parseDecimal reads the integer literal at p in one pass, accumulating the
+// digits while it scans for the end of the number. It handles the common
+// shape, an optional minus sign and up to eighteen digits with nothing after
+// them, which can neither overflow nor need strconv's range checks. Anything
+// else, including a fraction, an exponent or a leading zero followed by more
+// digits, is left to the general path, which also produces the right error.
+func parseDecimal(data []byte, p int) (v int64, end int, ok bool) {
+	i := p
+	neg := i < len(data) && data[i] == '-'
+	if neg {
+		i++
+	}
+	start := i
+	var u uint64
+	for i < len(data) {
+		c := data[i] - '0'
+		if c > 9 {
+			break
+		}
+		u = u*10 + uint64(c)
+		i++
+	}
+	n := i - start
+	if n == 0 || n > 18 || (data[start] == '0' && n > 1) {
+		return 0, p, false
+	}
+	if i < len(data) && (data[i] == '.' || data[i] == 'e' || data[i] == 'E') {
+		return 0, p, false
+	}
+	if neg {
+		return -int64(u), i, true
+	}
+	return int64(u), i, true
+}
+
 // ParseUint parses the JSON number at p into an unsigned integer of the given
 // bit size (8, 16, 32 or 64). A negative, fractional or out of range literal
 // produces a [TypeError].
 func ParseUint(data []byte, p int, bits int) (uint64, int, error) {
+	// A minus sign is rejected by strconv even before a zero, so "-0" has to
+	// take the general path to produce that error.
+	if v, end, ok := parseDecimal(data, p); ok && data[p] != '-' {
+		if bits < 64 && v > 1<<bits-1 {
+			return 0, p, &TypeError{Value: "number", Type: uintTypeName(bits), Offset: int64(p)}
+		}
+		return uint64(v), end, nil
+	}
 	end, err := numberLiteral(data, p, uintTypeName(bits))
 	if err != nil {
 		return 0, p, err
@@ -296,6 +345,13 @@ type anyFrame struct {
 // strings string, booleans bool and null nil. The decoder is iterative and
 // rejects documents nested deeper than [MaxDepth].
 func ParseAny(data []byte, p int) (any, int, error) {
+	return parseAny(data, p, nil, false)
+}
+
+// parseAny is the implementation of [ParseAny] and [ParseAnyWith]. trusted
+// says the input has already been validated as UTF-8, and c, when not nil,
+// interns the strings the result holds.
+func parseAny(data []byte, p int, sc *StringCache, trusted bool) (any, int, error) {
 	var stack []anyFrame
 	var v any
 
@@ -315,7 +371,7 @@ func ParseAny(data []byte, p int) (any, int, error) {
 				v = obj
 				break
 			}
-			key, next, err := parseKeyString(data, p)
+			key, next, err := parseKeyString(data, p, sc)
 			if err != nil {
 				return nil, next, err
 			}
@@ -335,7 +391,14 @@ func ParseAny(data []byte, p int) (any, int, error) {
 			stack = append(stack, anyFrame{arr: []any{}})
 			continue
 		case '"':
-			s, next, err := ParseString(data, p)
+			var s string
+			var next int
+			var err error
+			if trusted {
+				s, next, err = ParseStringWith(data, p, sc)
+			} else {
+				s, next, err = ParseString(data, p)
+			}
 			if err != nil {
 				return nil, next, err
 			}
@@ -386,7 +449,7 @@ func ParseAny(data []byte, p int) (any, int, error) {
 			case data[p] == ',':
 				p = SkipSpace(data, p+1)
 				if isObj {
-					key, next, err := parseKeyString(data, p)
+					key, next, err := parseKeyString(data, p, sc)
 					if err != nil {
 						return nil, next, err
 					}
@@ -413,13 +476,14 @@ func ParseAny(data []byte, p int) (any, int, error) {
 	}
 }
 
-// parseKeyString is [ParseKey] returning the member name as a Go string.
-func parseKeyString(data []byte, p int) (string, int, error) {
+// parseKeyString is [ParseKey] returning the member name as a Go string,
+// interned through c when it is not nil.
+func parseKeyString(data []byte, p int, c *StringCache) (string, int, error) {
 	key, _, next, err := ParseKey(data, p)
 	if err != nil {
 		return "", next, err
 	}
-	return string(key), next, nil
+	return c.Make(key), next, nil
 }
 
 // unquote decodes the body of a JSON string literal (the bytes between the

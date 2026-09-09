@@ -57,6 +57,13 @@ type ctx struct {
 	// trimmed says the position is already at the first byte of the value,
 	// so the fragment's leading whitespace skip can be dropped.
 	trimmed bool
+	// v2 selects encoding/json/v2's decoding semantics: a null stores the
+	// zero value whatever the target, and a fixed size array must match the
+	// document's length exactly.
+	v2 bool
+	// cache names the *odjsonrt.StringCache the fragment interns strings
+	// through, or is empty when it allocates every string.
+	cache string
 }
 
 // fail renders the statement returning expr as the fragment's error.
@@ -165,22 +172,34 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 		g.pf("// returns the offset just past it.")
 		g.pf("func %sParse(data []byte, v *%s, p int) (int, error) {", s.Helper, s.Expr)
 	}
-	g.decodeStruct(s)
+	g.decodeStruct(s, ctx{data: "data", pos: "p", ret: "p"})
 	g.pf("}")
 
 	if g.opts.Methods && g.opts.JSONV2 {
 		g.pkg.Imports.Add(analyzer.JSONTextPath, "jsontext")
 		g.pf("")
 		if s.Local {
+			g.pf("// odjsonParseV2 is odjsonParse under encoding/json/v2's semantics, for")
+			g.pf("// input a jsontext.Decoder has already validated.")
+			g.pf("func (v *%s) odjsonParseV2(data []byte, p int, %s *odjsonrt.StringCache) (int, error) {", s.Expr, cache)
+		} else {
+			g.pf("// %sParseV2 is %sParse under encoding/json/v2's semantics, for", s.Helper, s.Helper)
+			g.pf("// input a jsontext.Decoder has already validated.")
+			g.pf("func %sParseV2(data []byte, v *%s, p int, %s *odjsonrt.StringCache) (int, error) {", s.Helper, s.Expr, cache)
+		}
+		g.decodeStruct(s, ctx{data: "data", pos: "p", ret: "p", trusted: true, v2: true, cache: cache})
+		g.pf("}")
+		g.pf("")
+		if s.Local {
 			g.pf("// odjsonParseFrom decodes the next value in dec into v,")
 			g.pf("// driving the decoder token by token so the document is")
 			g.pf("// parsed once rather than twice.")
-			g.pf("func (v *%s) odjsonParseFrom(dec *jsontext.Decoder) error {", s.Expr)
+			g.pf("func (v *%s) odjsonParseFrom(dec *jsontext.Decoder, %s *odjsonrt.StringCache) error {", s.Expr, cache)
 		} else {
 			g.pf("// %sParseFrom decodes the next value in dec into v,", s.Helper)
 			g.pf("// driving the decoder token by token so the document is")
 			g.pf("// parsed once rather than twice.")
-			g.pf("func %sParseFrom(dec *jsontext.Decoder, v *%s) error {", s.Helper, s.Expr)
+			g.pf("func %sParseFrom(dec *jsontext.Decoder, v *%s, %s *odjsonrt.StringCache) error {", s.Helper, s.Expr, cache)
 		}
 		g.decodeStructFrom(s)
 		g.pf("}")
@@ -262,7 +281,12 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 	g.pf("")
 	g.pf("// UnmarshalJSONFrom implements encoding/json/v2.UnmarshalerFrom.")
 	g.pf("func (v *%s) UnmarshalJSONFrom(dec *jsontext.Decoder) error {", s.Expr)
-	g.pf("\treturn v.odjsonParseFrom(dec)")
+	g.pf("\t// The cache plays the part of json/v2's own string cache: a value")
+	g.pf("\t// that recurs in the document is allocated once.")
+	g.pf("\t%s := odjsonrt.GetStringCache()", cache)
+	g.pf("\terr := v.odjsonParseFrom(dec, %s)", cache)
+	g.pf("\todjsonrt.PutStringCache(%s)", cache)
+	g.pf("\treturn err")
 	g.pf("}")
 }
 
