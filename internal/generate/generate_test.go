@@ -22,6 +22,8 @@ func TestFixturesAreUpToDate(t *testing.T) {
 		{dir: "../testfixture/fallback", methods: false, command: "odjson"},
 		{dir: "../testfixture/crosspkg", methods: false, command: "odjson"},
 		{dir: "../testfixture/suite", methods: false, command: "odjson"},
+		{dir: "../testfixture/suitev2", methods: true, command: "odjson -methods"},
+		{dir: "../testfixture/v2parity/gen", methods: true, command: "odjson -methods"},
 		{dir: "../testfixture/withmethods", methods: true, command: "odjson -methods"},
 	}
 
