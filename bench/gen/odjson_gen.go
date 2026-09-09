@@ -2398,7 +2398,8 @@ func (v *TwitterStruct) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte,
 		}
 		dst = append(dst, ']')
 	}
-	dst = append(dst, ",\"search_metadata\":"...)
+	dst = append(dst, ",\"search_metadat"...)
+	dst = append(dst, "a\":"...)
 	dst, err = v.SearchMetadata.odjsonAppend(dst, m)
 	if err != nil {
 		return nil, err
@@ -2892,7 +2893,8 @@ func (v *Statuses) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"in_reply_to_user_id_str\":"...)
+	dst = append(dst, ",\"in_reply_to_us"...)
+	dst = append(dst, "er_id_str\":"...)
 	if v.InReplyToUserIDStr == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
@@ -2920,9 +2922,11 @@ func (v *Statuses) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"retweet_count\":"...)
+	dst = append(dst, ",\"retweet_count\""...)
+	dst = append(dst, ":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.RetweetCount))
-	dst = append(dst, ",\"in_reply_to_status_id_str\":"...)
+	dst = append(dst, ",\"in_reply_to_st"...)
+	dst = append(dst, "atus_id_str\":"...)
 	if v.InReplyToStatusIDStr == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
@@ -2944,7 +2948,8 @@ func (v *Statuses) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	}
 	dst = append(dst, ",\"retweeted\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.Retweeted))
-	dst = append(dst, ",\"in_reply_to_user_id\":"...)
+	dst = append(dst, ",\"in_reply_to_us"...)
+	dst = append(dst, "er_id\":"...)
 	if v.InReplyToUserID == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
@@ -2967,7 +2972,8 @@ func (v *Statuses) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"in_reply_to_screen_name\":"...)
+	dst = append(dst, ",\"in_reply_to_sc"...)
+	dst = append(dst, "reen_name\":"...)
 	if v.InReplyToScreenName == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
@@ -2981,7 +2987,8 @@ func (v *Statuses) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"in_reply_to_status_id\":"...)
+	dst = append(dst, ",\"in_reply_to_st"...)
+	dst = append(dst, "atus_id\":"...)
 	if v.InReplyToStatusID == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
@@ -4651,7 +4658,8 @@ func (v *Entities) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 		}
 		dst = append(dst, ']')
 	}
-	dst = append(dst, ",\"user_mentions\":"...)
+	dst = append(dst, ",\"user_mentions\""...)
+	dst = append(dst, ":"...)
 	if v.UserMentions == nil {
 		dst = odjsonrt.AppendNilSlice(dst, m)
 	} else {
@@ -6025,7 +6033,8 @@ func (v *Metadata) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	var err error
 	_ = err
 	start := len(dst)
-	dst = append(dst, ",\"iso_language_code\":"...)
+	dst = append(dst, ",\"iso_language_c"...)
+	dst = append(dst, "ode\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.IsoLanguageCode), m)
 	if err != nil {
 		return nil, err
@@ -6440,24 +6449,28 @@ func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
-	dst = append(dst, ",\"profile_sidebar_fill_color\":"...)
+	dst = append(dst, ",\"profile_sideba"...)
+	dst = append(dst, "r_fill_color\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.ProfileSidebarFillColor), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"profile_sidebar_border_color\":"...)
+	dst = append(dst, ",\"profile_sideba"...)
+	dst = append(dst, "r_border_color\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.ProfileSidebarBorderColor), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"profile_background_tile\":"...)
+	dst = append(dst, ",\"profile_backgr"...)
+	dst = append(dst, "ound_tile\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.ProfileBackgroundTile))
 	dst = append(dst, ",\"name\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Name), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"profile_image_url\":"...)
+	dst = append(dst, ",\"profile_image_"...)
+	dst = append(dst, "url\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.ProfileImageURL), m)
 	if err != nil {
 		return nil, err
@@ -6472,7 +6485,8 @@ func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"follow_request_sent\":"...)
+	dst = append(dst, ",\"follow_request"...)
+	dst = append(dst, "_sent\":"...)
 	if v.FollowRequestSent == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
@@ -6481,12 +6495,14 @@ func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 			return nil, err
 		}
 	}
-	dst = append(dst, ",\"profile_link_color\":"...)
+	dst = append(dst, ",\"profile_link_c"...)
+	dst = append(dst, "olor\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.ProfileLinkColor), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"is_translator\":"...)
+	dst = append(dst, ",\"is_translator\""...)
+	dst = append(dst, ":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.IsTranslator))
 	dst = append(dst, ",\"id_str\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.IDStr), m)
@@ -6498,11 +6514,14 @@ func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"default_profile\":"...)
+	dst = append(dst, ",\"default_profil"...)
+	dst = append(dst, "e\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.DefaultProfile))
-	dst = append(dst, ",\"contributors_enabled\":"...)
+	dst = append(dst, ",\"contributors_e"...)
+	dst = append(dst, "nabled\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.ContributorsEnabled))
-	dst = append(dst, ",\"favourites_count\":"...)
+	dst = append(dst, ",\"favourites_cou"...)
+	dst = append(dst, "nt\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.FavouritesCount))
 	dst = append(dst, ",\"url\":"...)
 	if v.URL == nil {
@@ -6513,7 +6532,8 @@ func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 			return nil, err
 		}
 	}
-	dst = append(dst, ",\"profile_image_url_https\":"...)
+	dst = append(dst, ",\"profile_image_"...)
+	dst = append(dst, "url_https\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.ProfileImageURLHTTPS), m)
 	if err != nil {
 		return nil, err
@@ -6522,11 +6542,13 @@ func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	dst = odjsonrt.AppendInt(dst, int64(v.UtcOffset))
 	dst = append(dst, ",\"id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.ID))
-	dst = append(dst, ",\"profile_use_background_image\":"...)
+	dst = append(dst, ",\"profile_use_ba"...)
+	dst = append(dst, "ckground_image\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.ProfileUseBackgroundImage))
 	dst = append(dst, ",\"listed_count\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.ListedCount))
-	dst = append(dst, ",\"profile_text_color\":"...)
+	dst = append(dst, ",\"profile_text_c"...)
+	dst = append(dst, "olor\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.ProfileTextColor), m)
 	if err != nil {
 		return nil, err
@@ -6536,11 +6558,13 @@ func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"followers_count\":"...)
+	dst = append(dst, ",\"followers_coun"...)
+	dst = append(dst, "t\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.FollowersCount))
 	dst = append(dst, ",\"protected\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.Protected))
-	dst = append(dst, ",\"notifications\":"...)
+	dst = append(dst, ",\"notifications\""...)
+	dst = append(dst, ":"...)
 	if v.Notifications == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
@@ -6549,12 +6573,15 @@ func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 			return nil, err
 		}
 	}
-	dst = append(dst, ",\"profile_background_image_url_https\":"...)
+	dst = append(dst, ",\"profile_backgr"...)
+	dst = append(dst, "ound_image_url_h"...)
+	dst = append(dst, "ttps\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.ProfileBackgroundImageURLHTTPS), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"profile_background_color\":"...)
+	dst = append(dst, ",\"profile_backgr"...)
+	dst = append(dst, "ound_color\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.ProfileBackgroundColor), m)
 	if err != nil {
 		return nil, err
@@ -6573,16 +6600,20 @@ func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"default_profile_image\":"...)
+	dst = append(dst, ",\"default_profil"...)
+	dst = append(dst, "e_image\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.DefaultProfileImage))
-	dst = append(dst, ",\"profile_background_image_url\":"...)
+	dst = append(dst, ",\"profile_backgr"...)
+	dst = append(dst, "ound_image_url\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.ProfileBackgroundImageURL), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"statuses_count\":"...)
+	dst = append(dst, ",\"statuses_count"...)
+	dst = append(dst, "\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.StatusesCount))
-	dst = append(dst, ",\"friends_count\":"...)
+	dst = append(dst, ",\"friends_count\""...)
+	dst = append(dst, ":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.FriendsCount))
 	dst = append(dst, ",\"following\":"...)
 	if v.Following == nil {
@@ -6593,7 +6624,8 @@ func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 			return nil, err
 		}
 	}
-	dst = append(dst, ",\"show_all_inline_media\":"...)
+	dst = append(dst, ",\"show_all_inlin"...)
+	dst = append(dst, "e_media\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.ShowAllInlineMedia))
 	dst = append(dst, ",\"screen_name\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.ScreenName), m)
