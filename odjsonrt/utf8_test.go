@@ -2,6 +2,7 @@ package odjsonrt
 
 import (
 	"bytes"
+	"encoding/binary"
 	jsonv2 "encoding/json/v2"
 	"math/rand/v2"
 	"strings"
@@ -29,6 +30,25 @@ var utf8Cases = []string{
 	"\xe6\x97\xa5\xe6", "ab\xe6\x97\xa5\xe6\x97", // valid then truncated
 	"日本語\"quoted\"", "日本\\語", "日本\n語", "日本\x00語", "日本\x1f語",
 	"<b>こんにちは</b> & more テキスト", "  ",
+}
+
+// validUTF8 is skipNonASCII as a whole string verdict, the shape the
+// oracle test compares with utf8.Valid.
+func validUTF8(s []byte) bool {
+	i := 0
+	for i < len(s) {
+		if s[i] < utf8.RuneSelf {
+			i++
+			for i+8 <= len(s) && binary.LittleEndian.Uint64(s[i:])&swarHi == 0 {
+				i += 8
+			}
+			continue
+		}
+		if i = skipNonASCII(s, i); i < 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func TestSkipNonASCIIMatchesUTF8Valid(t *testing.T) {

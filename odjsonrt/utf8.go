@@ -69,23 +69,3 @@ func skipNonASCII(s []byte, i int) int {
 // cjkLead reports whether b leads a three byte sequence that accepts every
 // continuation byte as its second: E1-EC or EE-EF.
 func cjkLead(b byte) bool { return b-0xE1 <= 0xEC-0xE1 || b|1 == 0xEF }
-
-// validUTF8 reports whether s is valid UTF-8, through the same fast path
-// the scans use. It exists for the callers that hold a string body already
-// scanned by the legacy scanner and only need the verdict.
-func validUTF8(s []byte) bool {
-	i := 0
-	for i < len(s) {
-		if s[i] < utf8.RuneSelf {
-			i++
-			for i+8 <= len(s) && binary.LittleEndian.Uint64(s[i:])&swarHi == 0 {
-				i += 8
-			}
-			continue
-		}
-		if i = skipNonASCII(s, i); i < 0 {
-			return false
-		}
-	}
-	return true
-}

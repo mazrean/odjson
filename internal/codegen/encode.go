@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mazrean/odjson/internal/analyzer"
 )
@@ -116,6 +117,11 @@ func (g *generator) appendLit(b *block, lit string) {
 	const piece = 16
 	for len(lit) > 0 {
 		n := min(len(lit), piece)
+		// Back off to a rune boundary, so that a non-ASCII name is still
+		// readable in the generated file.
+		for n < len(lit) && !utf8.RuneStart(lit[n]) {
+			n--
+		}
 		g.emit(b, assign(dst, spread(id("append"), dst, str(lit[:n]))))
 		lit = lit[n:]
 	}
