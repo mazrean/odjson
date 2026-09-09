@@ -544,6 +544,11 @@ func TestParseAny(t *testing.T) {
 		`{"a":1,"a":2}`,
 		`  [ 1 , 2 ]  `,
 		"\"\xff\"",
+		// Numbers around the boxed small integer table: spellings of
+		// small values, values just outside it, and ones that only look
+		// small in the literal.
+		`0`, `999`, `1000`, `1e5`, `1E3`, `0e1`, `1.0`, `1.5`, `-1`, `-0`,
+		`[12, 21, 1e2, 2E3, 9e9, 0.5]`,
 	}
 	for _, c := range cases {
 		got, err := decodeDocument([]byte(c))
@@ -556,6 +561,10 @@ func TestParseAny(t *testing.T) {
 		if err == nil && !reflect.DeepEqual(got, want) {
 			t.Errorf("ParseAny(%q) = %#v, encoding/json = %#v", c, got, want)
 		}
+	}
+	// -0 must keep its sign: DeepEqual cannot tell it from 0.
+	if v, err := decodeDocument([]byte(`-0`)); err != nil || !math.Signbit(v.(float64)) {
+		t.Errorf("-0 decoded to %#v, %v", v, err)
 	}
 	// Empty containers must be non-nil, like encoding/json.
 	v, err := decodeDocument([]byte(`[]`))

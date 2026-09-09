@@ -24,6 +24,12 @@ func SkipSpace(data []byte, p int) int {
 
 // skipSpaceSlow consumes an actual run of whitespace.
 func skipSpaceSlow(data []byte, p int) int {
+	// The one space after a colon is the commonest run by far, and it is
+	// settled by the next byte: p+1 is a constant offset, not a value
+	// computed from the data, so nothing waits on the word scan below.
+	if p+1 < len(data) && data[p] == ' ' && data[p+1] > ' ' {
+		return p + 1
+	}
 	for p < len(data) && spaceSet[data[p]] {
 		p++
 		// An indented document is mostly a newline followed by a run of

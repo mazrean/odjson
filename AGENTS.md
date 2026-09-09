@@ -25,13 +25,14 @@ using the standard library, and take it off whenever you like" is the product,
 and a second entry point contradicts it.
 
 **Positioning** (measured, see `bench/`): the target is `encoding/json/v2`
-(1.5-3.1x faster on all four measurements) and `encoding/json` (1.12-1.6x on
-three of four; the twitter encode is 6% behind because v1's coder flags make
+(1.8-3.2x faster on all four measurements) and `encoding/json` (1.1-1.5x on
+three of four; the twitter encode is 4% behind because v1's coder flags make
 the direct path decline). `github.com/bytedance/sonic` and
 `github.com/goccy/go-json` honour the v1 interfaces too and the generated code
 is correct under them, but odjson does **not** make them faster: it wins only
-their small unmarshal rows (1.08x and 1.02x in `bench/ab`), and `bench/floor`
-proves why the rest cannot be won rather than asserting it: with a
+sonic's small unmarshal row (1.10x in `bench/ab`; go-json's is parity at
+0.99x), and `bench/floor` proves why the rest cannot be won rather than
+asserting it: with a
 `MarshalJSON` that costs nothing, sonic still spends 105us on the twitter
 payload against 111us for its own path, and go-json 338us against 239us,
 because sonic validates and go-json compacts whatever a marshaler returns.
@@ -42,8 +43,8 @@ JIT to break even there. Do not re-open either question without re-running
 `bench/floor` and `bench/ab`. In `README.md` those two libraries are
 **comparison baselines only** — their "with odjson" columns stay out of the
 tables, and the claim to keep honest is that json/v2 + odjson beats go-json on
-three of four and sits within 1.2-1.4x of sonic. Re-measure before restating
-any of it.
+all four (the small encode by 3%, the narrowest) and sits within 1.2-1.3x of
+sonic. Re-measure before restating any of it.
 
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,

@@ -1,10 +1,13 @@
 package odjsonrt
 
 import (
+	"bytes"
 	"encoding"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	jsonv2 "encoding/json/v2"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -59,6 +62,58 @@ func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next in
 		return nil, false, p, ErrSyntax(data, p, "invalid string literal")
 	}
 	return out, false, end, nil
+}
+
+// skipStringStrict scans the string literal at p under json/v2's rules
+// without producing it: the body must be UTF-8 and every \u escape must
+// decode, which for a surrogate means being one half of a pair. It is what
+// [SkipValueStrict] uses, so a skipped string with escapes is checked in
+// place instead of being unescaped into a buffer nobody reads.
+func skipStringStrict(data []byte, p int) (int, error) {
+	end, hasEscape, nonASCII, err := scanString(data, p)
+	if err != nil {
+		return end, err
+	}
+	body := data[p+1 : end-1]
+	if nonASCII && !utf8.Valid(body) {
+		return p, errInvalidUTF8(data, p)
+	}
+	if hasEscape && !validEscapes(body) {
+		return p, ErrSyntax(data, p, "invalid string literal")
+	}
+	return end, nil
+}
+
+// validEscapes reports whether every \u escape in a string body that
+// scanString has accepted decodes under json/v2's rules. Only surrogates can
+// fail: a high surrogate must be followed by a low one, and a low one may not
+// stand alone. The other escapes were settled by scanString.
+func validEscapes(s []byte) bool {
+	for {
+		n := bytes.IndexByte(s, '\\')
+		if n < 0 {
+			return true
+		}
+		s = s[n:]
+		if len(s) < 2 {
+			return false
+		}
+		if s[1] != 'u' {
+			s = s[2:]
+			continue
+		}
+		r := getu4(s)
+		if r < 0 {
+			return false
+		}
+		s = s[6:]
+		if utf16.IsSurrogate(r) {
+			if utf16.DecodeRune(r, getu4(s)) == utf8.RuneError {
+				return false
+			}
+			s = s[6:]
+		}
+	}
 }
 
 // ParseStringStrict is [ParseString] under json/v2's rules: invalid UTF-8 and
@@ -212,18 +267,53 @@ func ParseAnyStrict(data []byte, p int, c *StringCache) (any, int, error) {
 	return parseAny(data, p, c, parseStrict)
 }
 
+// strictLevel is what [SkipValueStrict] keeps per open object: where that
+// object's names start in the shared list, and a 256 bit filter over the
+// names it has seen so far. A name whose filter bit is clear is known to be
+// new, so only a hit pays for the scan; with a few dozen names per object
+// that turns the k²/2 comparisons of a plain scan into a handful.
+type strictLevel struct {
+	mark   int
+	filter [4]uint64
+}
+
+// nameHash is a cheap hash of a member name for [strictLevel]'s filter. The
+// first and last words and the length are enough to keep sibling names that
+// share a long prefix (profile_sidebar_fill_color, profile_sidebar_border_color)
+// apart.
+func nameHash(b []byte) uint64 {
+	var h uint64
+	switch n := len(b); {
+	case n >= 8:
+		h = binary.LittleEndian.Uint64(b) ^ binary.LittleEndian.Uint64(b[n-8:])*0x9e3779b97f4a7c15
+	case n >= 4:
+		h = uint64(binary.LittleEndian.Uint32(b)) ^ uint64(binary.LittleEndian.Uint32(b[n-4:]))*0x9e3779b97f4a7c15
+	case n >= 2:
+		h = uint64(binary.LittleEndian.Uint16(b)) ^ uint64(binary.LittleEndian.Uint16(b[n-2:]))*0x9e3779b97f4a7c15
+	case n == 1:
+		h = uint64(b[0]) * 0x9e3779b97f4a7c15
+	}
+	h ^= uint64(len(b)) * 0xff51afd7ed558ccd
+	return h ^ h>>29
+}
+
 // strictKey parses the member name at p and appends it to names, unless the
-// current object, whose names start at names[mark:], already holds it.
-func strictKey(data []byte, p int, names [][]byte, mark int) ([][]byte, int, error) {
+// current object, whose names start at names[lv.mark:], already holds it.
+func strictKey(data []byte, p int, names [][]byte, lv *strictLevel) ([][]byte, int, error) {
 	name, next, err := ParseKeyStrict(data, p)
 	if err != nil {
 		return names, next, err
 	}
-	for _, n := range names[mark:] {
-		if string(n) == string(name) {
-			return names, p, ErrDuplicateName(data, p, name)
+	h := nameHash(name)
+	w, bit := h>>62, uint64(1)<<(h>>56&63)
+	if lv.filter[w]&bit != 0 {
+		for _, n := range names[lv.mark:] {
+			if string(n) == string(name) {
+				return names, p, ErrDuplicateName(data, p, name)
+			}
 		}
 	}
+	lv.filter[w] |= bit
 	return append(names, name), next, nil
 }
 
@@ -231,16 +321,17 @@ func strictKey(data []byte, p int, names [][]byte, mark int) ([][]byte, int, err
 // UTF-8 and no object may hold a name twice, at any depth.
 //
 // The names of every open object are kept back to back in one list, with a
-// mark per level saying where that level's names start. Both live in small
-// arrays on the stack, so skipping a scalar or a small object allocates
-// nothing; only a wide or deep object spills them to the heap.
+// [strictLevel] per non-empty object saying where that object's names start
+// and which of them might already be present. Both live in small arrays on
+// the stack, so skipping a scalar or a small object allocates nothing; only a
+// wide or deep object spills them to the heap.
 func SkipValueStrict(data []byte, p int) (int, error) {
 	var inline [inlineDepth]byte
 	stack := inline[:0]
 	var namesBuf [64][]byte
-	var marksBuf [16]int
+	var levelsBuf [16]strictLevel
 	names := namesBuf[:0]
-	marks := marksBuf[:0]
+	levels := levelsBuf[:0]
 
 	for {
 		if p >= len(data) {
@@ -252,16 +343,15 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 				return p, ErrSyntax(data, p, "exceeded max depth")
 			}
 			stack = append(stack, '}')
-			marks = append(marks, len(names))
 			p = SkipSpace(data, p+1)
 			if p < len(data) && data[p] == '}' {
 				p++
 				stack = stack[:len(stack)-1]
-				names, marks = names[:marks[len(marks)-1]], marks[:len(marks)-1]
 				break
 			}
+			levels = append(levels, strictLevel{mark: len(names)})
 			var err error
-			if names, p, err = strictKey(data, p, names, marks[len(marks)-1]); err != nil {
+			if names, p, err = strictKey(data, p, names, &levels[len(levels)-1]); err != nil {
 				return p, err
 			}
 			continue
@@ -278,7 +368,7 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 			}
 			continue
 		case '"':
-			_, _, end, err := parseStringBytesStrict(data, p)
+			end, err := skipStringStrict(data, p)
 			if err != nil {
 				return end, err
 			}
@@ -323,7 +413,7 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 				p = SkipSpace(data, p+1)
 				if closer == '}' {
 					var err error
-					if names, p, err = strictKey(data, p, names, marks[len(marks)-1]); err != nil {
+					if names, p, err = strictKey(data, p, names, &levels[len(levels)-1]); err != nil {
 						return p, err
 					}
 				}
@@ -331,7 +421,7 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 				p++
 				stack = stack[:len(stack)-1]
 				if closer == '}' {
-					names, marks = names[:marks[len(marks)-1]], marks[:len(marks)-1]
+					names, levels = names[:levels[len(levels)-1].mark], levels[:len(levels)-1]
 				}
 				continue
 			default:
