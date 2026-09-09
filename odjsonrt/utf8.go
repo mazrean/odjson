@@ -35,13 +35,24 @@ func skipNonASCII(s []byte, i int) int {
 		if b < utf8.RuneSelf {
 			return i
 		}
-		if i+4 <= len(s) {
-			// One load covers the lead byte and both continuation bytes.
-			// The mask keeps the top nibble of the lead and the top two
-			// bits of each continuation byte; the range test on the lead
-			// then excludes E0 and ED, whose second byte is restricted.
+		// One load covers the lead byte and both continuation bytes of a
+		// sequence, or of two of them. The mask keeps the top nibble of
+		// each lead and the top two bits of each continuation byte; the
+		// range test on the lead then excludes E0 and ED, whose second byte
+		// is restricted.
+		if i+8 <= len(s) {
+			w := binary.LittleEndian.Uint64(s[i:])
+			if w&0xC0C0F0C0C0F0 == 0x8080E08080E0 && cjkLead(b) && cjkLead(byte(w>>24)) {
+				i += 6
+				continue
+			}
+			if w&0xC0C0F0 == 0x8080E0 && cjkLead(b) {
+				i += 3
+				continue
+			}
+		} else if i+4 <= len(s) {
 			w := binary.LittleEndian.Uint32(s[i:])
-			if w&0xC0C0F0 == 0x8080E0 && (b-0xE1 <= 0xEC-0xE1 || b|1 == 0xEF) {
+			if w&0xC0C0F0 == 0x8080E0 && cjkLead(b) {
 				i += 3
 				continue
 			}
@@ -54,6 +65,10 @@ func skipNonASCII(s []byte, i int) int {
 	}
 	return i
 }
+
+// cjkLead reports whether b leads a three byte sequence that accepts every
+// continuation byte as its second: E1-EC or EE-EF.
+func cjkLead(b byte) bool { return b-0xE1 <= 0xEC-0xE1 || b|1 == 0xEF }
 
 // validUTF8 reports whether s is valid UTF-8, through the same fast path
 // the scans use. It exists for the callers that hold a string body already
