@@ -700,7 +700,9 @@ func parseKeyString(data []byte, p int, c *StringCache, mode parseMode) (string,
 // quotes) that has already been validated by scanString. It mirrors
 // encoding/json's unquoteBytes: escapes are expanded, unpaired surrogates and
 // invalid UTF-8 become U+FFFD. Under strict an unpaired surrogate is instead
-// an error, as it is for encoding/json/v2.
+// an error, as it is for encoding/json/v2, and s must already be known to be
+// valid UTF-8: the strict callers have checked the whole body, so the runs
+// between escapes are copied without being looked at again.
 //
 // The runs between escapes are copied whole: a run that is valid UTF-8, which
 // is nearly every one, costs one validation pass and one copy instead of a
@@ -713,7 +715,7 @@ func unquote(s []byte, strict bool) ([]byte, bool) {
 		if n < 0 {
 			n = len(s) - r
 		}
-		if run := s[r : r+n]; utf8.Valid(run) {
+		if run := s[r : r+n]; strict || utf8.Valid(run) {
 			b = append(b, run...)
 		} else {
 			b = appendReplacing(b, run)
