@@ -117,15 +117,46 @@ To regenerate after changing the generator:
 cd bench/gen && go generate ./...
 ```
 
+## `ab`
+
+`bench/ab` measures the generated codec against the reflection baseline **in one
+process**. The other packages each measure one side, so comparing them is a
+comparison across processes: different heaps, different GC state, and several
+percent of drift between runs. Some of the differences that matter here are
+smaller than that drift, and reading them off two separate runs produced results
+whose sign changed with `GOMAXPROCS`. Use `ab` for any claim about `-methods`
+versus reflection; use `gen` and `plain` for the absolute numbers.
+
+```sh
+cd bench && go test -bench . -count 5 ./ab/
+```
+
+## `floor`
+
+`bench/floor` answers a different question: not "how fast is the generated
+codec" but "what does the host library charge for using a codec at all". Its
+marshaler returns an already encoded document and its unmarshaler discards its
+input, so the numbers are a lower bound for any implementation of
+`json.Marshaler` / `json.Unmarshaler`. For sonic and go-json that bound is
+already above what those libraries cost without the interface, which is why
+`-methods` cannot win on them at any speed. Keep this package: it is the
+evidence for that claim.
+
 ## `proto`
 
 `bench/proto` is a hand-written experiment, not generated code and not part of
 odjson's build. It implements `encoding/json/v2`'s `MarshalerTo` and
-`UnmarshalerFrom` for one struct three ways — reflection (no methods), the
-value-driven form odjson generates today, and a token-driven form — to measure
-how much of the drop-in overhead a different code generation strategy could
-remove. Keep it as the evidence behind the "what would remove it" section of the
-root README; delete it only together with that section.
+`UnmarshalerFrom` for one struct four ways — reflection (no methods), the
+value-driven form odjson generates, a token-driven form, and a value-driven form
+tuned for the streaming contract — over three payload shapes (`small`,
+`stringy`, `dense`).
+
+It is the evidence behind the generator's current strategy: the token-driven
+encoder measured at parity with reflection on string-heavy values but 18% worse
+on field-dense ones, so the value-driven form was kept; the token-driven
+*decoder* won on every shape, so that one was adopted. Keep it as the record
+behind the root README's "what the drop-in path costs" section; delete it only
+together with that section.
 
 See the root [README](../README.md#benchmarks) for the results table and what it
 means for how you should call odjson.

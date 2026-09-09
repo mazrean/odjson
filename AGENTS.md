@@ -23,15 +23,26 @@ Because every major Go JSON library honours those interfaces —
 `github.com/goccy/go-json` — odjson layers *on top of* whichever library the
 user already has, and makes it faster. It does not replace them.
 
-**Where the win actually is** (measured, see `bench/`): the direct functions.
-The `MarshalJSON` contract obliges the host library to make an interface call
-and then re-scan and copy the bytes it gets back, and to locate a value's
-extent before handing it to the decoder. Measured against the same code without
-the methods, that overhead exceeds the reflection the generated codec removes
-for every library except `encoding/json` on small payloads. That is why
-`-methods` defaults to **off**: a generator must not make a program slower by
-default. Keep this statement in `README.md`'s benchmark section; do not soften
-it, and re-measure before changing the default.
+**Where the win actually is** (measured, see `bench/`): the direct functions,
+always. `-methods` is a second, conditional win — as of the streaming-path work
+it makes `encoding/json` 1.08-1.17x *faster* on three of four measurements and
+`encoding/json/v2` roughly break even, but it cannot win on sonic or go-json,
+and `bench/floor` proves why rather than asserting it: with a `MarshalJSON`
+that costs nothing, sonic still spends 107us on the twitter payload against
+102us for its own reflection path, and go-json 347us against 239us. The
+interface floor is above the target, so no generated code can close it. Do not
+re-open that question without re-running `bench/floor`. It stays
+**off by default** for that reason: the recommendation is not uniform across
+libraries, so the user has to make it. Keep the benchmark section of
+`README.md` honest about this, and re-measure before changing the default.
+
+The generated `MarshalJSONTo`/`UnmarshalJSONFrom` deliberately follow
+`encoding/json/v2`'s semantics rather than `encoding/json`'s (nil slices encode
+as `[]`, `omitempty` keeps zero numbers, array lengths are strict, member names
+are matched case-sensitively). `odjsonrt.StringMode` is what selects between the
+two; it is threaded through every generated `odjsonAppend`. Changing that
+threading changes observable output, so `internal/testfixture/v2parity` and
+`internal/testfixture/suitev2` must stay green.
 
 Generation strategy:
 
