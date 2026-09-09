@@ -1,8 +1,8 @@
 package codegen
 
 import (
-	"fmt"
-	"strconv"
+	"go/ast"
+	"go/token"
 
 	"github.com/mazrean/odjson/internal/analyzer"
 )
@@ -36,88 +36,111 @@ import (
 // for the reflection decoder.
 const cache = "sc"
 
+// Identifiers the jsontext driven decoders share.
+var (
+	dec    = id("dec")
+	cacheV = id(cache)
+)
+
+// readToken renders if _, err = dec.ReadToken(); err != nil { return err }.
+func (g *generator) readToken(b *block) {
+	g.ifStmt(b, assignN(token.ASSIGN, []ast.Expr{id("_"), errV}, call(sel(dec, "ReadToken"))), bin(errV, token.NEQ, nilV), func(b *block) {
+		g.emit(b, ret(errV))
+	})
+}
+
+// nextKind renders odjsonrt.NextKind(dec).
+func nextKind() ast.Expr { return callRT("NextKind", dec) }
+
+// jsontextValue renders jsontext.Value.
+func jsontextValue() ast.Expr { return sel(id("jsontext"), "Value") }
+
 // decodeStructFrom writes the body of a struct's jsontext driven decoder.
-func (g *generator) decodeStructFrom(s *analyzer.StructInfo) {
-	g.pf("\tvar err error")
-	g.pf("\t_ = err")
+func (g *generator) decodeStructFrom(b *block, s *analyzer.StructInfo) {
+	g.emit(b, varDecl("err", id("error")))
+	g.emit(b, assign(id("_"), errV))
 	// A small value is read whole and handed to the byte oriented decoder:
 	// below a few kilobytes the decoder's per call cost outweighs a second
 	// scan of the bytes. See odjsonrt.WholeValue for how small is decided.
-	g.pf("\tif odjsonrt.WholeValue(dec) {")
-	g.pf("\t\tvar val jsontext.Value")
-	g.pf("\t\tif val, err = dec.ReadValue(); err != nil {")
-	g.pf("\t\t\treturn err")
-	g.pf("\t\t}")
-	if s.Local {
-		g.pf("\t\t_, err = v.odjsonParseV2(val, 0, %s, false)", cache)
-	} else {
-		g.pf("\t\t_, err = %sParseV2(val, v, 0, %s, false)", s.Helper, cache)
-	}
-	g.pf("\t\treturn err")
-	g.pf("\t}")
-	g.pf("\tswitch odjsonrt.NextKind(dec) {")
-	g.pf("\tcase 'n':")
-	g.pf("\t\tif _, err = dec.ReadToken(); err != nil {")
-	g.pf("\t\t\treturn err")
-	g.pf("\t\t}")
-	g.pf("\t\t*v = %s{}", s.Expr)
-	g.pf("\t\treturn nil")
-	g.pf("\tcase '{':")
-	g.pf("\tdefault:")
-	g.pf("\t\treturn odjsonrt.ErrKindFrom(dec, %s)", strconv.Quote(s.Expr))
-	g.pf("\t}")
-	g.pf("\tif _, err = dec.ReadToken(); err != nil {")
-	g.pf("\t\treturn err")
-	g.pf("\t}")
-	g.pf("\tfor odjsonrt.NextKind(dec) != '}' {")
-	g.pf("\t\tvar key jsontext.Value")
-	g.pf("\t\tkey, err = dec.ReadValue()")
-	g.pf("\t\tif err != nil {")
-	g.pf("\t\t\treturn err")
-	g.pf("\t\t}")
-	g.pf("\t\tidx := -1")
-	if len(s.Fields) > 0 {
-		g.pkg.Imports.Add("bytes", "bytes")
-		// Fast path: compare against the member name exactly as it appears
-		// in the document, which avoids unescaping it at all.
-		g.pf("\t\tswitch string(key) {")
-		for i, f := range s.Fields {
-			g.pf("\t\tcase %s:", strconv.Quote(jsonString(f.JSONName, false)))
-			g.pf("\t\t\tidx = %d", i)
-		}
-		g.pf("\t\t}")
-		// Only the escaped spelling of a name needs unquoting; unlike
-		// encoding/json, json/v2 does not fall back to a case-insensitive
-		// match, so neither does this decoder.
-		g.pf("\t\tif idx < 0 && bytes.IndexByte(key, '\\\\') >= 0 {")
-		g.pf("\t\t\tif name, ok := odjsonrt.UnquoteName(key); ok {")
-		g.pf("\t\t\t\tswitch string(name) {")
-		for i, f := range s.Fields {
-			g.pf("\t\t\t\tcase %s:", strconv.Quote(f.JSONName))
-			g.pf("\t\t\t\t\tidx = %d", i)
-		}
-		g.pf("\t\t\t\t}")
-		g.pf("\t\t\t}")
-		g.pf("\t\t}")
-	}
-	g.pf("\t\tswitch idx {")
-	for i, f := range s.Fields {
-		g.pf("\t\tcase %d:", i)
-		g.allocSteps(f, 3)
-		if f.AsString {
-			g.leafFrom(f.Type, selector(f), 3, true)
+	g.ifStmt(b, nil, callRT("WholeValue", dec), func(b *block) {
+		val := id("val")
+		g.emit(b, varDecl("val", jsontextValue()))
+		g.ifStmt(b, assignN(token.ASSIGN, []ast.Expr{val, errV}, call(sel(dec, "ReadValue"))), bin(errV, token.NEQ, nilV), func(b *block) {
+			g.emit(b, ret(errV))
+		})
+		if s.Local {
+			g.emit(b, assignN(token.ASSIGN, []ast.Expr{id("_"), errV}, call(sel(v, "odjsonParseV2"), val, num(0), cacheV, id("false"))))
 		} else {
-			g.decodeFrom(f.Type, selector(f), 3)
+			g.emit(b, assignN(token.ASSIGN, []ast.Expr{id("_"), errV}, call(id(s.Helper+"ParseV2"), val, v, num(0), cacheV, id("false"))))
 		}
-	}
-	g.pf("\t\tdefault:")
-	g.pf("\t\t\tif _, err = dec.ReadValue(); err != nil {")
-	g.pf("\t\t\t\treturn err")
-	g.pf("\t\t\t}")
-	g.pf("\t\t}")
-	g.pf("\t}")
-	g.pf("\t_, err = dec.ReadToken()")
-	g.pf("\treturn err")
+		g.emit(b, ret(errV))
+	})
+	g.switchStmt(b, nextKind(), func(sw *block) {
+		g.caseClause(sw, []ast.Expr{chr('n')}, func(b *block) {
+			g.readToken(b)
+			g.emit(b, assign(ptr(v), composite(typ(s.Expr))))
+			g.emit(b, ret(nilV))
+		})
+		g.caseClause(sw, []ast.Expr{chr('{')}, func(b *block) {})
+		g.defaultClause(sw, func(b *block) {
+			g.emit(b, ret(callRT("ErrKindFrom", dec, str(s.Expr))))
+		})
+	})
+	g.readToken(b)
+	g.forStmt(b, nil, bin(nextKind(), token.NEQ, chr('}')), nil, func(b *block) {
+		g.emit(b, varDecl("key", jsontextValue()))
+		g.emit(b, assignN(token.ASSIGN, []ast.Expr{key, errV}, call(sel(dec, "ReadValue"))))
+		g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
+			g.emit(b, ret(errV))
+		})
+		g.emit(b, define(idx, num(-1)))
+		if len(s.Fields) > 0 {
+			g.pkg.Imports.Add("bytes", "bytes")
+			// Fast path: compare against the member name exactly as it appears
+			// in the document, which avoids unescaping it at all.
+			g.switchStmt(b, call(id("string"), key), func(sw *block) {
+				for i, f := range s.Fields {
+					g.caseClause(sw, []ast.Expr{str(jsonString(f.JSONName, false))}, func(b *block) {
+						g.emit(b, assign(idx, num(int64(i))))
+					})
+				}
+			})
+			// Only the escaped spelling of a name needs unquoting; unlike
+			// encoding/json, json/v2 does not fall back to a case-insensitive
+			// match, so neither does this decoder.
+			name, ok := id("name"), id("ok")
+			g.ifStmt(b, nil, and(bin(idx, token.LSS, num(0)), bin(call(sel(id("bytes"), "IndexByte"), key, chr('\\')), token.GEQ, num(0))), func(b *block) {
+				g.ifStmt(b, assignN(token.DEFINE, []ast.Expr{name, ok}, callRT("UnquoteName", key)), ok, func(b *block) {
+					g.switchStmt(b, call(id("string"), name), func(sw *block) {
+						for i, f := range s.Fields {
+							g.caseClause(sw, []ast.Expr{str(f.JSONName)}, func(b *block) {
+								g.emit(b, assign(idx, num(int64(i))))
+							})
+						}
+					})
+				})
+			})
+		}
+		g.switchStmt(b, idx, func(sw *block) {
+			for i, f := range s.Fields {
+				g.caseClause(sw, []ast.Expr{num(int64(i))}, func(b *block) {
+					g.allocSteps(b, f)
+					if f.AsString {
+						g.leafFrom(b, f.Type, selector(f), true)
+					} else {
+						g.decodeFrom(b, f.Type, selector(f))
+					}
+				})
+			}
+			g.defaultClause(sw, func(b *block) {
+				g.ifStmt(b, assignN(token.ASSIGN, []ast.Expr{id("_"), errV}, call(sel(dec, "ReadValue"))), bin(errV, token.NEQ, nilV), func(b *block) {
+					g.emit(b, ret(errV))
+				})
+			})
+		})
+	})
+	g.emit(b, assignN(token.ASSIGN, []ast.Expr{id("_"), errV}, call(sel(dec, "ReadToken"))))
+	g.emit(b, ret(errV))
 }
 
 // containsStruct reports whether decoding a value of type t involves a struct
@@ -148,224 +171,218 @@ func scalarFast(t *analyzer.Type) bool {
 }
 
 // zeroLit renders the zero value of t, which is what json/v2 stores for null.
-func zeroLit(t *analyzer.Type) string {
+func zeroLit(t *analyzer.Type) ast.Expr {
 	switch t.Kind {
 	case analyzer.KindBool:
-		return "false"
+		return id("false")
 	case analyzer.KindInt, analyzer.KindUint, analyzer.KindFloat:
-		return "0"
+		return num(0)
 	case analyzer.KindString, analyzer.KindNumber:
-		return `""`
+		return str("")
 	case analyzer.KindArray, analyzer.KindStruct:
-		return t.Expr + "{}"
+		return composite(typ(t.Expr))
 	case analyzer.KindAny:
 		if t.Interface {
-			return "nil"
+			return nilV
 		}
-		return "*new(" + t.Expr + ")"
+		return &ast.StarExpr{X: call(id("new"), typ(t.Expr))}
 	}
-	return "nil"
+	return nilV
 }
 
 // leafFrom reads one complete value out of the decoder and decodes it. Scalars
 // go through the value helpers; anything else is handed to the byte oriented
 // emitter in trusted mode, since jsontext has already validated it.
-func (g *generator) leafFrom(t *analyzer.Type, target string, n int, quoted bool) {
-	val := g.tmp("val")
-	g.pf("%svar %s jsontext.Value", ind(n), val)
-	g.pf("%s%s, err = dec.ReadValue()", ind(n), val)
-	g.pf("%sif err != nil {", ind(n))
-	g.pf("%sreturn err", ind(n+1))
-	g.pf("%s}", ind(n))
+func (g *generator) leafFrom(b *block, t *analyzer.Type, target ast.Expr, quoted bool) {
+	val := id(g.tmp("val"))
+	g.emit(b, varDecl(val.Name, jsontextValue()))
+	g.emit(b, assignN(token.ASSIGN, []ast.Expr{val, errV}, call(sel(dec, "ReadValue"))))
+	g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
+		g.emit(b, ret(errV))
+	})
 	if !quoted && scalarFast(t) {
-		g.scalarFrom(t, target, val, n)
+		g.scalarFrom(b, t, target, val)
 		return
 	}
-	pos := g.tmp("vp")
-	g.pf("%s%s := 0", ind(n), pos)
-	c := ctx{data: val, pos: pos, single: true, trusted: true, trimmed: true, v2: true, cache: cache}
+	pos := id(g.tmp("vp"))
+	g.emit(b, define(pos, num(0)))
+	c := ctx{data: val.Name, pos: pos.Name, single: true, trusted: true, trimmed: true, v2: true, cache: cache}
 	if quoted {
-		g.decodeQuoted(t, target, c, n)
+		g.decodeQuoted(b, t, target, c)
 	} else {
-		g.decode(t, target, c, n)
+		g.decode(b, t, target, c)
 	}
 	// The decoder has already delimited the value, so where the fragment
 	// stopped inside it does not matter. Marking the offset used keeps the
 	// generated file free of dead stores.
-	g.pf("%s_ = %s", ind(n), pos)
+	g.emit(b, assign(id("_"), pos))
 }
 
 // scalarFrom decodes the complete value in val into a scalar target. A null
 // stores the zero value, as json/v2 does.
-func (g *generator) scalarFrom(t *analyzer.Type, target, val string, n int) {
-	x := g.tmp("x")
-	g.pf("%sif %s[0] == 'n' {", ind(n), val)
-	g.pf("%s%s = %s", ind(n+1), target, zeroLit(t))
-	g.pf("%s} else {", ind(n))
-	var native string
-	switch t.Kind {
-	case analyzer.KindBool:
-		native = "bool"
-		g.pf("%svar %s bool", ind(n+1), x)
-		g.pf("%s%s, _, err = odjsonrt.ParseBool(%s, 0)", ind(n+1), x, val)
-	case analyzer.KindInt:
-		native = "int64"
-		g.pf("%svar %s int64", ind(n+1), x)
-		g.pf("%s%s, _, err = odjsonrt.ParseInt(%s, 0, %d)", ind(n+1), x, val, t.Bits)
-	case analyzer.KindUint:
-		native = "uint64"
-		g.pf("%svar %s uint64", ind(n+1), x)
-		g.pf("%s%s, _, err = odjsonrt.ParseUint(%s, 0, %d)", ind(n+1), x, val, t.Bits)
-	case analyzer.KindFloat:
-		native = "float64"
-		g.pf("%svar %s float64", ind(n+1), x)
-		g.pf("%s%s, err = odjsonrt.ParseFloatValue(%s, %d)", ind(n+1), x, val, t.Bits)
-	case analyzer.KindString:
-		native = "string"
-		g.pf("%svar %s string", ind(n+1), x)
-		g.pf("%s%s, err = odjsonrt.ParseStringValue(%s, %s)", ind(n+1), x, val, cache)
-	}
-	g.pf("%sif err != nil {", ind(n+1))
-	g.pf("%sreturn err", ind(n+2))
-	g.pf("%s}", ind(n+1))
-	if t.Expr == native {
-		g.pf("%s%s = %s", ind(n+1), target, x)
-	} else {
-		g.pf("%s%s = %s(%s)", ind(n+1), target, t.Expr, x)
-	}
-	g.pf("%s}", ind(n))
+func (g *generator) scalarFrom(b *block, t *analyzer.Type, target ast.Expr, val *ast.Ident) {
+	x := id(g.tmp("x"))
+	s := g.ifStmt(b, nil, bin(index(val, num(0)), token.EQL, chr('n')), func(b *block) {
+		g.emit(b, assign(target, zeroLit(t)))
+	})
+	g.elseBlock(s, func(b *block) {
+		var native string
+		switch t.Kind {
+		case analyzer.KindBool:
+			native = "bool"
+			g.emit(b, varDecl(x.Name, id("bool")))
+			g.emit(b, assignN(token.ASSIGN, []ast.Expr{x, id("_"), errV}, callRT("ParseBool", val, num(0))))
+		case analyzer.KindInt:
+			native = "int64"
+			g.emit(b, varDecl(x.Name, id("int64")))
+			g.emit(b, assignN(token.ASSIGN, []ast.Expr{x, id("_"), errV}, callRT("ParseInt", val, num(0), num(int64(t.Bits)))))
+		case analyzer.KindUint:
+			native = "uint64"
+			g.emit(b, varDecl(x.Name, id("uint64")))
+			g.emit(b, assignN(token.ASSIGN, []ast.Expr{x, id("_"), errV}, callRT("ParseUint", val, num(0), num(int64(t.Bits)))))
+		case analyzer.KindFloat:
+			native = "float64"
+			g.emit(b, varDecl(x.Name, id("float64")))
+			g.emit(b, assignN(token.ASSIGN, []ast.Expr{x, errV}, callRT("ParseFloatValue", val, num(int64(t.Bits)))))
+		case analyzer.KindString:
+			native = "string"
+			g.emit(b, varDecl(x.Name, id("string")))
+			g.emit(b, assignN(token.ASSIGN, []ast.Expr{x, errV}, callRT("ParseStringValue", val, cacheV)))
+		}
+		g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
+			g.emit(b, ret(errV))
+		})
+		if t.Expr == native {
+			g.emit(b, assign(target, x))
+		} else {
+			g.emit(b, assign(target, call(typ(t.Expr), x)))
+		}
+	})
 }
 
 // decodeFrom writes the statements decoding one value out of the decoder into
 // target.
-func (g *generator) decodeFrom(t *analyzer.Type, target string, n int) {
+func (g *generator) decodeFrom(b *block, t *analyzer.Type, target ast.Expr) {
 	if !containsStruct(t) {
-		g.leafFrom(t, target, n, false)
+		g.leafFrom(b, t, target, false)
 		return
 	}
 	switch t.Kind {
 	case analyzer.KindPointer:
-		g.pf("%sif odjsonrt.NextKind(dec) == 'n' {", ind(n))
-		g.pf("%sif _, err = dec.ReadToken(); err != nil {", ind(n+1))
-		g.pf("%sreturn err", ind(n+2))
-		g.pf("%s}", ind(n+1))
-		g.pf("%s%s = nil", ind(n+1), target)
-		g.pf("%s} else {", ind(n))
-		g.pf("%sif %s == nil {", ind(n+1), target)
-		g.pf("%s%s = new(%s)", ind(n+2), target, t.Elem.Expr)
-		g.pf("%s}", ind(n+1))
-		g.decodeFrom(t.Elem, "(*"+target+")", n+1)
-		g.pf("%s}", ind(n))
+		s := g.ifStmt(b, nil, bin(nextKind(), token.EQL, chr('n')), func(b *block) {
+			g.readToken(b)
+			g.emit(b, assign(target, nilV))
+		})
+		g.elseBlock(s, func(b *block) {
+			g.ifStmt(b, nil, bin(target, token.EQL, nilV), func(b *block) {
+				g.emit(b, assign(target, call(id("new"), typ(t.Elem.Expr))))
+			})
+			g.decodeFrom(b, t.Elem, deref(target))
+		})
 	case analyzer.KindStruct:
+		var parse ast.Expr
 		if t.Struct.Local {
-			g.pf("%sif err = %s.odjsonParseFrom(dec, %s); err != nil {", ind(n), target, cache)
+			parse = call(sel(target, "odjsonParseFrom"), dec, cacheV)
 		} else {
-			g.pf("%sif err = %sParseFrom(dec, %s, %s); err != nil {", ind(n), t.Struct.Helper, addr(target), cache)
+			parse = call(id(t.Struct.Helper+"ParseFrom"), dec, addr(target), cacheV)
 		}
-		g.pf("%sreturn err", ind(n+1))
-		g.pf("%s}", ind(n))
+		g.ifStmt(b, assign(errV, parse), bin(errV, token.NEQ, nilV), func(b *block) {
+			g.emit(b, ret(errV))
+		})
 	case analyzer.KindSlice:
-		g.sliceFrom(t, target, n)
+		g.sliceFrom(b, t, target)
 	case analyzer.KindArray:
-		g.arrayFrom(t, target, n)
+		g.arrayFrom(b, t, target)
 	case analyzer.KindMap:
-		g.mapFrom(t, target, n)
+		g.mapFrom(b, t, target)
 	}
 }
 
-// openFrom emits the null and kind checks shared by the container decoders and
-// consumes the opening delimiter. A null zeroes the target, as json/v2 does.
-func (g *generator) openFrom(open byte, t *analyzer.Type, target string, n int) {
-	g.pf("%sswitch odjsonrt.NextKind(dec) {", ind(n))
-	g.pf("%scase 'n':", ind(n))
-	g.pf("%sif _, err = dec.ReadToken(); err != nil {", ind(n+1))
-	g.pf("%sreturn err", ind(n+2))
-	g.pf("%s}", ind(n+1))
-	g.pf("%s%s = %s", ind(n+1), target, zeroLit(t))
-	g.pf("%scase '%c':", ind(n), open)
-	g.pf("%sif _, err = dec.ReadToken(); err != nil {", ind(n+1))
-	g.pf("%sreturn err", ind(n+2))
-	g.pf("%s}", ind(n+1))
+// containerFrom emits the null and kind checks shared by the container
+// decoders around body, which decodes the container once its opening
+// delimiter has been consumed. A null zeroes the target, as json/v2 does.
+func (g *generator) containerFrom(b *block, open byte, t *analyzer.Type, target ast.Expr, body func(*block)) {
+	g.switchStmt(b, nextKind(), func(sw *block) {
+		g.caseClause(sw, []ast.Expr{chr('n')}, func(b *block) {
+			g.readToken(b)
+			g.emit(b, assign(target, zeroLit(t)))
+		})
+		g.caseClause(sw, []ast.Expr{chr(open)}, func(b *block) {
+			g.readToken(b)
+			body(b)
+		})
+		g.defaultClause(sw, func(b *block) {
+			g.emit(b, ret(callRT("ErrKindFrom", dec, str(t.Expr))))
+		})
+	})
 }
 
-func (g *generator) sliceFrom(t *analyzer.Type, target string, n int) {
-	s, e := g.tmp("s"), g.tmp("e")
-	g.openFrom('[', t, target, n)
-	g.pf("%s%s := %s[:0]", ind(n+1), s, target)
-	g.pf("%sif odjsonrt.NextKind(dec) != ']' && cap(%s) == 0 {", ind(n+1), s)
-	g.pf("%s%s = make(%s, 0, 4)", ind(n+2), s, t.Expr)
-	g.pf("%s}", ind(n+1))
-	g.pf("%sfor odjsonrt.NextKind(dec) != ']' {", ind(n+1))
-	g.pf("%svar %s %s", ind(n+2), e, t.Elem.Expr)
-	g.decodeFrom(t.Elem, e, n+2)
-	g.pf("%s%s = append(%s, %s)", ind(n+2), s, s, e)
-	g.pf("%s}", ind(n+1))
-	g.pf("%sif _, err = dec.ReadToken(); err != nil {", ind(n+1))
-	g.pf("%sreturn err", ind(n+2))
-	g.pf("%s}", ind(n+1))
-	g.pf("%sif %s == nil {", ind(n+1), s)
-	g.pf("%s%s = %s{}", ind(n+2), s, t.Expr)
-	g.pf("%s}", ind(n+1))
-	g.pf("%s%s = %s", ind(n+1), target, s)
-	g.closeFrom(t.Expr, n)
+func (g *generator) sliceFrom(b *block, t *analyzer.Type, target ast.Expr) {
+	s, e := id(g.tmp("s")), id(g.tmp("e"))
+	g.containerFrom(b, '[', t, target, func(b *block) {
+		g.emit(b, define(s, slice(target, nil, num(0))))
+		g.ifStmt(b, nil, and(bin(nextKind(), token.NEQ, chr(']')), bin(call(id("cap"), s), token.EQL, num(0))), func(b *block) {
+			g.emit(b, assign(s, call(id("make"), typ(t.Expr), num(0), num(4))))
+		})
+		g.forStmt(b, nil, bin(nextKind(), token.NEQ, chr(']')), nil, func(b *block) {
+			g.emit(b, varDecl(e.Name, typ(t.Elem.Expr)))
+			g.decodeFrom(b, t.Elem, e)
+			g.emit(b, assign(s, call(id("append"), s, e)))
+		})
+		g.readToken(b)
+		g.ifStmt(b, nil, bin(s, token.EQL, nilV), func(b *block) {
+			g.emit(b, assign(s, composite(typ(t.Expr))))
+		})
+		g.emit(b, assign(target, s))
+	})
 }
 
-func (g *generator) arrayFrom(t *analyzer.Type, target string, n int) {
-	i := g.tmp("i")
-	g.openFrom('[', t, target, n)
-	g.pf("%s%s := 0", ind(n+1), i)
-	g.pf("%sfor odjsonrt.NextKind(dec) != ']' {", ind(n+1))
-	// json/v2 rejects an array whose length does not match the Go array,
-	// where encoding/json silently pads or truncates.
-	g.pf("%sif %s >= %d {", ind(n+2), i, t.Len)
-	g.pf("%sreturn odjsonrt.ErrArrayLength(%s, true)", ind(n+3), strconv.Quote(t.Expr))
-	g.pf("%s}", ind(n+2))
-	g.decodeFrom(t.Elem, fmt.Sprintf("%s[%s]", target, i), n+2)
-	g.pf("%s%s++", ind(n+2), i)
-	g.pf("%s}", ind(n+1))
-	g.pf("%sif %s != %d {", ind(n+1), i, t.Len)
-	g.pf("%sreturn odjsonrt.ErrArrayLength(%s, false)", ind(n+2), strconv.Quote(t.Expr))
-	g.pf("%s}", ind(n+1))
-	g.pf("%sif _, err = dec.ReadToken(); err != nil {", ind(n+1))
-	g.pf("%sreturn err", ind(n+2))
-	g.pf("%s}", ind(n+1))
-	g.closeFrom(t.Expr, n)
+func (g *generator) arrayFrom(b *block, t *analyzer.Type, target ast.Expr) {
+	i := id(g.tmp("i"))
+	g.containerFrom(b, '[', t, target, func(b *block) {
+		g.emit(b, define(i, num(0)))
+		g.forStmt(b, nil, bin(nextKind(), token.NEQ, chr(']')), nil, func(b *block) {
+			// json/v2 rejects an array whose length does not match the Go array,
+			// where encoding/json silently pads or truncates.
+			g.ifStmt(b, nil, bin(i, token.GEQ, num(t.Len)), func(b *block) {
+				g.emit(b, ret(callRT("ErrArrayLength", str(t.Expr), id("true"))))
+			})
+			g.decodeFrom(b, t.Elem, index(target, i))
+			g.emit(b, incr(i))
+		})
+		g.ifStmt(b, nil, bin(i, token.NEQ, num(t.Len)), func(b *block) {
+			g.emit(b, ret(callRT("ErrArrayLength", str(t.Expr), id("false"))))
+		})
+		g.readToken(b)
+	})
 }
 
-func (g *generator) mapFrom(t *analyzer.Type, target string, n int) {
-	m, k, name, ok, key, mv := g.tmp("m"), g.tmp("k"), g.tmp("name"), g.tmp("ok"), g.tmp("key"), g.tmp("mv")
-	g.openFrom('{', t, target, n)
-	g.pf("%s%s := %s", ind(n+1), m, target)
-	g.pf("%sif %s == nil {", ind(n+1), m)
-	g.pf("%s%s = make(%s)", ind(n+2), m, t.Expr)
-	g.pf("%s}", ind(n+1))
-	g.pf("%sfor odjsonrt.NextKind(dec) != '}' {", ind(n+1))
-	g.pf("%svar %s jsontext.Value", ind(n+2), k)
-	g.pf("%s%s, err = dec.ReadValue()", ind(n+2), k)
-	g.pf("%sif err != nil {", ind(n+2))
-	g.pf("%sreturn err", ind(n+3))
-	g.pf("%s}", ind(n+2))
-	g.pf("%s%s, %s := odjsonrt.UnquoteName(%s)", ind(n+2), name, ok, k)
-	g.pf("%sif !%s {", ind(n+2), ok)
-	g.pf("%sreturn odjsonrt.ErrSyntax(%s, 0, \"invalid object name\")", ind(n+3), k)
-	g.pf("%s}", ind(n+2))
-	// The name is only valid until the next read, and a streaming decoder
-	// deliberately clobbers it then, so it becomes a string before the
-	// member value is read.
-	g.pf("%s%s := %s", ind(n+2), key, convert(t.Key.Expr, cache+".Make("+name+")"))
-	g.pf("%svar %s %s", ind(n+2), mv, t.Elem.Expr)
-	g.decodeFrom(t.Elem, mv, n+2)
-	g.pf("%s%s[%s] = %s", ind(n+2), m, key, mv)
-	g.pf("%s}", ind(n+1))
-	g.pf("%sif _, err = dec.ReadToken(); err != nil {", ind(n+1))
-	g.pf("%sreturn err", ind(n+2))
-	g.pf("%s}", ind(n+1))
-	g.pf("%s%s = %s", ind(n+1), target, m)
-	g.closeFrom(t.Expr, n)
-}
-
-func (g *generator) closeFrom(expr string, n int) {
-	g.pf("%sdefault:", ind(n))
-	g.pf("%sreturn odjsonrt.ErrKindFrom(dec, %s)", ind(n+1), strconv.Quote(expr))
-	g.pf("%s}", ind(n))
+func (g *generator) mapFrom(b *block, t *analyzer.Type, target ast.Expr) {
+	m, k, name, ok, mk, mv := id(g.tmp("m")), id(g.tmp("k")), id(g.tmp("name")), id(g.tmp("ok")), id(g.tmp("key")), id(g.tmp("mv"))
+	g.containerFrom(b, '{', t, target, func(b *block) {
+		g.emit(b, define(m, target))
+		g.ifStmt(b, nil, bin(m, token.EQL, nilV), func(b *block) {
+			g.emit(b, assign(m, call(id("make"), typ(t.Expr))))
+		})
+		g.forStmt(b, nil, bin(nextKind(), token.NEQ, chr('}')), nil, func(b *block) {
+			g.emit(b, varDecl(k.Name, jsontextValue()))
+			g.emit(b, assignN(token.ASSIGN, []ast.Expr{k, errV}, call(sel(dec, "ReadValue"))))
+			g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
+				g.emit(b, ret(errV))
+			})
+			g.emit(b, assignN(token.DEFINE, []ast.Expr{name, ok}, callRT("UnquoteName", k)))
+			g.ifStmt(b, nil, not(ok), func(b *block) {
+				g.emit(b, ret(callRT("ErrSyntax", k, num(0), str("invalid object name"))))
+			})
+			// The name is only valid until the next read, and a streaming decoder
+			// deliberately clobbers it then, so it becomes a string before the
+			// member value is read.
+			g.emit(b, define(mk, conv(t.Key.Expr, call(sel(cacheV, "Make"), name))))
+			g.emit(b, varDecl(mv.Name, typ(t.Elem.Expr)))
+			g.decodeFrom(b, t.Elem, mv)
+			g.emit(b, assign(index(m, mk), mv))
+		})
+		g.readToken(b)
+		g.emit(b, assign(target, m))
+	})
 }
