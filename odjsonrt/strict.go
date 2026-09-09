@@ -318,7 +318,7 @@ func ParseIntoV2(data []byte, p int, v any, strict bool) (int, error) {
 // ParseAnyStrict is [ParseAny] under json/v2's rules, interning strings
 // through c when it is not nil.
 func ParseAnyStrict(data []byte, p int, c *StringCache) (any, int, error) {
-	return parseAny(data, p, c, parseStrict)
+	return parseAny(data, p, c, true, false)
 }
 
 // strictLevel is what [SkipValueStrict] keeps per open object: where that
@@ -354,10 +354,34 @@ func nameHash(b []byte) uint64 {
 // strictKey parses the member name at p and appends it to names, unless the
 // current object, whose names start at names[lv.mark:], already holds it.
 func strictKey(data []byte, p int, names [][]byte, lv *strictLevel) ([][]byte, int, error) {
-	name, next, err := ParseKeyStrict(data, p)
-	if err != nil {
-		return names, next, err
+	// ParseKeyStrict's work, without its layers: the name is scanned in
+	// place, and only an escaped one is decoded.
+	if p >= len(data) {
+		return names, p, errUnexpectedEnd(p)
 	}
+	if data[p] != '"' {
+		return names, p, errChar(data, p, "looking for beginning of object key string")
+	}
+	end, hasEscape, _, err := scanStringStrict(data, p)
+	if err != nil {
+		return names, end, err
+	}
+	name := data[p+1 : end-1]
+	if hasEscape {
+		out, ok := unquote(name, true)
+		if !ok {
+			return names, p, ErrSyntax(data, p, "invalid string literal")
+		}
+		name = out
+	}
+	next := SkipSpace(data, end)
+	if next >= len(data) {
+		return names, next, errUnexpectedEnd(next)
+	}
+	if data[next] != ':' {
+		return names, next, errChar(data, next, "after object key")
+	}
+	next = SkipSpace(data, next+1)
 	h := nameHash(name)
 	w, bit := h>>62, uint64(1)<<(h>>56&63)
 	if lv.filter[w]&bit != 0 {
@@ -497,7 +521,8 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 // that case would refuse what the caller explicitly allowed.
 
 // ParseStringV2 is [ParseStringStrict] under strict and [ParseStringWith]
-// otherwise.
+// otherwise. It is one body rather than a call to either, so that a string
+// on the direct path costs the generated decoder a single call.
 func ParseStringV2(data []byte, p int, c *StringCache, strict bool) (string, int, error) {
 	if strict {
 		return ParseStringStrict(data, p, c)
@@ -569,10 +594,7 @@ func ParseUnmarshalerV2(data []byte, p int, u json.Unmarshaler, strict bool) (in
 
 // ParseAnyV2 is [ParseAnyStrict] under strict and [ParseAnyWith] otherwise.
 func ParseAnyV2(data []byte, p int, c *StringCache, strict bool) (any, int, error) {
-	if strict {
-		return parseAny(data, p, c, parseStrict)
-	}
-	return parseAny(data, p, c, parseTrusted)
+	return parseAny(data, p, c, strict, false)
 }
 
 // SkipValueV2 is [SkipValueStrict] under strict and [SkipValue] otherwise.

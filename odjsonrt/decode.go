@@ -509,34 +509,26 @@ type anyFrame struct {
 // strings string, booleans bool and null nil. The decoder is iterative and
 // rejects documents nested deeper than [MaxDepth].
 func ParseAny(data []byte, p int) (any, int, error) {
-	return parseAny(data, p, nil, parseLegacy)
+	return parseAny(data, p, nil, false, true)
 }
 
 // ParseAnyCached is [ParseAny] with a string cache for the member names and
 // string values it produces; c may be nil.
 func ParseAnyCached(data []byte, p int, c *StringCache) (any, int, error) {
-	return parseAny(data, p, c, parseLegacy)
+	return parseAny(data, p, c, false, true)
 }
-
-// parseMode says which rules a byte oriented parser applies to strings and
-// object names.
-type parseMode uint8
-
-const (
-	// parseLegacy is encoding/json: invalid UTF-8 becomes U+FFFD and the
-	// last of two equal names wins.
-	parseLegacy parseMode = iota
-	// parseTrusted is for input a jsontext.Decoder has validated: neither
-	// invalid UTF-8 nor duplicate names can occur, so nothing is checked.
-	parseTrusted
-	// parseStrict is encoding/json/v2 on unvalidated input: invalid UTF-8
-	// and duplicate names are errors.
-	parseStrict
-)
 
 // parseAny is the implementation of [ParseAny], [ParseAnyWith] and
 // [ParseAnyStrict]. sc, when not nil, interns the strings the result holds.
-func parseAny(data []byte, p int, sc *StringCache, mode parseMode) (any, int, error) {
+//
+// Two flags say which rules apply to strings and object names. legacy is
+// encoding/json: invalid UTF-8 becomes U+FFFD and the last of two equal
+// names wins. strict is encoding/json/v2 on unvalidated input: invalid
+// UTF-8 and duplicate names are errors. Neither is input a jsontext.Decoder
+// has validated, where nothing can occur that needs checking. They are two
+// booleans rather than one mode so that [ParseAnyV2] stays a single call
+// the compiler inlines into generated code.
+func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, int, error) {
 	var stack []anyFrame
 	var v any
 
@@ -556,7 +548,7 @@ func parseAny(data []byte, p int, sc *StringCache, mode parseMode) (any, int, er
 				v = obj
 				break
 			}
-			key, next, err := parseKeyString(data, p, sc, mode)
+			key, next, err := parseKeyString(data, p, sc, strict)
 			if err != nil {
 				return nil, next, err
 			}
@@ -581,13 +573,13 @@ func parseAny(data []byte, p int, sc *StringCache, mode parseMode) (any, int, er
 			var s string
 			var next int
 			var err error
-			switch mode {
-			case parseTrusted:
-				s, next, err = ParseStringWith(data, p, sc)
-			case parseStrict:
+			switch {
+			case legacy:
+				s, next, err = ParseStringCached(data, p, sc)
+			case strict:
 				s, next, err = ParseStringStrict(data, p, sc)
 			default:
-				s, next, err = ParseStringCached(data, p, sc)
+				s, next, err = ParseStringWith(data, p, sc)
 			}
 			if err != nil {
 				return nil, next, err
@@ -647,11 +639,11 @@ func parseAny(data []byte, p int, sc *StringCache, mode parseMode) (any, int, er
 			case data[p] == ',':
 				p = SkipSpace(data, p+1)
 				if isObj {
-					key, next, err := parseKeyString(data, p, sc, mode)
+					key, next, err := parseKeyString(data, p, sc, strict)
 					if err != nil {
 						return nil, next, err
 					}
-					if mode == parseStrict {
+					if strict {
 						if _, dup := f.obj[key]; dup {
 							return nil, p, ErrDuplicateName(data, p, []byte(key))
 						}
@@ -681,11 +673,11 @@ func parseAny(data []byte, p int, sc *StringCache, mode parseMode) (any, int, er
 
 // parseKeyString is [ParseKey] returning the member name as a Go string,
 // interned through c when it is not nil.
-func parseKeyString(data []byte, p int, c *StringCache, mode parseMode) (string, int, error) {
+func parseKeyString(data []byte, p int, c *StringCache, strict bool) (string, int, error) {
 	var key []byte
 	var next int
 	var err error
-	if mode == parseStrict {
+	if strict {
 		key, next, err = ParseKeyStrict(data, p)
 	} else {
 		key, _, next, err = ParseKey(data, p)

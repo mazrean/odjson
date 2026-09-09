@@ -265,5 +265,5 @@ func ParseFloatValue(val []byte, bits int) (float64, error) {
 // ParseAnyWith is [ParseAny] for input a [jsontext.Decoder] has validated,
 // with a string cache for the member names and string values it produces.
 func ParseAnyWith(data []byte, p int, c *StringCache) (any, int, error) {
-	return parseAny(data, p, c, parseTrusted)
+	return parseAny(data, p, c, false, false)
 }

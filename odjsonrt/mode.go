@@ -44,17 +44,9 @@ func (m StringMode) V2() bool { return m == ModeStream || m == ModeV2 }
 // AppendStringChecked is [AppendStringMode] with the error [ModeV2] can
 // report: a string that is not valid UTF-8. The other modes never fail.
 func AppendStringChecked(dst []byte, s string, m StringMode) ([]byte, error) {
-	switch m {
-	case ModeV2:
-		out, ok := appendQuotedV2(dst, unsafe.Slice(unsafe.StringData(s), len(s)))
-		if !ok {
-			return dst, ErrInvalidUTF8
-		}
-		return out, nil
-	case ModeStream:
-		return appendQuotedStreamString(dst, s), nil
-	}
-	return appendQuotedString(dst, s, m == ModeHTML), nil
+	// A single call, so that this inlines into generated code and a string
+	// under ModeV2, the common case, costs one call rather than two.
+	return appendStringChecked(dst, unsafe.Slice(unsafe.StringData(s), len(s)), m)
 }
 
 // ErrInvalidUTF8 is reported by [AppendStringChecked] under [ModeV2] for a
@@ -198,13 +190,20 @@ func appendEscape(dst []byte, b byte) []byte {
 	}
 }
 
-// appendQuotedV2 is the ModeV2 implementation: [appendQuotedStream]'s
-// escaping with json/v2's UTF-8 rule folded into the same pass. The word
-// scan stops at a byte that needs escaping or at the first non-ASCII byte;
-// a non-ASCII run is validated in place by skipNonASCII, which also finds
-// where the scan resumes. ok is false when src is not valid UTF-8, in which
-// case dst is returned as it was.
-func appendQuotedV2(dst []byte, src []byte) ([]byte, bool) {
+// appendStringChecked is [AppendStringChecked] on a byte slice. Its body is
+// the ModeV2 implementation: [appendQuotedStream]'s escaping with json/v2's
+// UTF-8 rule folded into the same pass. The word scan stops at a byte that
+// needs escaping or at the first non-ASCII byte; a non-ASCII run is
+// validated in place by skipNonASCII, which also finds where the scan
+// resumes. A string that is not valid UTF-8 is reported as [ErrInvalidUTF8]
+// with dst as it was. The other modes are handed on.
+func appendStringChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
+	switch m {
+	case ModeStream:
+		return appendQuotedStream(dst, src), nil
+	case ModeHTML, ModePlain:
+		return appendQuoted(dst, src, m == ModeHTML), nil
+	}
 	mark := len(dst)
 	dst = append(dst, '"')
 	start := 0
@@ -243,7 +242,7 @@ func appendQuotedV2(dst []byte, src []byte) ([]byte, bool) {
 			// The run stays part of the pending copy: a valid sequence
 			// holds nothing that needs escaping.
 			if i = skipNonASCII(src, i); i < 0 {
-				return dst[:mark], false
+				return dst[:mark], ErrInvalidUTF8
 			}
 			continue
 		}
@@ -253,7 +252,7 @@ func appendQuotedV2(dst []byte, src []byte) ([]byte, bool) {
 		start = i
 	}
 	dst = append(dst, src[start:]...)
-	return append(dst, '"'), true
+	return append(dst, '"'), nil
 }
 
 // ParseStringTrusted is [ParseString] for input whose UTF-8 has already been
