@@ -52,6 +52,15 @@ var codecs = []codec{
 		unmarshal: sonicTrusting.Unmarshal,
 	},
 	{
+		// sonic configured to produce encoding/json's bytes, which is what
+		// odjson's generated codec produces. sonic's default configuration
+		// neither escapes HTML nor validates UTF-8, so the default row is not
+		// comparing like with like.
+		name:      "sonic-std",
+		marshal:   sonic.ConfigStd.Marshal,
+		unmarshal: sonic.ConfigStd.Unmarshal,
+	},
+	{
 		// odjson's own entry points, bypassing every host library. This
 		// is the ceiling: the host libraries all re-validate the bytes a
 		// MarshalJSON method hands back, and this path does not.

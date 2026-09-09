@@ -41,6 +41,15 @@ var codecs = []codec{
 		marshal:   gojson.Marshal,
 		unmarshal: gojson.Unmarshal,
 	},
+	{
+		// sonic's default configuration neither escapes HTML nor validates
+		// UTF-8, so it is not producing encoding/json's bytes. ConfigStd does
+		// both, which is the semantics odjson's generated codec implements;
+		// this row makes the comparison like for like.
+		name:      "sonic-std",
+		marshal:   sonic.ConfigStd.Marshal,
+		unmarshal: sonic.ConfigStd.Unmarshal,
+	},
 }
 
 // payload is a single JSON document plus the Go type it decodes into.
