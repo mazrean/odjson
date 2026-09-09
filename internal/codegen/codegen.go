@@ -64,6 +64,10 @@ type ctx struct {
 	// cache names the *odjsonrt.StringCache the fragment interns strings
 	// through, or is empty when it allocates every string.
 	cache string
+	// strict says nobody has validated the bytes, so the fragment must
+	// reject what encoding/json/v2 rejects: invalid UTF-8 and duplicate
+	// object names.
+	strict bool
 }
 
 // fail renders the statement returning expr as the fragment's error.
@@ -187,7 +191,7 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 			g.pf("// input a jsontext.Decoder has already validated.")
 			g.pf("func %sParseV2(data []byte, v *%s, p int, %s *odjsonrt.StringCache) (int, error) {", s.Helper, s.Expr, cache)
 		}
-		g.decodeStruct(s, ctx{data: "data", pos: "p", ret: "p", trusted: true, v2: true, cache: cache})
+		g.decodeStruct(s, ctx{data: "data", pos: "p", ret: "p", v2: true, cache: cache, strict: true})
 		g.pf("}")
 		g.pf("")
 		if s.Local {
@@ -264,9 +268,22 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 	g.pf("")
 	g.pf("// MarshalJSONTo implements encoding/json/v2.MarshalerTo.")
 	g.pf("func (v %s) MarshalJSONTo(enc *jsontext.Encoder) error {", s.Expr)
-	g.pf("\t// WriteValue copies what it is given, so the scratch buffer can go")
-	g.pf("\t// straight back to the pool. ModeStream leaves the HTML escaping and")
-	g.pf("\t// the UTF-8 validation to the encoder, which performs both while")
+	g.pf("\t// A top-level value under a plain json.Marshal is appended straight")
+	g.pf("\t// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what")
+	g.pf("\t// qualifies. Nothing downstream looks at those bytes, so ModeV2 does")
+	g.pf("\t// json/v2's own escaping and rejects invalid UTF-8 itself.")
+	g.pf("\tif buf, ok := odjsonrt.BeginDirectEncode(enc); ok {")
+	g.pf("\t\tbuf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)")
+	g.pf("\t\tif err != nil {")
+	g.pf("\t\t\treturn err")
+	g.pf("\t\t}")
+	g.pf("\t\todjsonSize%s.Record(buf)", name)
+	g.pf("\t\todjsonrt.EndDirectEncode(enc, buf)")
+	g.pf("\t\treturn nil")
+	g.pf("\t}")
+	g.pf("\t// Otherwise WriteValue copies what it is given, so the scratch buffer")
+	g.pf("\t// can go straight back to the pool. ModeStream leaves the HTML escaping")
+	g.pf("\t// and the UTF-8 validation to the encoder, which performs both while")
 	g.pf("\t// reformatting the value either way.")
 	g.pf("\tbuf := odjsonrt.GetBuffer()")
 	g.pf("\tvar err error")
@@ -284,7 +301,19 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 	g.pf("\t// The cache plays the part of json/v2's own string cache: a value")
 	g.pf("\t// that recurs in the document is allocated once.")
 	g.pf("\t%s := odjsonrt.GetStringCache()", cache)
-	g.pf("\terr := v.odjsonParseFrom(dec, %s)", cache)
+	g.pf("\tvar err error")
+	g.pf("\t// A top-level value under a plain json.Unmarshal is parsed straight")
+	g.pf("\t// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what")
+	g.pf("\t// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects")
+	g.pf("\t// what jsontext would have.")
+	g.pf("\tif data, ok := odjsonrt.BeginDirectDecode(dec); ok {")
+	g.pf("\t\tvar end int")
+	g.pf("\t\tif end, err = v.odjsonParseV2(data, 0, %s); err == nil {", cache)
+	g.pf("\t\t\todjsonrt.EndDirectDecode(dec, end)")
+	g.pf("\t\t}")
+	g.pf("\t} else {")
+	g.pf("\t\terr = v.odjsonParseFrom(dec, %s)", cache)
+	g.pf("\t}")
 	g.pf("\todjsonrt.PutStringCache(%s)", cache)
 	g.pf("\treturn err")
 	g.pf("}")

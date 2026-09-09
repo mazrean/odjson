@@ -2,6 +2,7 @@ package odjsonrt
 
 import (
 	"encoding/binary"
+	"errors"
 	"unicode/utf8"
 	"unsafe"
 )
@@ -26,10 +27,40 @@ const (
 	// byte >= 0x80 verbatim. It is only correct when the result is passed to
 	// a jsontext.Encoder, which rejects invalid UTF-8 itself.
 	ModeStream
+	// ModeV2 is encoding/json/v2's own output: ModeStream's escaping, with
+	// invalid UTF-8 reported as an error since nothing downstream will. It
+	// is what the direct path (see direct.go) writes into the encoder.
+	ModeV2
 )
 
 // EscapeHTML reports whether the mode escapes '<', '>' and '&'.
 func (m StringMode) EscapeHTML() bool { return m == ModeHTML }
+
+// V2 reports whether the mode follows encoding/json/v2's semantics for
+// everything but string escaping: nil containers encode as empty ones and
+// omitempty keeps zero numbers and bools.
+func (m StringMode) V2() bool { return m == ModeStream || m == ModeV2 }
+
+// AppendStringChecked is [AppendStringMode] with the error [ModeV2] can
+// report: a string that is not valid UTF-8. The other modes never fail.
+func AppendStringChecked(dst []byte, s string, m StringMode) ([]byte, error) {
+	switch m {
+	case ModeV2:
+		src := unsafe.Slice(unsafe.StringData(s), len(s))
+		out, hi := appendQuotedStreamScan(dst, src)
+		if hi&swarHi != 0 && !utf8.Valid(src) {
+			return dst, ErrInvalidUTF8
+		}
+		return out, nil
+	case ModeStream:
+		return appendQuotedStreamString(dst, s), nil
+	}
+	return appendQuotedString(dst, s, m == ModeHTML), nil
+}
+
+// ErrInvalidUTF8 is reported by [AppendStringChecked] under [ModeV2] for a
+// string that is not valid UTF-8, which encoding/json/v2 refuses to encode.
+var ErrInvalidUTF8 = errors.New("odjson: invalid UTF-8 in string")
 
 // streamSafeSet marks the bytes ModeStream copies verbatim: every byte that
 // JSON does not require to be escaped, including all of 0x80-0xFF. U+2028 and
@@ -45,8 +76,9 @@ var streamSafeSet = func() (t [256]bool) {
 }()
 
 // AppendStringMode appends s to dst as a quoted JSON string under mode m.
+// Under [ModeV2] it cannot report invalid UTF-8; use [AppendStringChecked].
 func AppendStringMode(dst []byte, s string, m StringMode) []byte {
-	if m == ModeStream {
+	if m.V2() {
 		return appendQuotedStreamString(dst, s)
 	}
 	return appendQuotedString(dst, s, m == ModeHTML)
@@ -54,7 +86,7 @@ func AppendStringMode(dst []byte, s string, m StringMode) []byte {
 
 // AppendStringBytesMode is [AppendStringMode] for a byte slice.
 func AppendStringBytesMode(dst []byte, s []byte, m StringMode) []byte {
-	if m == ModeStream {
+	if m.V2() {
 		return appendQuotedStream(dst, s)
 	}
 	return appendQuoted(dst, s, m == ModeHTML)
@@ -63,7 +95,7 @@ func AppendStringBytesMode(dst []byte, s []byte, m StringMode) []byte {
 // AppendStringQuotedMode writes s as a JSON string whose content is itself a
 // JSON string, which is what the ",string" struct tag option asks for.
 func AppendStringQuotedMode(dst []byte, s string, m StringMode) []byte {
-	if m != ModeStream {
+	if !m.V2() {
 		return AppendStringQuoted(dst, s, m == ModeHTML)
 	}
 	buf := GetBuffer()
@@ -104,14 +136,25 @@ func appendQuotedStreamString(dst []byte, s string) []byte {
 // per iteration, whole safe runs are copied at once, and no UTF-8 decoding
 // happens at all.
 func appendQuotedStream(dst []byte, src []byte) []byte {
+	dst, _ = appendQuotedStreamScan(dst, src)
+	return dst
+}
+
+// appendQuotedStreamScan is [appendQuotedStream] that also returns the OR of
+// every byte it scanned, so that a caller who must validate UTF-8 can tell
+// from hi&swarHi whether src has any non-ASCII byte at all. The scan touches
+// every byte anyway; pure ASCII, the common case, then costs nothing extra.
+func appendQuotedStreamScan(dst []byte, src []byte) ([]byte, uint64) {
 	dst = append(dst, '"')
 	start := 0
+	var hi uint64
 	for i := 0; i < len(src); {
 		// Two words per iteration: the loads are independent, so the CPU
 		// overlaps them and the scan runs close to load throughput.
 		for i+16 <= len(src) {
 			w0 := binary.LittleEndian.Uint64(src[i:])
 			w1 := binary.LittleEndian.Uint64(src[i+8:])
+			hi |= w0 | w1
 			if m0 := swarUnsafe(w0); m0 != 0 {
 				i += swarIndex(m0)
 				goto found
@@ -123,13 +166,16 @@ func appendQuotedStream(dst []byte, src []byte) []byte {
 			i += 16
 		}
 		for i+8 <= len(src) {
-			if m := swarUnsafe(binary.LittleEndian.Uint64(src[i:])); m != 0 {
+			w := binary.LittleEndian.Uint64(src[i:])
+			hi |= w
+			if m := swarUnsafe(w); m != 0 {
 				i += swarIndex(m)
 				goto found
 			}
 			i += 8
 		}
 		for i < len(src) && streamSafeSet[src[i]] {
+			hi |= uint64(src[i])
 			i++
 		}
 	found:
@@ -157,7 +203,7 @@ func appendQuotedStream(dst []byte, src []byte) []byte {
 		start = i
 	}
 	dst = append(dst, src[start:]...)
-	return append(dst, '"')
+	return append(dst, '"'), hi
 }
 
 // ParseStringTrusted is [ParseString] for input whose UTF-8 has already been
@@ -181,7 +227,7 @@ func ParseStringTrusted(data []byte, p int) (string, int, error) {
 	if !hasEscape {
 		return string(body), end, nil
 	}
-	out, ok := unquote(body)
+	out, ok := unquote(body, false)
 	if !ok {
 		return "", p, ErrSyntax(data, p, "invalid string literal")
 	}
@@ -197,7 +243,7 @@ func UnquoteName(name []byte) ([]byte, bool) {
 	body := name[1 : len(name)-1]
 	for i := 0; i < len(body); i++ {
 		if body[i] == '\\' {
-			return unquote(body)
+			return unquote(body, false)
 		}
 	}
 	return body, true
@@ -239,7 +285,7 @@ func kindName(kind byte) string {
 // jsontext.Encoder must follow suit: a drop-in accelerator has to preserve the
 // output of the library it is dropped into.
 func AppendNilSlice(dst []byte, m StringMode) []byte {
-	if m == ModeStream {
+	if m.V2() {
 		return append(dst, '[', ']')
 	}
 	return append(dst, "null"...)
@@ -247,7 +293,7 @@ func AppendNilSlice(dst []byte, m StringMode) []byte {
 
 // AppendNilMap writes a nil map under mode m.
 func AppendNilMap(dst []byte, m StringMode) []byte {
-	if m == ModeStream {
+	if m.V2() {
 		return append(dst, '{', '}')
 	}
 	return append(dst, "null"...)
@@ -255,7 +301,7 @@ func AppendNilMap(dst []byte, m StringMode) []byte {
 
 // AppendNilBytes writes a nil byte slice under mode m.
 func AppendNilBytes(dst []byte, m StringMode) []byte {
-	if m == ModeStream {
+	if m.V2() {
 		return append(dst, '"', '"')
 	}
 	return append(dst, "null"...)

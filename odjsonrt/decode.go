@@ -56,7 +56,7 @@ func ParseStringBytes(data []byte, p int) (s []byte, aliased bool, next int, err
 	if !hasEscape && (!nonASCII || utf8.Valid(body)) {
 		return body, true, end, nil
 	}
-	out, ok := unquote(body)
+	out, ok := unquote(body, false)
 	if !ok {
 		return nil, false, p, ErrSyntax(data, p, "invalid string literal")
 	}
@@ -345,13 +345,28 @@ type anyFrame struct {
 // strings string, booleans bool and null nil. The decoder is iterative and
 // rejects documents nested deeper than [MaxDepth].
 func ParseAny(data []byte, p int) (any, int, error) {
-	return parseAny(data, p, nil, false)
+	return parseAny(data, p, nil, parseLegacy)
 }
 
-// parseAny is the implementation of [ParseAny] and [ParseAnyWith]. trusted
-// says the input has already been validated as UTF-8, and c, when not nil,
-// interns the strings the result holds.
-func parseAny(data []byte, p int, sc *StringCache, trusted bool) (any, int, error) {
+// parseMode says which rules a byte oriented parser applies to strings and
+// object names.
+type parseMode uint8
+
+const (
+	// parseLegacy is encoding/json: invalid UTF-8 becomes U+FFFD and the
+	// last of two equal names wins.
+	parseLegacy parseMode = iota
+	// parseTrusted is for input a jsontext.Decoder has validated: neither
+	// invalid UTF-8 nor duplicate names can occur, so nothing is checked.
+	parseTrusted
+	// parseStrict is encoding/json/v2 on unvalidated input: invalid UTF-8
+	// and duplicate names are errors.
+	parseStrict
+)
+
+// parseAny is the implementation of [ParseAny], [ParseAnyWith] and
+// [ParseAnyStrict]. sc, when not nil, interns the strings the result holds.
+func parseAny(data []byte, p int, sc *StringCache, mode parseMode) (any, int, error) {
 	var stack []anyFrame
 	var v any
 
@@ -371,7 +386,7 @@ func parseAny(data []byte, p int, sc *StringCache, trusted bool) (any, int, erro
 				v = obj
 				break
 			}
-			key, next, err := parseKeyString(data, p, sc)
+			key, next, err := parseKeyString(data, p, sc, mode)
 			if err != nil {
 				return nil, next, err
 			}
@@ -394,9 +409,12 @@ func parseAny(data []byte, p int, sc *StringCache, trusted bool) (any, int, erro
 			var s string
 			var next int
 			var err error
-			if trusted {
+			switch mode {
+			case parseTrusted:
 				s, next, err = ParseStringWith(data, p, sc)
-			} else {
+			case parseStrict:
+				s, next, err = ParseStringStrict(data, p, sc)
+			default:
 				s, next, err = ParseString(data, p)
 			}
 			if err != nil {
@@ -449,9 +467,14 @@ func parseAny(data []byte, p int, sc *StringCache, trusted bool) (any, int, erro
 			case data[p] == ',':
 				p = SkipSpace(data, p+1)
 				if isObj {
-					key, next, err := parseKeyString(data, p, sc)
+					key, next, err := parseKeyString(data, p, sc, mode)
 					if err != nil {
 						return nil, next, err
+					}
+					if mode == parseStrict {
+						if _, dup := f.obj[key]; dup {
+							return nil, p, ErrDuplicateName(data, p, []byte(key))
+						}
 					}
 					f.key = key
 					p = next
@@ -478,8 +501,15 @@ func parseAny(data []byte, p int, sc *StringCache, trusted bool) (any, int, erro
 
 // parseKeyString is [ParseKey] returning the member name as a Go string,
 // interned through c when it is not nil.
-func parseKeyString(data []byte, p int, c *StringCache) (string, int, error) {
-	key, _, next, err := ParseKey(data, p)
+func parseKeyString(data []byte, p int, c *StringCache, mode parseMode) (string, int, error) {
+	var key []byte
+	var next int
+	var err error
+	if mode == parseStrict {
+		key, next, err = ParseKeyStrict(data, p)
+	} else {
+		key, _, next, err = ParseKey(data, p)
+	}
 	if err != nil {
 		return "", next, err
 	}
@@ -489,8 +519,9 @@ func parseKeyString(data []byte, p int, c *StringCache) (string, int, error) {
 // unquote decodes the body of a JSON string literal (the bytes between the
 // quotes) that has already been validated by scanString. It mirrors
 // encoding/json's unquoteBytes: escapes are expanded, unpaired surrogates and
-// invalid UTF-8 become U+FFFD.
-func unquote(s []byte) ([]byte, bool) {
+// invalid UTF-8 become U+FFFD. Under strict an unpaired surrogate is instead
+// an error, as it is for encoding/json/v2.
+func unquote(s []byte, strict bool) ([]byte, bool) {
 	b := make([]byte, len(s)+2*utf8.UTFMax)
 	w := 0
 	r := 0
@@ -545,6 +576,9 @@ func unquote(s []byte) ([]byte, bool) {
 						r += 6
 						w += utf8.EncodeRune(b[w:], dec)
 						break
+					}
+					if strict {
+						return nil, false
 					}
 					rr = utf8.RuneError
 				}

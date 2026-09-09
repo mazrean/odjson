@@ -151,7 +151,7 @@ func ParseStringValue(val []byte, c *StringCache) (string, error) {
 	if bytes.IndexByte(body, '\\') < 0 {
 		return c.Make(body), nil
 	}
-	out, ok := unquote(body)
+	out, ok := unquote(body, false)
 	if !ok {
 		return "", ErrSyntax(val, 0, "invalid string literal")
 	}
@@ -174,7 +174,7 @@ func ParseStringWith(data []byte, p int, c *StringCache) (string, int, error) {
 	if !hasEscape {
 		return c.Make(body), end, nil
 	}
-	out, ok := unquote(body)
+	out, ok := unquote(body, false)
 	if !ok {
 		return "", p, ErrSyntax(data, p, "invalid string literal")
 	}
@@ -198,5 +198,5 @@ func ParseFloatValue(val []byte, bits int) (float64, error) {
 // ParseAnyWith is [ParseAny] for input a [jsontext.Decoder] has validated,
 // with a string cache for the member names and string values it produces.
 func ParseAnyWith(data []byte, p int, c *StringCache) (any, int, error) {
-	return parseAny(data, p, c, true)
+	return parseAny(data, p, c, parseTrusted)
 }

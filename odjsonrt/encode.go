@@ -369,7 +369,7 @@ func appendAny(dst []byte, v any, m StringMode, depth int) ([]byte, error) {
 	case bool:
 		return AppendBool(dst, x), nil
 	case string:
-		return AppendStringMode(dst, x, m), nil
+		return AppendStringChecked(dst, x, m)
 	case float64:
 		return AppendFloat(dst, x, 64)
 	case float32:
@@ -421,7 +421,7 @@ func appendAny(dst []byte, v any, m StringMode, depth int) ([]byte, error) {
 		if x == nil {
 			return append(dst, "null"...), nil
 		}
-		if m == ModeStream {
+		if m.V2() {
 			// encoding/json/v2 writes object members in map iteration order;
 			// only encoding/json sorts them. Skipping the sort is both the
 			// matching semantics and one less allocation per object.
@@ -432,9 +432,11 @@ func appendAny(dst []byte, v any, m StringMode, depth int) ([]byte, error) {
 					dst = append(dst, ',')
 				}
 				first = false
-				dst = AppendStringMode(dst, k, m)
-				dst = append(dst, ':')
 				var err error
+				if dst, err = AppendStringChecked(dst, k, m); err != nil {
+					return dst, err
+				}
+				dst = append(dst, ':')
 				if dst, err = appendAny(dst, elem, m, depth+1); err != nil {
 					return dst, err
 				}

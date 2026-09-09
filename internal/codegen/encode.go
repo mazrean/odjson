@@ -60,7 +60,7 @@ func (g *generator) encodeStruct(s *analyzer.StructInfo) {
 				// encoding/json/v2 only omits values that encode as "",
 				// [], {} or null, so under ModeStream they stay.
 				if alwaysKeptByV2(f.Type) {
-					c = "(" + mode + " == odjsonrt.ModeStream || " + c + ")"
+					c = "(" + mode + ".V2() || " + c + ")"
 				}
 				conds = append(conds, c)
 			}
@@ -163,7 +163,8 @@ func (g *generator) encode(t *analyzer.Type, src string, addressable bool, n int
 		g.pf("%sdst, err = odjsonrt.AppendFloat(dst, float64(%s), %d)", ind(n), src, t.Bits)
 		g.encErr(n)
 	case analyzer.KindString:
-		g.pf("%sdst = odjsonrt.AppendStringMode(dst, string(%s), %s)", ind(n), src, mode)
+		g.pf("%sdst, err = odjsonrt.AppendStringChecked(dst, string(%s), %s)", ind(n), src, mode)
+		g.encErr(n)
 	case analyzer.KindBytes:
 		g.pf("%sif %s == nil {", ind(n), src)
 		g.pf("%sdst = odjsonrt.AppendNilBytes(dst, %s)", ind(n+1), mode)
@@ -210,7 +211,8 @@ func (g *generator) encode(t *analyzer.Type, src string, addressable bool, n int
 		g.pf("%sif %s > 0 {", ind(n+2), i)
 		g.pf("%sdst = append(dst, ',')", ind(n+3))
 		g.pf("%s}", ind(n+2))
-		g.pf("%sdst = odjsonrt.AppendStringMode(dst, %s, %s)", ind(n+2), k, mode)
+		g.pf("%sdst, err = odjsonrt.AppendStringChecked(dst, %s, %s)", ind(n+2), k, mode)
+		g.encErr(n + 2)
 		g.pf("%sdst = append(dst, ':')", ind(n+2))
 		g.pf("%s%s := %s[%s]", ind(n+2), mv, src, convert(t.Key.Expr, k))
 		g.encode(t.Elem, mv, true, n+2)

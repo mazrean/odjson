@@ -112,10 +112,15 @@ func (v *Raw) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 	if p < len(data) && data[p] == '}' {
 		return p + 1, nil
 	}
+	var seen [1]uint64
+	_ = seen
+	var unknownBuf [8][]byte
+	unknown := unknownBuf[:0]
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
-		key, _, p, err = odjsonrt.ParseKey(data, p)
+		kp := p
+		key, p, err = odjsonrt.ParseKeyStrict(data, p)
 		if err != nil {
 			return p, err
 		}
@@ -126,13 +131,23 @@ func (v *Raw) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 		}
 		switch idx {
 		case 0:
-			p, err = odjsonrt.ParseUnmarshaler(data, p, &v.X)
+			if seen[0]&(1<<0) != 0 {
+				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			}
+			seen[0] |= 1 << 0
+			p, err = odjsonrt.ParseUnmarshalerStrict(data, p, &v.X)
 			if err != nil {
 				return p, err
 			}
 		default:
+			for _, u := range unknown {
+				if string(u) == string(key) {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				}
+			}
+			unknown = append(unknown, key)
 			p = odjsonrt.SkipSpace(data, p)
-			p, err = odjsonrt.SkipValue(data, p)
+			p, err = odjsonrt.SkipValueStrict(data, p)
 			if err != nil {
 				return p, err
 			}
@@ -261,9 +276,22 @@ func (v *Raw) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Raw) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// WriteValue copies what it is given, so the scratch buffer can go
-	// straight back to the pool. ModeStream leaves the HTML escaping and
-	// the UTF-8 validation to the encoder, which performs both while
+	// A top-level value under a plain json.Marshal is appended straight
+	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
+	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
+	// json/v2's own escaping and rejects invalid UTF-8 itself.
+	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
+		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+		if err != nil {
+			return err
+		}
+		odjsonSizeRaw.Record(buf)
+		odjsonrt.EndDirectEncode(enc, buf)
+		return nil
+	}
+	// Otherwise WriteValue copies what it is given, so the scratch buffer
+	// can go straight back to the pool. ModeStream leaves the HTML escaping
+	// and the UTF-8 validation to the encoder, which performs both while
 	// reformatting the value either way.
 	buf := odjsonrt.GetBuffer()
 	var err error
@@ -280,7 +308,19 @@ func (v *Raw) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// The cache plays the part of json/v2's own string cache: a value
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
-	err := v.odjsonParseFrom(dec, sc)
+	var err error
+	// A top-level value under a plain json.Unmarshal is parsed straight
+	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
+	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
+	// what jsontext would have.
+	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+		var end int
+		if end, err = v.odjsonParseV2(data, 0, sc); err == nil {
+			odjsonrt.EndDirectDecode(dec, end)
+		}
+	} else {
+		err = v.odjsonParseFrom(dec, sc)
+	}
 	odjsonrt.PutStringCache(sc)
 	return err
 }
@@ -398,10 +438,15 @@ func (v *Value) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 	if p < len(data) && data[p] == '}' {
 		return p + 1, nil
 	}
+	var seen [1]uint64
+	_ = seen
+	var unknownBuf [8][]byte
+	unknown := unknownBuf[:0]
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
-		key, _, p, err = odjsonrt.ParseKey(data, p)
+		kp := p
+		key, p, err = odjsonrt.ParseKeyStrict(data, p)
 		if err != nil {
 			return p, err
 		}
@@ -412,21 +457,31 @@ func (v *Value) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 		}
 		switch idx {
 		case 0:
+			if seen[0]&(1<<0) != 0 {
+				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			}
+			seen[0] |= 1 << 0
 			p = odjsonrt.SkipSpace(data, p)
 			if np6, ok7 := odjsonrt.ParseNull(data, p); ok7 {
 				p = np6
 				v.X = nil
 			} else {
 				var a8 any
-				a8, p, err = odjsonrt.ParseAnyWith(data, p, sc)
+				a8, p, err = odjsonrt.ParseAnyStrict(data, p, sc)
 				if err != nil {
 					return p, err
 				}
 				v.X = a8
 			}
 		default:
+			for _, u := range unknown {
+				if string(u) == string(key) {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				}
+			}
+			unknown = append(unknown, key)
 			p = odjsonrt.SkipSpace(data, p)
-			p, err = odjsonrt.SkipValue(data, p)
+			p, err = odjsonrt.SkipValueStrict(data, p)
 			if err != nil {
 				return p, err
 			}
@@ -562,9 +617,22 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Value) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// WriteValue copies what it is given, so the scratch buffer can go
-	// straight back to the pool. ModeStream leaves the HTML escaping and
-	// the UTF-8 validation to the encoder, which performs both while
+	// A top-level value under a plain json.Marshal is appended straight
+	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
+	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
+	// json/v2's own escaping and rejects invalid UTF-8 itself.
+	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
+		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+		if err != nil {
+			return err
+		}
+		odjsonSizeValue.Record(buf)
+		odjsonrt.EndDirectEncode(enc, buf)
+		return nil
+	}
+	// Otherwise WriteValue copies what it is given, so the scratch buffer
+	// can go straight back to the pool. ModeStream leaves the HTML escaping
+	// and the UTF-8 validation to the encoder, which performs both while
 	// reformatting the value either way.
 	buf := odjsonrt.GetBuffer()
 	var err error
@@ -581,7 +649,19 @@ func (v *Value) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// The cache plays the part of json/v2's own string cache: a value
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
-	err := v.odjsonParseFrom(dec, sc)
+	var err error
+	// A top-level value under a plain json.Unmarshal is parsed straight
+	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
+	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
+	// what jsontext would have.
+	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+		var end int
+		if end, err = v.odjsonParseV2(data, 0, sc); err == nil {
+			odjsonrt.EndDirectDecode(dec, end)
+		}
+	} else {
+		err = v.odjsonParseFrom(dec, sc)
+	}
 	odjsonrt.PutStringCache(sc)
 	return err
 }
@@ -687,10 +767,15 @@ func (v *Typed) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 	if p < len(data) && data[p] == '}' {
 		return p + 1, nil
 	}
+	var seen [1]uint64
+	_ = seen
+	var unknownBuf [8][]byte
+	unknown := unknownBuf[:0]
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
-		key, _, p, err = odjsonrt.ParseKey(data, p)
+		kp := p
+		key, p, err = odjsonrt.ParseKeyStrict(data, p)
 		if err != nil {
 			return p, err
 		}
@@ -701,13 +786,23 @@ func (v *Typed) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 		}
 		switch idx {
 		case 0:
+			if seen[0]&(1<<0) != 0 {
+				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			}
+			seen[0] |= 1 << 0
 			p, err = v.X.odjsonParseV2(data, p, sc)
 			if err != nil {
 				return p, err
 			}
 		default:
+			for _, u := range unknown {
+				if string(u) == string(key) {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				}
+			}
+			unknown = append(unknown, key)
 			p = odjsonrt.SkipSpace(data, p)
-			p, err = odjsonrt.SkipValue(data, p)
+			p, err = odjsonrt.SkipValueStrict(data, p)
 			if err != nil {
 				return p, err
 			}
@@ -828,9 +923,22 @@ func (v *Typed) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Typed) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// WriteValue copies what it is given, so the scratch buffer can go
-	// straight back to the pool. ModeStream leaves the HTML escaping and
-	// the UTF-8 validation to the encoder, which performs both while
+	// A top-level value under a plain json.Marshal is appended straight
+	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
+	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
+	// json/v2's own escaping and rejects invalid UTF-8 itself.
+	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
+		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+		if err != nil {
+			return err
+		}
+		odjsonSizeTyped.Record(buf)
+		odjsonrt.EndDirectEncode(enc, buf)
+		return nil
+	}
+	// Otherwise WriteValue copies what it is given, so the scratch buffer
+	// can go straight back to the pool. ModeStream leaves the HTML escaping
+	// and the UTF-8 validation to the encoder, which performs both while
 	// reformatting the value either way.
 	buf := odjsonrt.GetBuffer()
 	var err error
@@ -847,7 +955,19 @@ func (v *Typed) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// The cache plays the part of json/v2's own string cache: a value
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
-	err := v.odjsonParseFrom(dec, sc)
+	var err error
+	// A top-level value under a plain json.Unmarshal is parsed straight
+	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
+	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
+	// what jsontext would have.
+	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+		var end int
+		if end, err = v.odjsonParseV2(data, 0, sc); err == nil {
+			odjsonrt.EndDirectDecode(dec, end)
+		}
+	} else {
+		err = v.odjsonParseFrom(dec, sc)
+	}
 	odjsonrt.PutStringCache(sc)
 	return err
 }
@@ -858,7 +978,10 @@ func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"s\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.S), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.S), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"n\":"...)
 	dst, err = odjsonrt.AppendFloat(dst, float64(v.N), 64)
 	if err != nil {
@@ -893,10 +1016,16 @@ func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 			if i17 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = odjsonrt.AppendStringMode(dst, k16, m)
+			dst, err = odjsonrt.AppendStringChecked(dst, k16, m)
+			if err != nil {
+				return nil, err
+			}
 			dst = append(dst, ':')
 			mv18 := v.M[k16]
-			dst = odjsonrt.AppendStringMode(dst, string(mv18), m)
+			dst, err = odjsonrt.AppendStringChecked(dst, string(mv18), m)
+			if err != nil {
+				return nil, err
+			}
 		}
 		dst = append(dst, '}')
 	}
@@ -1198,10 +1327,15 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 	if p < len(data) && data[p] == '}' {
 		return p + 1, nil
 	}
+	var seen [1]uint64
+	_ = seen
+	var unknownBuf [8][]byte
+	unknown := unknownBuf[:0]
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
-		key, _, p, err = odjsonrt.ParseKey(data, p)
+		kp := p
+		key, p, err = odjsonrt.ParseKeyStrict(data, p)
 		if err != nil {
 			return p, err
 		}
@@ -1224,19 +1358,27 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 		}
 		switch idx {
 		case 0:
+			if seen[0]&(1<<0) != 0 {
+				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			}
+			seen[0] |= 1 << 0
 			p = odjsonrt.SkipSpace(data, p)
 			if np48, ok49 := odjsonrt.ParseNull(data, p); ok49 {
 				p = np48
 				v.S = ""
 			} else {
 				var x50 string
-				x50, p, err = odjsonrt.ParseStringWith(data, p, sc)
+				x50, p, err = odjsonrt.ParseStringStrict(data, p, sc)
 				if err != nil {
 					return p, err
 				}
 				v.S = x50
 			}
 		case 1:
+			if seen[0]&(1<<1) != 0 {
+				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			}
+			seen[0] |= 1 << 1
 			p = odjsonrt.SkipSpace(data, p)
 			if np51, ok52 := odjsonrt.ParseNull(data, p); ok52 {
 				p = np51
@@ -1250,6 +1392,10 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 				v.N = x53
 			}
 		case 2:
+			if seen[0]&(1<<2) != 0 {
+				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			}
+			seen[0] |= 1 << 2
 			p = odjsonrt.SkipSpace(data, p)
 			if np54, ok55 := odjsonrt.ParseNull(data, p); ok55 {
 				p = np54
@@ -1263,6 +1409,10 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 				v.B = x56
 			}
 		case 3:
+			if seen[0]&(1<<3) != 0 {
+				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			}
+			seen[0] |= 1 << 3
 			p = odjsonrt.SkipSpace(data, p)
 			if np57, ok58 := odjsonrt.ParseNull(data, p); ok58 {
 				p = np57
@@ -1316,6 +1466,10 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 				v.L = s59
 			}
 		case 4:
+			if seen[0]&(1<<4) != 0 {
+				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			}
+			seen[0] |= 1 << 4
 			p = odjsonrt.SkipSpace(data, p)
 			if np64, ok65 := odjsonrt.ParseNull(data, p); ok65 {
 				p = np64
@@ -1329,6 +1483,10 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 				if m66 == nil {
 					m66 = make(map[string]string)
 				}
+				var seen69 map[string]struct{}
+				if len(m66) > 0 {
+					seen69 = make(map[string]struct{})
+				}
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == '}' {
 					p++
@@ -1336,22 +1494,33 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 					for {
 						var k67 []byte
 						p = odjsonrt.SkipSpace(data, p)
-						k67, _, p, err = odjsonrt.ParseKey(data, p)
+						kp70 := p
+						k67, p, err = odjsonrt.ParseKeyStrict(data, p)
 						if err != nil {
 							return p, err
 						}
+						if seen69 == nil {
+							if _, dup := m66[string(k67)]; dup {
+								return p, odjsonrt.ErrDuplicateName(data, kp70, k67)
+							}
+						} else {
+							if _, dup := seen69[string(k67)]; dup {
+								return p, odjsonrt.ErrDuplicateName(data, kp70, k67)
+							}
+							seen69[string(k67)] = struct{}{}
+						}
 						var mv68 string
 						p = odjsonrt.SkipSpace(data, p)
-						if np69, ok70 := odjsonrt.ParseNull(data, p); ok70 {
-							p = np69
+						if np71, ok72 := odjsonrt.ParseNull(data, p); ok72 {
+							p = np71
 							mv68 = ""
 						} else {
-							var x71 string
-							x71, p, err = odjsonrt.ParseStringWith(data, p, sc)
+							var x73 string
+							x73, p, err = odjsonrt.ParseStringStrict(data, p, sc)
 							if err != nil {
 								return p, err
 							}
-							mv68 = x71
+							mv68 = x73
 						}
 						m66[sc.Make(k67)] = mv68
 						p = odjsonrt.SkipSpace(data, p)
@@ -1372,23 +1541,31 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 				v.M = m66
 			}
 		case 5:
+			if seen[0]&(1<<5) != 0 {
+				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			}
+			seen[0] |= 1 << 5
 			p = odjsonrt.SkipSpace(data, p)
-			if np72, ok73 := odjsonrt.ParseNull(data, p); ok73 {
-				p = np72
+			if np74, ok75 := odjsonrt.ParseNull(data, p); ok75 {
+				p = np74
 				v.A = nil
 			} else {
-				var a74 any
-				a74, p, err = odjsonrt.ParseAnyWith(data, p, sc)
+				var a76 any
+				a76, p, err = odjsonrt.ParseAnyStrict(data, p, sc)
 				if err != nil {
 					return p, err
 				}
-				v.A = a74
+				v.A = a76
 			}
 		case 6:
+			if seen[0]&(1<<6) != 0 {
+				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			}
+			seen[0] |= 1 << 6
 			p = odjsonrt.SkipSpace(data, p)
-			if np75, ok76 := odjsonrt.ParseNull(data, p); ok76 {
+			if np77, ok78 := odjsonrt.ParseNull(data, p); ok78 {
 				v.P = nil
-				p = np75
+				p = np77
 			} else {
 				if v.P == nil {
 					v.P = new(Inner)
@@ -1399,8 +1576,14 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int
 				}
 			}
 		default:
+			for _, u := range unknown {
+				if string(u) == string(key) {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				}
+			}
+			unknown = append(unknown, key)
 			p = odjsonrt.SkipSpace(data, p)
-			p, err = odjsonrt.SkipValue(data, p)
+			p, err = odjsonrt.SkipValueStrict(data, p)
 			if err != nil {
 				return p, err
 			}
@@ -1493,193 +1676,193 @@ func (v *Inner) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 		}
 		switch idx {
 		case 0:
-			var val77 jsontext.Value
-			val77, err = dec.ReadValue()
-			if err != nil {
-				return err
-			}
-			if val77[0] == 'n' {
-				v.S = ""
-			} else {
-				var x78 string
-				x78, err = odjsonrt.ParseStringValue(val77, sc)
-				if err != nil {
-					return err
-				}
-				v.S = x78
-			}
-		case 1:
 			var val79 jsontext.Value
 			val79, err = dec.ReadValue()
 			if err != nil {
 				return err
 			}
 			if val79[0] == 'n' {
-				v.N = 0
+				v.S = ""
 			} else {
-				var x80 float64
-				x80, err = odjsonrt.ParseFloatValue(val79, 64)
+				var x80 string
+				x80, err = odjsonrt.ParseStringValue(val79, sc)
 				if err != nil {
 					return err
 				}
-				v.N = x80
+				v.S = x80
 			}
-		case 2:
+		case 1:
 			var val81 jsontext.Value
 			val81, err = dec.ReadValue()
 			if err != nil {
 				return err
 			}
 			if val81[0] == 'n' {
-				v.B = false
+				v.N = 0
 			} else {
-				var x82 bool
-				x82, _, err = odjsonrt.ParseBool(val81, 0)
+				var x82 float64
+				x82, err = odjsonrt.ParseFloatValue(val81, 64)
 				if err != nil {
 					return err
 				}
-				v.B = x82
+				v.N = x82
 			}
-		case 3:
+		case 2:
 			var val83 jsontext.Value
 			val83, err = dec.ReadValue()
 			if err != nil {
 				return err
 			}
-			vp84 := 0
-			if np85, ok86 := odjsonrt.ParseNull(val83, vp84); ok86 {
-				vp84 = np85
-				v.L = nil
+			if val83[0] == 'n' {
+				v.B = false
 			} else {
-				if vp84 >= len(val83) || val83[vp84] != '[' {
-					return odjsonrt.ErrType(val83, vp84, "[]int")
-				}
-				vp84++
-				s87 := v.L[:0]
-				vp84 = odjsonrt.SkipSpace(val83, vp84)
-				if vp84 < len(val83) && val83[vp84] == ']' {
-					vp84++
-				} else {
-					if cap(s87) == 0 {
-						s87 = make([]int, 0, 4)
-					}
-					for {
-						var e88 int
-						vp84 = odjsonrt.SkipSpace(val83, vp84)
-						if np89, ok90 := odjsonrt.ParseNull(val83, vp84); ok90 {
-							vp84 = np89
-							e88 = 0
-						} else {
-							var x91 int64
-							x91, vp84, err = odjsonrt.ParseInt(val83, vp84, 64)
-							if err != nil {
-								return err
-							}
-							e88 = int(x91)
-						}
-						s87 = append(s87, e88)
-						vp84 = odjsonrt.SkipSpace(val83, vp84)
-						if vp84 >= len(val83) {
-							return odjsonrt.ErrSyntax(val83, vp84, "unexpected end of JSON input")
-						}
-						if val83[vp84] == ',' {
-							vp84++
-							continue
-						}
-						if val83[vp84] == ']' {
-							vp84++
-							break
-						}
-						return odjsonrt.ErrSyntax(val83, vp84, "after array element")
-					}
-				}
-				if s87 == nil {
-					s87 = []int{}
-				}
-				v.L = s87
-			}
-			_ = vp84
-		case 4:
-			var val92 jsontext.Value
-			val92, err = dec.ReadValue()
-			if err != nil {
-				return err
-			}
-			vp93 := 0
-			if np94, ok95 := odjsonrt.ParseNull(val92, vp93); ok95 {
-				vp93 = np94
-				v.M = nil
-			} else {
-				if vp93 >= len(val92) || val92[vp93] != '{' {
-					return odjsonrt.ErrType(val92, vp93, "map[string]string")
-				}
-				vp93++
-				m96 := v.M
-				if m96 == nil {
-					m96 = make(map[string]string)
-				}
-				vp93 = odjsonrt.SkipSpace(val92, vp93)
-				if vp93 < len(val92) && val92[vp93] == '}' {
-					vp93++
-				} else {
-					for {
-						var k97 []byte
-						vp93 = odjsonrt.SkipSpace(val92, vp93)
-						k97, _, vp93, err = odjsonrt.ParseKey(val92, vp93)
-						if err != nil {
-							return err
-						}
-						var mv98 string
-						vp93 = odjsonrt.SkipSpace(val92, vp93)
-						if np99, ok100 := odjsonrt.ParseNull(val92, vp93); ok100 {
-							vp93 = np99
-							mv98 = ""
-						} else {
-							var x101 string
-							x101, vp93, err = odjsonrt.ParseStringWith(val92, vp93, sc)
-							if err != nil {
-								return err
-							}
-							mv98 = x101
-						}
-						m96[sc.Make(k97)] = mv98
-						vp93 = odjsonrt.SkipSpace(val92, vp93)
-						if vp93 >= len(val92) {
-							return odjsonrt.ErrSyntax(val92, vp93, "unexpected end of JSON input")
-						}
-						if val92[vp93] == ',' {
-							vp93++
-							continue
-						}
-						if val92[vp93] == '}' {
-							vp93++
-							break
-						}
-						return odjsonrt.ErrSyntax(val92, vp93, "after object key:value pair")
-					}
-				}
-				v.M = m96
-			}
-			_ = vp93
-		case 5:
-			var val102 jsontext.Value
-			val102, err = dec.ReadValue()
-			if err != nil {
-				return err
-			}
-			vp103 := 0
-			if np104, ok105 := odjsonrt.ParseNull(val102, vp103); ok105 {
-				vp103 = np104
-				v.A = nil
-			} else {
-				var a106 any
-				a106, vp103, err = odjsonrt.ParseAnyWith(val102, vp103, sc)
+				var x84 bool
+				x84, _, err = odjsonrt.ParseBool(val83, 0)
 				if err != nil {
 					return err
 				}
-				v.A = a106
+				v.B = x84
 			}
-			_ = vp103
+		case 3:
+			var val85 jsontext.Value
+			val85, err = dec.ReadValue()
+			if err != nil {
+				return err
+			}
+			vp86 := 0
+			if np87, ok88 := odjsonrt.ParseNull(val85, vp86); ok88 {
+				vp86 = np87
+				v.L = nil
+			} else {
+				if vp86 >= len(val85) || val85[vp86] != '[' {
+					return odjsonrt.ErrType(val85, vp86, "[]int")
+				}
+				vp86++
+				s89 := v.L[:0]
+				vp86 = odjsonrt.SkipSpace(val85, vp86)
+				if vp86 < len(val85) && val85[vp86] == ']' {
+					vp86++
+				} else {
+					if cap(s89) == 0 {
+						s89 = make([]int, 0, 4)
+					}
+					for {
+						var e90 int
+						vp86 = odjsonrt.SkipSpace(val85, vp86)
+						if np91, ok92 := odjsonrt.ParseNull(val85, vp86); ok92 {
+							vp86 = np91
+							e90 = 0
+						} else {
+							var x93 int64
+							x93, vp86, err = odjsonrt.ParseInt(val85, vp86, 64)
+							if err != nil {
+								return err
+							}
+							e90 = int(x93)
+						}
+						s89 = append(s89, e90)
+						vp86 = odjsonrt.SkipSpace(val85, vp86)
+						if vp86 >= len(val85) {
+							return odjsonrt.ErrSyntax(val85, vp86, "unexpected end of JSON input")
+						}
+						if val85[vp86] == ',' {
+							vp86++
+							continue
+						}
+						if val85[vp86] == ']' {
+							vp86++
+							break
+						}
+						return odjsonrt.ErrSyntax(val85, vp86, "after array element")
+					}
+				}
+				if s89 == nil {
+					s89 = []int{}
+				}
+				v.L = s89
+			}
+			_ = vp86
+		case 4:
+			var val94 jsontext.Value
+			val94, err = dec.ReadValue()
+			if err != nil {
+				return err
+			}
+			vp95 := 0
+			if np96, ok97 := odjsonrt.ParseNull(val94, vp95); ok97 {
+				vp95 = np96
+				v.M = nil
+			} else {
+				if vp95 >= len(val94) || val94[vp95] != '{' {
+					return odjsonrt.ErrType(val94, vp95, "map[string]string")
+				}
+				vp95++
+				m98 := v.M
+				if m98 == nil {
+					m98 = make(map[string]string)
+				}
+				vp95 = odjsonrt.SkipSpace(val94, vp95)
+				if vp95 < len(val94) && val94[vp95] == '}' {
+					vp95++
+				} else {
+					for {
+						var k99 []byte
+						vp95 = odjsonrt.SkipSpace(val94, vp95)
+						k99, _, vp95, err = odjsonrt.ParseKey(val94, vp95)
+						if err != nil {
+							return err
+						}
+						var mv100 string
+						vp95 = odjsonrt.SkipSpace(val94, vp95)
+						if np101, ok102 := odjsonrt.ParseNull(val94, vp95); ok102 {
+							vp95 = np101
+							mv100 = ""
+						} else {
+							var x103 string
+							x103, vp95, err = odjsonrt.ParseStringWith(val94, vp95, sc)
+							if err != nil {
+								return err
+							}
+							mv100 = x103
+						}
+						m98[sc.Make(k99)] = mv100
+						vp95 = odjsonrt.SkipSpace(val94, vp95)
+						if vp95 >= len(val94) {
+							return odjsonrt.ErrSyntax(val94, vp95, "unexpected end of JSON input")
+						}
+						if val94[vp95] == ',' {
+							vp95++
+							continue
+						}
+						if val94[vp95] == '}' {
+							vp95++
+							break
+						}
+						return odjsonrt.ErrSyntax(val94, vp95, "after object key:value pair")
+					}
+				}
+				v.M = m98
+			}
+			_ = vp95
+		case 5:
+			var val104 jsontext.Value
+			val104, err = dec.ReadValue()
+			if err != nil {
+				return err
+			}
+			vp105 := 0
+			if np106, ok107 := odjsonrt.ParseNull(val104, vp105); ok107 {
+				vp105 = np106
+				v.A = nil
+			} else {
+				var a108 any
+				a108, vp105, err = odjsonrt.ParseAnyWith(val104, vp105, sc)
+				if err != nil {
+					return err
+				}
+				v.A = a108
+			}
+			_ = vp105
 		case 6:
 			if odjsonrt.NextKind(dec) == 'n' {
 				if _, err = dec.ReadToken(); err != nil {
@@ -1743,9 +1926,22 @@ func (v *Inner) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Inner) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// WriteValue copies what it is given, so the scratch buffer can go
-	// straight back to the pool. ModeStream leaves the HTML escaping and
-	// the UTF-8 validation to the encoder, which performs both while
+	// A top-level value under a plain json.Marshal is appended straight
+	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
+	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
+	// json/v2's own escaping and rejects invalid UTF-8 itself.
+	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
+		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+		if err != nil {
+			return err
+		}
+		odjsonSizeInner.Record(buf)
+		odjsonrt.EndDirectEncode(enc, buf)
+		return nil
+	}
+	// Otherwise WriteValue copies what it is given, so the scratch buffer
+	// can go straight back to the pool. ModeStream leaves the HTML escaping
+	// and the UTF-8 validation to the encoder, which performs both while
 	// reformatting the value either way.
 	buf := odjsonrt.GetBuffer()
 	var err error
@@ -1762,7 +1958,19 @@ func (v *Inner) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// The cache plays the part of json/v2's own string cache: a value
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
-	err := v.odjsonParseFrom(dec, sc)
+	var err error
+	// A top-level value under a plain json.Unmarshal is parsed straight
+	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
+	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
+	// what jsontext would have.
+	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+		var end int
+		if end, err = v.odjsonParseV2(data, 0, sc); err == nil {
+			odjsonrt.EndDirectDecode(dec, end)
+		}
+	} else {
+		err = v.odjsonParseFrom(dec, sc)
+	}
 	odjsonrt.PutStringCache(sc)
 	return err
 }

@@ -66,7 +66,10 @@ func (v *Fallbacks) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, err
 		}
 	}
 	dst = append(dst, ",\"plain\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Plain), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Plain), m)
+	if err != nil {
+		return nil, err
+	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {

@@ -357,7 +357,10 @@ func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"s\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.S), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.S), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"n\":"...)
 	dst, err = odjsonrt.AppendFloat(dst, float64(v.N), 64)
 	if err != nil {
@@ -392,10 +395,16 @@ func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 			if i7 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = odjsonrt.AppendStringMode(dst, k6, m)
+			dst, err = odjsonrt.AppendStringChecked(dst, k6, m)
+			if err != nil {
+				return nil, err
+			}
 			dst = append(dst, ':')
 			mv8 := v.M[k6]
-			dst = odjsonrt.AppendStringMode(dst, string(mv8), m)
+			dst, err = odjsonrt.AppendStringChecked(dst, string(mv8), m)
+			if err != nil {
+				return nil, err
+			}
 		}
 		dst = append(dst, '}')
 	}

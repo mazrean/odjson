@@ -64,7 +64,10 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 			if i4 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = odjsonrt.AppendStringMode(dst, k3, m)
+			dst, err = odjsonrt.AppendStringChecked(dst, k3, m)
+			if err != nil {
+				return nil, err
+			}
 			dst = append(dst, ':')
 			mv5 := v.Map[k3]
 			dst, err = odjsonOtherThingAppend(dst, &mv5, m)
@@ -389,7 +392,10 @@ func odjsonOtherThingAppend(dst []byte, v *other.Thing, m odjsonrt.StringMode) (
 	dst = odjsonrt.AppendInt(dst, int64(v.ID))
 	if len(v.Name) != 0 {
 		dst = append(dst, ",\"name\":"...)
-		dst = odjsonrt.AppendStringMode(dst, string(v.Name), m)
+		dst, err = odjsonrt.AppendStringChecked(dst, string(v.Name), m)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')

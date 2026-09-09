@@ -14,9 +14,15 @@ func (v *Deep) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"deep_only\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.DeepOnly), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.DeepOnly), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"shared\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Shared), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Shared), m)
+	if err != nil {
+		return nil, err
+	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -146,9 +152,15 @@ func (v *Mid) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"deep_only\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Deep.DeepOnly), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Deep.DeepOnly), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"shared\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Shared), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Shared), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"mid_only\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.MidOnly))
 	if len(dst) == start {
@@ -296,9 +308,15 @@ func (v *LeftConflict) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, 
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"Clash\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Clash), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Clash), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"left\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Left), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Left), m)
+	if err != nil {
+		return nil, err
+	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -428,9 +446,15 @@ func (v *RightConflict) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte,
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"Clash\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Clash), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Clash), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"right\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Right), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Right), m)
+	if err != nil {
+		return nil, err
+	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -560,7 +584,10 @@ func (v *UntaggedSide) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, 
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"Winner\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Winner), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Winner), m)
+	if err != nil {
+		return nil, err
+	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -674,7 +701,10 @@ func (v *TaggedSide) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"Winner\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Winner), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Winner), m)
+	if err != nil {
+		return nil, err
+	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -1016,30 +1046,51 @@ func (v *Promoted) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"deep_only\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Mid.Deep.DeepOnly), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Mid.Deep.DeepOnly), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"shared\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Mid.Shared), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Mid.Shared), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"mid_only\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Mid.MidOnly))
 	dst = append(dst, ",\"left\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.LeftConflict.Left), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.LeftConflict.Left), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"right\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.RightConflict.Right), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.RightConflict.Right), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"Winner\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.TaggedSide.Winner), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.TaggedSide.Winner), m)
+	if err != nil {
+		return nil, err
+	}
 	if v.PtrPart != nil {
 		dst = append(dst, ",\"ptr_only\":"...)
 		dst = odjsonrt.AppendInt(dst, int64(v.PtrPart.PtrOnly))
 	}
 	dst = append(dst, ",\"Label\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Label), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Label), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"named\":"...)
 	dst, err = v.Named.odjsonAppend(dst, m)
 	if err != nil {
 		return nil, err
 	}
 	dst = append(dst, ",\"own\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Own), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Own), m)
+	if err != nil {
+		return nil, err
+	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -1293,7 +1344,10 @@ func (v *ShallowWins) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"deep_only\":"...)
-	dst = odjsonrt.AppendStringMode(dst, string(v.Deep.DeepOnly), m)
+	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Deep.DeepOnly), m)
+	if err != nil {
+		return nil, err
+	}
 	dst = append(dst, ",\"shared\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Shared))
 	if len(dst) == start {
