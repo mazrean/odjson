@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/bytedance/sonic"
+	gojson "github.com/goccy/go-json"
 
 	"github.com/mazrean/odjson/bench/gen"
 	"github.com/mazrean/odjson/bench/plain"
@@ -224,6 +225,8 @@ func BenchmarkMarshalTwitter(b *testing.B) {
 	b.Run("json-v2", func(b *testing.B) {
 		runMarshal(b, ss, len(twitterJSON), func(v any) ([]byte, error) { return jsonv2.Marshal(v) })
 	})
+	b.Run("sonic", func(b *testing.B) { runMarshal(b, ss, len(twitterJSON), sonic.Marshal) })
+	b.Run("go-json", func(b *testing.B) { runMarshal(b, ss, len(twitterJSON), gojson.Marshal) })
 }
 
 func BenchmarkMarshalSmall(b *testing.B) {
@@ -233,6 +236,8 @@ func BenchmarkMarshalSmall(b *testing.B) {
 	b.Run("json-v2", func(b *testing.B) {
 		runMarshal(b, ss, n, func(v any) ([]byte, error) { return jsonv2.Marshal(v) })
 	})
+	b.Run("sonic", func(b *testing.B) { runMarshal(b, ss, n, sonic.Marshal) })
+	b.Run("go-json", func(b *testing.B) { runMarshal(b, ss, n, gojson.Marshal) })
 }
 
 func BenchmarkUnmarshalTwitter(b *testing.B) {
@@ -241,6 +246,8 @@ func BenchmarkUnmarshalTwitter(b *testing.B) {
 	b.Run("json-v2", func(b *testing.B) {
 		runUnmarshal(b, ss, twitterJSON, func(d []byte, v any) error { return jsonv2.Unmarshal(d, v) })
 	})
+	b.Run("sonic", func(b *testing.B) { runUnmarshal(b, ss, twitterJSON, sonic.Unmarshal) })
+	b.Run("go-json", func(b *testing.B) { runUnmarshal(b, ss, twitterJSON, gojson.Unmarshal) })
 }
 
 func BenchmarkUnmarshalSmall(b *testing.B) {
@@ -250,6 +257,8 @@ func BenchmarkUnmarshalSmall(b *testing.B) {
 	b.Run("json-v2", func(b *testing.B) {
 		runUnmarshal(b, ss, data, func(d []byte, v any) error { return jsonv2.Unmarshal(d, v) })
 	})
+	b.Run("sonic", func(b *testing.B) { runUnmarshal(b, ss, data, sonic.Unmarshal) })
+	b.Run("go-json", func(b *testing.B) { runUnmarshal(b, ss, data, gojson.Unmarshal) })
 }
 
 // BenchmarkDirectVsSonicStd puts odjson's direct decoder next to sonic
