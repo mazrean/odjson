@@ -472,6 +472,7 @@ that library's rules rather than imposing one set:
 | HTML characters, U+2028/9 | escaped | not escaped |
 | array length mismatch (decode) | padded or truncated | rejected |
 | case-insensitive member match (decode) | yes | no |
+| `null` into a scalar, struct, `time.Time` or `,string` field (decode) | left untouched | zeroed |
 | map member order | sorted by name | map iteration order |
 
 The map row is the one that costs something: `encoding/json/v2` does not sort
