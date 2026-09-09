@@ -44,18 +44,9 @@ func (m StringMode) V2() bool { return m == ModeStream || m == ModeV2 }
 // AppendStringChecked is [AppendStringMode] with the error [ModeV2] can
 // report: a string that is not valid UTF-8. The other modes never fail.
 func AppendStringChecked(dst []byte, s string, m StringMode) ([]byte, error) {
-	switch m {
-	case ModeV2:
-		src := unsafe.Slice(unsafe.StringData(s), len(s))
-		out, hi := appendQuotedStreamScan(dst, src)
-		if hi&swarHi != 0 && !utf8.Valid(src) {
-			return dst, ErrInvalidUTF8
-		}
-		return out, nil
-	case ModeStream:
-		return appendQuotedStreamString(dst, s), nil
-	}
-	return appendQuotedString(dst, s, m == ModeHTML), nil
+	// A single call, so that this inlines into generated code and a string
+	// under ModeV2, the common case, costs one call rather than two.
+	return appendStringChecked(dst, unsafe.Slice(unsafe.StringData(s), len(s)), m)
 }
 
 // ErrInvalidUTF8 is reported by [AppendStringChecked] under [ModeV2] for a
@@ -136,25 +127,14 @@ func appendQuotedStreamString(dst []byte, s string) []byte {
 // per iteration, whole safe runs are copied at once, and no UTF-8 decoding
 // happens at all.
 func appendQuotedStream(dst []byte, src []byte) []byte {
-	dst, _ = appendQuotedStreamScan(dst, src)
-	return dst
-}
-
-// appendQuotedStreamScan is [appendQuotedStream] that also returns the OR of
-// every byte it scanned, so that a caller who must validate UTF-8 can tell
-// from hi&swarHi whether src has any non-ASCII byte at all. The scan touches
-// every byte anyway; pure ASCII, the common case, then costs nothing extra.
-func appendQuotedStreamScan(dst []byte, src []byte) ([]byte, uint64) {
 	dst = append(dst, '"')
 	start := 0
-	var hi uint64
 	for i := 0; i < len(src); {
 		// Two words per iteration: the loads are independent, so the CPU
 		// overlaps them and the scan runs close to load throughput.
 		for i+16 <= len(src) {
 			w0 := binary.LittleEndian.Uint64(src[i:])
 			w1 := binary.LittleEndian.Uint64(src[i+8:])
-			hi |= w0 | w1
 			if m0 := swarUnsafe(w0); m0 != 0 {
 				i += swarIndex(m0)
 				goto found
@@ -167,7 +147,6 @@ func appendQuotedStreamScan(dst []byte, src []byte) ([]byte, uint64) {
 		}
 		for i+8 <= len(src) {
 			w := binary.LittleEndian.Uint64(src[i:])
-			hi |= w
 			if m := swarUnsafe(w); m != 0 {
 				i += swarIndex(m)
 				goto found
@@ -175,7 +154,6 @@ func appendQuotedStreamScan(dst []byte, src []byte) ([]byte, uint64) {
 			i += 8
 		}
 		for i < len(src) && streamSafeSet[src[i]] {
-			hi |= uint64(src[i])
 			i++
 		}
 	found:
@@ -183,27 +161,98 @@ func appendQuotedStreamScan(dst []byte, src []byte) ([]byte, uint64) {
 			break
 		}
 		dst = append(dst, src[start:i]...)
-		switch b := src[i]; b {
-		case '\\', '"':
-			dst = append(dst, '\\', b)
-		case '\b':
-			dst = append(dst, '\\', 'b')
-		case '\f':
-			dst = append(dst, '\\', 'f')
-		case '\n':
-			dst = append(dst, '\\', 'n')
-		case '\r':
-			dst = append(dst, '\\', 'r')
-		case '\t':
-			dst = append(dst, '\\', 't')
-		default:
-			dst = append(dst, '\\', 'u', '0', '0', hexDigits[b>>4], hexDigits[b&0xF])
-		}
+		dst = appendEscape(dst, src[i])
 		i++
 		start = i
 	}
 	dst = append(dst, src[start:]...)
-	return append(dst, '"'), hi
+	return append(dst, '"')
+}
+
+// appendEscape appends the escape sequence for b, a byte that JSON syntax
+// does not allow verbatim in a string literal.
+func appendEscape(dst []byte, b byte) []byte {
+	switch b {
+	case '\\', '"':
+		return append(dst, '\\', b)
+	case '\b':
+		return append(dst, '\\', 'b')
+	case '\f':
+		return append(dst, '\\', 'f')
+	case '\n':
+		return append(dst, '\\', 'n')
+	case '\r':
+		return append(dst, '\\', 'r')
+	case '\t':
+		return append(dst, '\\', 't')
+	default:
+		return append(dst, '\\', 'u', '0', '0', hexDigits[b>>4], hexDigits[b&0xF])
+	}
+}
+
+// appendStringChecked is [AppendStringChecked] on a byte slice. Its body is
+// the ModeV2 implementation: [appendQuotedStream]'s escaping with json/v2's
+// UTF-8 rule folded into the same pass. The word scan stops at a byte that
+// needs escaping or at the first non-ASCII byte; a non-ASCII run is
+// validated in place by skipNonASCII, which also finds where the scan
+// resumes. A string that is not valid UTF-8 is reported as [ErrInvalidUTF8]
+// with dst as it was. The other modes are handed on.
+func appendStringChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
+	switch m {
+	case ModeStream:
+		return appendQuotedStream(dst, src), nil
+	case ModeHTML, ModePlain:
+		return appendQuoted(dst, src, m == ModeHTML), nil
+	}
+	mark := len(dst)
+	dst = append(dst, '"')
+	start := 0
+	for i := 0; i < len(src); {
+		for i+16 <= len(src) {
+			w0 := binary.LittleEndian.Uint64(src[i:])
+			w1 := binary.LittleEndian.Uint64(src[i+8:])
+			if m0 := swarUnsafe(w0) | w0&swarHi; m0 != 0 {
+				i += swarIndex(m0)
+				goto found
+			}
+			if m1 := swarUnsafe(w1) | w1&swarHi; m1 != 0 {
+				i += 8 + swarIndex(m1)
+				goto found
+			}
+			i += 16
+		}
+		for i+8 <= len(src) {
+			w := binary.LittleEndian.Uint64(src[i:])
+			if m := swarUnsafe(w) | w&swarHi; m != 0 {
+				i += swarIndex(m)
+				goto found
+			}
+			i += 8
+		}
+		// safeSet is false for every byte >= 0x80, so this stops where the
+		// word scan would have.
+		for i < len(src) && safeSet[src[i]] {
+			i++
+		}
+	found:
+		if i >= len(src) {
+			break
+		}
+		if b := src[i]; b >= utf8.RuneSelf {
+			// The run stays part of the pending copy: a valid sequence
+			// holds nothing that needs escaping.
+			if i = skipNonASCII(src, i); i < 0 {
+				return dst[:mark], ErrInvalidUTF8
+			}
+			continue
+		}
+		dst = append(dst, src[start:i]...)
+		dst = appendEscape(dst, src[i])
+		i++
+		start = i
+	}
+	dst = append(dst, src[start:]...)
+	return append(dst, '"'), nil
 }
 
 // ParseStringTrusted is [ParseString] for input whose UTF-8 has already been

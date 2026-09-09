@@ -58,16 +58,15 @@ func (v *Address) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"street\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"street\"" {
 					idx, p = 0, p+8
 				}
 			case 'c':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"city\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"city\"" {
 					idx, p = 1, p+6
 				}
 			}
@@ -163,16 +162,15 @@ func (v *Address) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"street\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"street\"" {
 					idx, key, p = 0, rest[1:7], p+8
 				}
 			case 'c':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"city\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"city\"" {
 					idx, key, p = 1, rest[1:5], p+6
 				}
 			}
@@ -506,29 +504,28 @@ func (v *Person) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"name\"":
+		rest := data[p:]
+		if len(rest) > 3 {
+			switch rest[3] {
+			case 'm':
+				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
 					idx, p = 0, p+6
 				}
-			case 'a':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"age\"":
-					idx, p = 1, p+5
-				case len(rest) >= 9 && string(rest[:9]) == "\"address\"":
-					idx, p = 4, p+9
-				}
 			case 'e':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"email\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"age\"" {
+					idx, p = 1, p+5
+				}
+			case 'a':
+				if len(rest) >= 7 && string(rest[:7]) == "\"email\"" {
 					idx, p = 2, p+7
 				}
-			case 't':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"tags\"":
+			case 'g':
+				if len(rest) >= 6 && string(rest[:6]) == "\"tags\"" {
 					idx, p = 3, p+6
+				}
+			case 'd':
+				if len(rest) >= 9 && string(rest[:9]) == "\"address\"" {
+					idx, p = 4, p+9
 				}
 			}
 		}
@@ -710,29 +707,28 @@ func (v *Person) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"name\"":
+		rest := data[p:]
+		if len(rest) > 3 {
+			switch rest[3] {
+			case 'm':
+				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
 					idx, key, p = 0, rest[1:5], p+6
 				}
-			case 'a':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"age\"":
-					idx, key, p = 1, rest[1:4], p+5
-				case len(rest) >= 9 && string(rest[:9]) == "\"address\"":
-					idx, key, p = 4, rest[1:8], p+9
-				}
 			case 'e':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"email\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"age\"" {
+					idx, key, p = 1, rest[1:4], p+5
+				}
+			case 'a':
+				if len(rest) >= 7 && string(rest[:7]) == "\"email\"" {
 					idx, key, p = 2, rest[1:6], p+7
 				}
-			case 't':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"tags\"":
+			case 'g':
+				if len(rest) >= 6 && string(rest[:6]) == "\"tags\"" {
 					idx, key, p = 3, rest[1:5], p+6
+				}
+			case 'd':
+				if len(rest) >= 9 && string(rest[:9]) == "\"address\"" {
+					idx, key, p = 4, rest[1:8], p+9
 				}
 			}
 		}

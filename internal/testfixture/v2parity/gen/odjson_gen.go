@@ -58,16 +58,15 @@ func (v *Nested) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				switch {
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
+				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
 					idx, p = 0, p+4
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"note\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"note\"" {
 					idx, p = 1, p+6
 				}
 			}
@@ -168,16 +167,15 @@ func (v *Nested) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				switch {
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
+				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
 					idx, key, p = 0, rest[1:3], p+4
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"note\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"note\"" {
 					idx, key, p = 1, rest[1:5], p+6
 				}
 			}
@@ -793,115 +791,190 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'b':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"bool\"":
-					idx, p = 0, p+6
-				case len(rest) >= 7 && string(rest[:7]) == "\"bytes\"":
-					idx, p = 8, p+7
+				if len(rest) > 2 {
+					switch rest[2] {
+					case 'o':
+						if len(rest) >= 6 && string(rest[:6]) == "\"bool\"" {
+							idx, p = 0, p+6
+						}
+					case 'y':
+						if len(rest) >= 7 && string(rest[:7]) == "\"bytes\"" {
+							idx, p = 8, p+7
+						}
+					}
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"int\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"int\"" {
 					idx, p = 1, p+5
 				}
 			case 'u':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"uint64\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"uint64\"" {
 					idx, p = 2, p+8
 				}
 			case 'f':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"float64\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"float64\"" {
 					idx, p = 3, p+9
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"string\"":
-					idx, p = 4, p+8
-				case len(rest) >= 7 && string(rest[:7]) == "\"slice\"":
-					idx, p = 6, p+7
-				case len(rest) >= 9 && string(rest[:9]) == "\"strings\"":
-					idx, p = 7, p+9
-				case len(rest) >= 9 && string(rest[:9]) == "\"str_map\"":
-					idx, p = 12, p+9
+				if len(rest) > 4 {
+					switch rest[4] {
+					case 'i':
+						if len(rest) > 7 {
+							switch rest[7] {
+							case '"':
+								if len(rest) >= 8 && string(rest[:8]) == "\"string\"" {
+									idx, p = 4, p+8
+								}
+							case 's':
+								if len(rest) >= 9 && string(rest[:9]) == "\"strings\"" {
+									idx, p = 7, p+9
+								}
+							}
+						}
+					case 'c':
+						if len(rest) >= 7 && string(rest[:7]) == "\"slice\"" {
+							idx, p = 6, p+7
+						}
+					case '_':
+						if len(rest) >= 9 && string(rest[:9]) == "\"str_map\"" {
+							idx, p = 12, p+9
+						}
+					}
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"named\"":
-					idx, p = 5, p+7
-				case len(rest) >= 11 && string(rest[:11]) == "\"named_bag\"":
-					idx, p = 9, p+11
-				case len(rest) >= 8 && string(rest[:8]) == "\"nested\"":
-					idx, p = 13, p+8
-				case len(rest) >= 12 && string(rest[:12]) == "\"nested_ptr\"":
-					idx, p = 14, p+12
-				case len(rest) >= 9 && string(rest[:9]) == "\"nesteds\"":
-					idx, p = 15, p+9
-				case len(rest) >= 12 && string(rest[:12]) == "\"nested_map\"":
-					idx, p = 16, p+12
-				case len(rest) >= 8 && string(rest[:8]) == "\"number\"":
-					idx, p = 20, p+8
+				if len(rest) > 6 {
+					switch rest[6] {
+					case '"':
+						if len(rest) >= 7 && string(rest[:7]) == "\"named\"" {
+							idx, p = 5, p+7
+						}
+					case '_':
+						if len(rest) >= 11 && string(rest[:11]) == "\"named_bag\"" {
+							idx, p = 9, p+11
+						}
+					case 'd':
+						if len(rest) > 7 {
+							switch rest[7] {
+							case '"':
+								if len(rest) >= 8 && string(rest[:8]) == "\"nested\"" {
+									idx, p = 13, p+8
+								}
+							case '_':
+								if len(rest) > 8 {
+									switch rest[8] {
+									case 'p':
+										if len(rest) >= 12 && string(rest[:12]) == "\"nested_ptr\"" {
+											idx, p = 14, p+12
+										}
+									case 'm':
+										if len(rest) >= 12 && string(rest[:12]) == "\"nested_map\"" {
+											idx, p = 16, p+12
+										}
+									}
+								}
+							case 's':
+								if len(rest) >= 9 && string(rest[:9]) == "\"nesteds\"" {
+									idx, p = 15, p+9
+								}
+							}
+						}
+					case 'r':
+						if len(rest) >= 8 && string(rest[:8]) == "\"number\"" {
+							idx, p = 20, p+8
+						}
+					}
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"array\"":
-					idx, p = 10, p+7
-				case len(rest) >= 5 && string(rest[:5]) == "\"any\"":
-					idx, p = 17, p+5
-				case len(rest) >= 6 && string(rest[:6]) == "\"anys\"":
-					idx, p = 18, p+6
+				if len(rest) > 4 {
+					switch rest[4] {
+					case 'a':
+						if len(rest) >= 7 && string(rest[:7]) == "\"array\"" {
+							idx, p = 10, p+7
+						}
+					case '"':
+						if len(rest) >= 5 && string(rest[:5]) == "\"any\"" {
+							idx, p = 17, p+5
+						}
+					case 's':
+						if len(rest) >= 6 && string(rest[:6]) == "\"anys\"" {
+							idx, p = 18, p+6
+						}
+					}
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"map\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"map\"" {
 					idx, p = 11, p+5
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"raw\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"raw\"" {
 					idx, p = 19, p+5
 				}
 			case 't':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"time\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"time\"" {
 					idx, p = 21, p+6
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"ptr\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"ptr\"" {
 					idx, p = 22, p+5
 				}
 			case 'q':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"quoted\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"quoted\"" {
 					idx, p = 23, p+8
 				}
 			case 'o':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"omit_bool\"":
-					idx, p = 24, p+11
-				case len(rest) >= 10 && string(rest[:10]) == "\"omit_int\"":
-					idx, p = 25, p+10
-				case len(rest) >= 12 && string(rest[:12]) == "\"omit_float\"":
-					idx, p = 26, p+12
-				case len(rest) >= 13 && string(rest[:13]) == "\"omit_string\"":
-					idx, p = 27, p+13
-				case len(rest) >= 12 && string(rest[:12]) == "\"omit_slice\"":
-					idx, p = 28, p+12
-				case len(rest) >= 10 && string(rest[:10]) == "\"omit_map\"":
-					idx, p = 29, p+10
-				case len(rest) >= 10 && string(rest[:10]) == "\"omit_ptr\"":
-					idx, p = 30, p+10
+				if len(rest) > 6 {
+					switch rest[6] {
+					case 'b':
+						if len(rest) >= 11 && string(rest[:11]) == "\"omit_bool\"" {
+							idx, p = 24, p+11
+						}
+					case 'i':
+						if len(rest) >= 10 && string(rest[:10]) == "\"omit_int\"" {
+							idx, p = 25, p+10
+						}
+					case 'f':
+						if len(rest) >= 12 && string(rest[:12]) == "\"omit_float\"" {
+							idx, p = 26, p+12
+						}
+					case 's':
+						if len(rest) > 7 {
+							switch rest[7] {
+							case 't':
+								if len(rest) >= 13 && string(rest[:13]) == "\"omit_string\"" {
+									idx, p = 27, p+13
+								}
+							case 'l':
+								if len(rest) >= 12 && string(rest[:12]) == "\"omit_slice\"" {
+									idx, p = 28, p+12
+								}
+							}
+						}
+					case 'm':
+						if len(rest) >= 10 && string(rest[:10]) == "\"omit_map\"" {
+							idx, p = 29, p+10
+						}
+					case 'p':
+						if len(rest) >= 10 && string(rest[:10]) == "\"omit_ptr\"" {
+							idx, p = 30, p+10
+						}
+					}
 				}
 			case 'z':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"zero_time\"":
-					idx, p = 31, p+11
-				case len(rest) >= 13 && string(rest[:13]) == "\"zero_nested\"":
-					idx, p = 32, p+13
+				if len(rest) > 6 {
+					switch rest[6] {
+					case 't':
+						if len(rest) >= 11 && string(rest[:11]) == "\"zero_time\"" {
+							idx, p = 31, p+11
+						}
+					case 'n':
+						if len(rest) >= 13 && string(rest[:13]) == "\"zero_nested\"" {
+							idx, p = 32, p+13
+						}
+					}
 				}
 			}
 		}
@@ -1890,115 +1963,190 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'b':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"bool\"":
-					idx, key, p = 0, rest[1:5], p+6
-				case len(rest) >= 7 && string(rest[:7]) == "\"bytes\"":
-					idx, key, p = 8, rest[1:6], p+7
+				if len(rest) > 2 {
+					switch rest[2] {
+					case 'o':
+						if len(rest) >= 6 && string(rest[:6]) == "\"bool\"" {
+							idx, key, p = 0, rest[1:5], p+6
+						}
+					case 'y':
+						if len(rest) >= 7 && string(rest[:7]) == "\"bytes\"" {
+							idx, key, p = 8, rest[1:6], p+7
+						}
+					}
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"int\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"int\"" {
 					idx, key, p = 1, rest[1:4], p+5
 				}
 			case 'u':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"uint64\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"uint64\"" {
 					idx, key, p = 2, rest[1:7], p+8
 				}
 			case 'f':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"float64\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"float64\"" {
 					idx, key, p = 3, rest[1:8], p+9
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"string\"":
-					idx, key, p = 4, rest[1:7], p+8
-				case len(rest) >= 7 && string(rest[:7]) == "\"slice\"":
-					idx, key, p = 6, rest[1:6], p+7
-				case len(rest) >= 9 && string(rest[:9]) == "\"strings\"":
-					idx, key, p = 7, rest[1:8], p+9
-				case len(rest) >= 9 && string(rest[:9]) == "\"str_map\"":
-					idx, key, p = 12, rest[1:8], p+9
+				if len(rest) > 4 {
+					switch rest[4] {
+					case 'i':
+						if len(rest) > 7 {
+							switch rest[7] {
+							case '"':
+								if len(rest) >= 8 && string(rest[:8]) == "\"string\"" {
+									idx, key, p = 4, rest[1:7], p+8
+								}
+							case 's':
+								if len(rest) >= 9 && string(rest[:9]) == "\"strings\"" {
+									idx, key, p = 7, rest[1:8], p+9
+								}
+							}
+						}
+					case 'c':
+						if len(rest) >= 7 && string(rest[:7]) == "\"slice\"" {
+							idx, key, p = 6, rest[1:6], p+7
+						}
+					case '_':
+						if len(rest) >= 9 && string(rest[:9]) == "\"str_map\"" {
+							idx, key, p = 12, rest[1:8], p+9
+						}
+					}
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"named\"":
-					idx, key, p = 5, rest[1:6], p+7
-				case len(rest) >= 11 && string(rest[:11]) == "\"named_bag\"":
-					idx, key, p = 9, rest[1:10], p+11
-				case len(rest) >= 8 && string(rest[:8]) == "\"nested\"":
-					idx, key, p = 13, rest[1:7], p+8
-				case len(rest) >= 12 && string(rest[:12]) == "\"nested_ptr\"":
-					idx, key, p = 14, rest[1:11], p+12
-				case len(rest) >= 9 && string(rest[:9]) == "\"nesteds\"":
-					idx, key, p = 15, rest[1:8], p+9
-				case len(rest) >= 12 && string(rest[:12]) == "\"nested_map\"":
-					idx, key, p = 16, rest[1:11], p+12
-				case len(rest) >= 8 && string(rest[:8]) == "\"number\"":
-					idx, key, p = 20, rest[1:7], p+8
+				if len(rest) > 6 {
+					switch rest[6] {
+					case '"':
+						if len(rest) >= 7 && string(rest[:7]) == "\"named\"" {
+							idx, key, p = 5, rest[1:6], p+7
+						}
+					case '_':
+						if len(rest) >= 11 && string(rest[:11]) == "\"named_bag\"" {
+							idx, key, p = 9, rest[1:10], p+11
+						}
+					case 'd':
+						if len(rest) > 7 {
+							switch rest[7] {
+							case '"':
+								if len(rest) >= 8 && string(rest[:8]) == "\"nested\"" {
+									idx, key, p = 13, rest[1:7], p+8
+								}
+							case '_':
+								if len(rest) > 8 {
+									switch rest[8] {
+									case 'p':
+										if len(rest) >= 12 && string(rest[:12]) == "\"nested_ptr\"" {
+											idx, key, p = 14, rest[1:11], p+12
+										}
+									case 'm':
+										if len(rest) >= 12 && string(rest[:12]) == "\"nested_map\"" {
+											idx, key, p = 16, rest[1:11], p+12
+										}
+									}
+								}
+							case 's':
+								if len(rest) >= 9 && string(rest[:9]) == "\"nesteds\"" {
+									idx, key, p = 15, rest[1:8], p+9
+								}
+							}
+						}
+					case 'r':
+						if len(rest) >= 8 && string(rest[:8]) == "\"number\"" {
+							idx, key, p = 20, rest[1:7], p+8
+						}
+					}
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"array\"":
-					idx, key, p = 10, rest[1:6], p+7
-				case len(rest) >= 5 && string(rest[:5]) == "\"any\"":
-					idx, key, p = 17, rest[1:4], p+5
-				case len(rest) >= 6 && string(rest[:6]) == "\"anys\"":
-					idx, key, p = 18, rest[1:5], p+6
+				if len(rest) > 4 {
+					switch rest[4] {
+					case 'a':
+						if len(rest) >= 7 && string(rest[:7]) == "\"array\"" {
+							idx, key, p = 10, rest[1:6], p+7
+						}
+					case '"':
+						if len(rest) >= 5 && string(rest[:5]) == "\"any\"" {
+							idx, key, p = 17, rest[1:4], p+5
+						}
+					case 's':
+						if len(rest) >= 6 && string(rest[:6]) == "\"anys\"" {
+							idx, key, p = 18, rest[1:5], p+6
+						}
+					}
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"map\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"map\"" {
 					idx, key, p = 11, rest[1:4], p+5
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"raw\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"raw\"" {
 					idx, key, p = 19, rest[1:4], p+5
 				}
 			case 't':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"time\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"time\"" {
 					idx, key, p = 21, rest[1:5], p+6
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"ptr\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"ptr\"" {
 					idx, key, p = 22, rest[1:4], p+5
 				}
 			case 'q':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"quoted\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"quoted\"" {
 					idx, key, p = 23, rest[1:7], p+8
 				}
 			case 'o':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"omit_bool\"":
-					idx, key, p = 24, rest[1:10], p+11
-				case len(rest) >= 10 && string(rest[:10]) == "\"omit_int\"":
-					idx, key, p = 25, rest[1:9], p+10
-				case len(rest) >= 12 && string(rest[:12]) == "\"omit_float\"":
-					idx, key, p = 26, rest[1:11], p+12
-				case len(rest) >= 13 && string(rest[:13]) == "\"omit_string\"":
-					idx, key, p = 27, rest[1:12], p+13
-				case len(rest) >= 12 && string(rest[:12]) == "\"omit_slice\"":
-					idx, key, p = 28, rest[1:11], p+12
-				case len(rest) >= 10 && string(rest[:10]) == "\"omit_map\"":
-					idx, key, p = 29, rest[1:9], p+10
-				case len(rest) >= 10 && string(rest[:10]) == "\"omit_ptr\"":
-					idx, key, p = 30, rest[1:9], p+10
+				if len(rest) > 6 {
+					switch rest[6] {
+					case 'b':
+						if len(rest) >= 11 && string(rest[:11]) == "\"omit_bool\"" {
+							idx, key, p = 24, rest[1:10], p+11
+						}
+					case 'i':
+						if len(rest) >= 10 && string(rest[:10]) == "\"omit_int\"" {
+							idx, key, p = 25, rest[1:9], p+10
+						}
+					case 'f':
+						if len(rest) >= 12 && string(rest[:12]) == "\"omit_float\"" {
+							idx, key, p = 26, rest[1:11], p+12
+						}
+					case 's':
+						if len(rest) > 7 {
+							switch rest[7] {
+							case 't':
+								if len(rest) >= 13 && string(rest[:13]) == "\"omit_string\"" {
+									idx, key, p = 27, rest[1:12], p+13
+								}
+							case 'l':
+								if len(rest) >= 12 && string(rest[:12]) == "\"omit_slice\"" {
+									idx, key, p = 28, rest[1:11], p+12
+								}
+							}
+						}
+					case 'm':
+						if len(rest) >= 10 && string(rest[:10]) == "\"omit_map\"" {
+							idx, key, p = 29, rest[1:9], p+10
+						}
+					case 'p':
+						if len(rest) >= 10 && string(rest[:10]) == "\"omit_ptr\"" {
+							idx, key, p = 30, rest[1:9], p+10
+						}
+					}
 				}
 			case 'z':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"zero_time\"":
-					idx, key, p = 31, rest[1:10], p+11
-				case len(rest) >= 13 && string(rest[:13]) == "\"zero_nested\"":
-					idx, key, p = 32, rest[1:12], p+13
+				if len(rest) > 6 {
+					switch rest[6] {
+					case 't':
+						if len(rest) >= 11 && string(rest[:11]) == "\"zero_time\"" {
+							idx, key, p = 31, rest[1:10], p+11
+						}
+					case 'n':
+						if len(rest) >= 13 && string(rest[:13]) == "\"zero_nested\"" {
+							idx, key, p = 32, rest[1:12], p+13
+						}
+					}
 				}
 			}
 		}

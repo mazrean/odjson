@@ -30,12 +30,22 @@ func skipSpaceSlow(data []byte, p int) int {
 	if p+1 < len(data) && data[p] == ' ' && data[p+1] > ' ' {
 		return p + 1
 	}
+	// An indented document is mostly a newline followed by a run of
+	// spaces. Two words cover a run of up to sixteen, and the length is
+	// computed rather than branched on: the lowest lane that differs from
+	// a space is the first non-space byte, exactly, a word of nothing but
+	// spaces reports eight, and the second word counts only when the first
+	// was all spaces. Run lengths vary from line to line, so a loop that
+	// tests each word mispredicts on most of them; this does not. Whatever
+	// the run ends on, the loop below takes over, and it is a run of
+	// nothing but spaces when it finds a non-space byte right away.
+	if p+17 <= len(data) && data[p] == '\n' {
+		n0 := bits.TrailingZeros64(binary.LittleEndian.Uint64(data[p+1:])^allSpaces) / 8
+		n1 := bits.TrailingZeros64(binary.LittleEndian.Uint64(data[p+9:])^allSpaces) / 8
+		p += 1 + n0 + n1&-(n0>>3)
+	}
 	for p < len(data) && spaceSet[data[p]] {
 		p++
-		// An indented document is mostly a newline followed by a run of
-		// spaces, so consume those a word at a time: the lowest lane that
-		// differs from a space is the first non-space byte, exactly, and a
-		// word of nothing but spaces reports eight.
 		for p+8 <= len(data) {
 			n := bits.TrailingZeros64(binary.LittleEndian.Uint64(data[p:])^allSpaces) / 8
 			p += n

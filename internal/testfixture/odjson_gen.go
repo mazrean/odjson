@@ -58,16 +58,15 @@ func (v *Inner) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				switch {
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
+				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
 					idx, p = 0, p+4
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"note\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"note\"" {
 					idx, p = 1, p+6
 				}
 			}
@@ -177,16 +176,15 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				switch {
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
+				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
 					idx, key, p = 0, rest[1:3], p+4
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"note\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"note\"" {
 					idx, key, p = 1, rest[1:5], p+6
 				}
 			}
@@ -493,13 +491,15 @@ func (v *Base) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'b':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"base_id\"":
+		rest := data[p:]
+		if len(rest) > 6 {
+			switch rest[6] {
+			case 'i':
+				if len(rest) >= 9 && string(rest[:9]) == "\"base_id\"" {
 					idx, p = 0, p+9
-				case len(rest) >= 11 && string(rest[:11]) == "\"base_name\"":
+				}
+			case 'n':
+				if len(rest) >= 11 && string(rest[:11]) == "\"base_name\"" {
 					idx, p = 1, p+11
 				}
 			}
@@ -609,13 +609,15 @@ func (v *Base) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'b':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"base_id\"":
+		rest := data[p:]
+		if len(rest) > 6 {
+			switch rest[6] {
+			case 'i':
+				if len(rest) >= 9 && string(rest[:9]) == "\"base_id\"" {
 					idx, key, p = 0, rest[1:8], p+9
-				case len(rest) >= 11 && string(rest[:11]) == "\"base_name\"":
+				}
+			case 'n':
+				if len(rest) >= 11 && string(rest[:11]) == "\"base_name\"" {
 					idx, key, p = 1, rest[1:10], p+11
 				}
 			}
@@ -918,14 +920,9 @@ func (v *PtrBase) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'p':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"ptr_field\"":
-					idx, p = 0, p+11
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 11 && string(rest[:11]) == "\"ptr_field\"" {
+			idx, p = 0, p+11
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -1012,14 +1009,9 @@ func (v *PtrBase) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'p':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"ptr_field\"":
-					idx, key, p = 0, rest[1:10], p+11
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 11 && string(rest[:11]) == "\"ptr_field\"" {
+			idx, key, p = 0, rest[1:10], p+11
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -1424,106 +1416,175 @@ func (v *Scalars) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'b':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"base_id\"":
-					idx, p = 0, p+9
-				case len(rest) >= 11 && string(rest[:11]) == "\"base_name\"":
-					idx, p = 1, p+11
-				case len(rest) >= 6 && string(rest[:6]) == "\"bool\"":
-					idx, p = 3, p+6
+		rest := data[p:]
+		if len(rest) > 4 {
+			switch rest[4] {
+			case 'e':
+				if len(rest) > 6 {
+					switch rest[6] {
+					case 'i':
+						if len(rest) >= 9 && string(rest[:9]) == "\"base_id\"" {
+							idx, p = 0, p+9
+						}
+					case 'n':
+						if len(rest) >= 11 && string(rest[:11]) == "\"base_name\"" {
+							idx, p = 1, p+11
+						}
+					case '"':
+						if len(rest) >= 7 && string(rest[:7]) == "\"named\"" {
+							idx, p = 17, p+7
+						}
+					case '_':
+						if len(rest) >= 13 && string(rest[:13]) == "\"named_level\"" {
+							idx, p = 18, p+13
+						}
+					}
 				}
-			case 'p':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"ptr_field\"":
+			case '_':
+				if len(rest) >= 11 && string(rest[:11]) == "\"ptr_field\"" {
 					idx, p = 2, p+11
 				}
-			case 'i':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"int\"":
+			case 'l':
+				if len(rest) >= 6 && string(rest[:6]) == "\"bool\"" {
+					idx, p = 3, p+6
+				}
+			case '"':
+				if len(rest) >= 5 && string(rest[:5]) == "\"int\"" {
 					idx, p = 4, p+5
-				case len(rest) >= 6 && string(rest[:6]) == "\"int8\"":
+				}
+			case '8':
+				if len(rest) >= 6 && string(rest[:6]) == "\"int8\"" {
 					idx, p = 5, p+6
-				case len(rest) >= 7 && string(rest[:7]) == "\"int16\"":
+				}
+			case '1':
+				if len(rest) >= 7 && string(rest[:7]) == "\"int16\"" {
 					idx, p = 6, p+7
-				case len(rest) >= 7 && string(rest[:7]) == "\"int32\"":
+				}
+			case '3':
+				if len(rest) >= 7 && string(rest[:7]) == "\"int32\"" {
 					idx, p = 7, p+7
-				case len(rest) >= 7 && string(rest[:7]) == "\"int64\"":
+				}
+			case '6':
+				if len(rest) >= 7 && string(rest[:7]) == "\"int64\"" {
 					idx, p = 8, p+7
 				}
-			case 'u':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"uint\"":
-					idx, p = 9, p+6
-				case len(rest) >= 7 && string(rest[:7]) == "\"uint8\"":
-					idx, p = 10, p+7
-				case len(rest) >= 8 && string(rest[:8]) == "\"uint16\"":
-					idx, p = 11, p+8
-				case len(rest) >= 8 && string(rest[:8]) == "\"uint32\"":
-					idx, p = 12, p+8
-				case len(rest) >= 8 && string(rest[:8]) == "\"uint64\"":
-					idx, p = 13, p+8
+			case 't':
+				if len(rest) > 5 {
+					switch rest[5] {
+					case '"':
+						switch rest[1] {
+						case 'u':
+							if len(rest) >= 6 && string(rest[:6]) == "\"uint\"" {
+								idx, p = 9, p+6
+							}
+						case 'q':
+							if len(rest) >= 6 && string(rest[:6]) == "\"qint\"" {
+								idx, p = 19, p+6
+							}
+						}
+					case '8':
+						if len(rest) >= 7 && string(rest[:7]) == "\"uint8\"" {
+							idx, p = 10, p+7
+						}
+					case '1':
+						if len(rest) >= 8 && string(rest[:8]) == "\"uint16\"" {
+							idx, p = 11, p+8
+						}
+					case '3':
+						if len(rest) >= 8 && string(rest[:8]) == "\"uint32\"" {
+							idx, p = 12, p+8
+						}
+					case '6':
+						if len(rest) >= 8 && string(rest[:8]) == "\"uint64\"" {
+							idx, p = 13, p+8
+						}
+					case 'i':
+						if len(rest) >= 9 && string(rest[:9]) == "\"oz_time\"" {
+							idx, p = 30, p+9
+						}
+					}
 				}
-			case 'f':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"float32\"":
-					idx, p = 14, p+9
-				case len(rest) >= 9 && string(rest[:9]) == "\"float64\"":
-					idx, p = 15, p+9
+			case 'a':
+				if len(rest) > 6 {
+					switch rest[6] {
+					case '3':
+						if len(rest) >= 9 && string(rest[:9]) == "\"float32\"" {
+							idx, p = 14, p+9
+						}
+					case '6':
+						if len(rest) >= 9 && string(rest[:9]) == "\"float64\"" {
+							idx, p = 15, p+9
+						}
+					case 'e':
+						if len(rest) >= 9 && string(rest[:9]) == "\"renamed\"" {
+							idx, p = 24, p+9
+						}
+					case 'g':
+						if len(rest) >= 10 && string(rest[:10]) == "\"Untagged\"" {
+							idx, p = 25, p+10
+						}
+					}
 				}
-			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"string\"":
-					idx, p = 16, p+8
-				}
-			case 'n':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"named\"":
-					idx, p = 17, p+7
-				case len(rest) >= 13 && string(rest[:13]) == "\"named_level\"":
-					idx, p = 18, p+13
-				}
-			case 'q':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"qint\"":
-					idx, p = 19, p+6
-				case len(rest) >= 7 && string(rest[:7]) == "\"qbool\"":
-					idx, p = 20, p+7
-				case len(rest) >= 9 && string(rest[:9]) == "\"qstring\"":
-					idx, p = 21, p+9
-				case len(rest) >= 8 && string(rest[:8]) == "\"qfloat\"":
-					idx, p = 22, p+8
-				case len(rest) >= 6 && string(rest[:6]) == "\"qptr\"":
-					idx, p = 23, p+6
-				}
-			case 'r':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"renamed\"":
-					idx, p = 24, p+9
-				}
-			case 'U':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"Untagged\"":
-					idx, p = 25, p+10
+			case 'i':
+				switch rest[2] {
+				case 't':
+					if len(rest) >= 8 && string(rest[:8]) == "\"string\"" {
+						idx, p = 16, p+8
+					}
+				case 'e':
+					if len(rest) >= 8 && string(rest[:8]) == "\"oe_int\"" {
+						idx, p = 27, p+8
+					}
+				case 'z':
+					if len(rest) >= 10 && string(rest[:10]) == "\"oz_inner\"" {
+						idx, p = 31, p+10
+					}
 				}
 			case 'o':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"oe_string\"":
-					idx, p = 26, p+11
-				case len(rest) >= 8 && string(rest[:8]) == "\"oe_int\"":
-					idx, p = 27, p+8
-				case len(rest) >= 8 && string(rest[:8]) == "\"oe_ptr\"":
+				switch rest[2] {
+				case 'b':
+					if len(rest) >= 7 && string(rest[:7]) == "\"qbool\"" {
+						idx, p = 20, p+7
+					}
+				case 'f':
+					if len(rest) >= 8 && string(rest[:8]) == "\"qfloat\"" {
+						idx, p = 22, p+8
+					}
+				}
+			case 'r':
+				switch rest[2] {
+				case 's':
+					if len(rest) >= 9 && string(rest[:9]) == "\"qstring\"" {
+						idx, p = 21, p+9
+					}
+				case 'p':
+					if len(rest) >= 6 && string(rest[:6]) == "\"qptr\"" {
+						idx, p = 23, p+6
+					}
+				}
+			case 's':
+				switch rest[2] {
+				case 'e':
+					if len(rest) > 5 {
+						switch rest[5] {
+						case 't':
+							if len(rest) >= 11 && string(rest[:11]) == "\"oe_string\"" {
+								idx, p = 26, p+11
+							}
+						case 'l':
+							if len(rest) >= 10 && string(rest[:10]) == "\"oe_slice\"" {
+								idx, p = 29, p+10
+							}
+						}
+					}
+				case 'z':
+					if len(rest) >= 11 && string(rest[:11]) == "\"oz_string\"" {
+						idx, p = 32, p+11
+					}
+				}
+			case 'p':
+				if len(rest) >= 8 && string(rest[:8]) == "\"oe_ptr\"" {
 					idx, p = 28, p+8
-				case len(rest) >= 10 && string(rest[:10]) == "\"oe_slice\"":
-					idx, p = 29, p+10
-				case len(rest) >= 9 && string(rest[:9]) == "\"oz_time\"":
-					idx, p = 30, p+9
-				case len(rest) >= 10 && string(rest[:10]) == "\"oz_inner\"":
-					idx, p = 31, p+10
-				case len(rest) >= 11 && string(rest[:11]) == "\"oz_string\"":
-					idx, p = 32, p+11
 				}
 			}
 		}
@@ -2327,106 +2388,175 @@ func (v *Scalars) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'b':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"base_id\"":
-					idx, key, p = 0, rest[1:8], p+9
-				case len(rest) >= 11 && string(rest[:11]) == "\"base_name\"":
-					idx, key, p = 1, rest[1:10], p+11
-				case len(rest) >= 6 && string(rest[:6]) == "\"bool\"":
-					idx, key, p = 3, rest[1:5], p+6
+		rest := data[p:]
+		if len(rest) > 4 {
+			switch rest[4] {
+			case 'e':
+				if len(rest) > 6 {
+					switch rest[6] {
+					case 'i':
+						if len(rest) >= 9 && string(rest[:9]) == "\"base_id\"" {
+							idx, key, p = 0, rest[1:8], p+9
+						}
+					case 'n':
+						if len(rest) >= 11 && string(rest[:11]) == "\"base_name\"" {
+							idx, key, p = 1, rest[1:10], p+11
+						}
+					case '"':
+						if len(rest) >= 7 && string(rest[:7]) == "\"named\"" {
+							idx, key, p = 17, rest[1:6], p+7
+						}
+					case '_':
+						if len(rest) >= 13 && string(rest[:13]) == "\"named_level\"" {
+							idx, key, p = 18, rest[1:12], p+13
+						}
+					}
 				}
-			case 'p':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"ptr_field\"":
+			case '_':
+				if len(rest) >= 11 && string(rest[:11]) == "\"ptr_field\"" {
 					idx, key, p = 2, rest[1:10], p+11
 				}
-			case 'i':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"int\"":
+			case 'l':
+				if len(rest) >= 6 && string(rest[:6]) == "\"bool\"" {
+					idx, key, p = 3, rest[1:5], p+6
+				}
+			case '"':
+				if len(rest) >= 5 && string(rest[:5]) == "\"int\"" {
 					idx, key, p = 4, rest[1:4], p+5
-				case len(rest) >= 6 && string(rest[:6]) == "\"int8\"":
+				}
+			case '8':
+				if len(rest) >= 6 && string(rest[:6]) == "\"int8\"" {
 					idx, key, p = 5, rest[1:5], p+6
-				case len(rest) >= 7 && string(rest[:7]) == "\"int16\"":
+				}
+			case '1':
+				if len(rest) >= 7 && string(rest[:7]) == "\"int16\"" {
 					idx, key, p = 6, rest[1:6], p+7
-				case len(rest) >= 7 && string(rest[:7]) == "\"int32\"":
+				}
+			case '3':
+				if len(rest) >= 7 && string(rest[:7]) == "\"int32\"" {
 					idx, key, p = 7, rest[1:6], p+7
-				case len(rest) >= 7 && string(rest[:7]) == "\"int64\"":
+				}
+			case '6':
+				if len(rest) >= 7 && string(rest[:7]) == "\"int64\"" {
 					idx, key, p = 8, rest[1:6], p+7
 				}
-			case 'u':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"uint\"":
-					idx, key, p = 9, rest[1:5], p+6
-				case len(rest) >= 7 && string(rest[:7]) == "\"uint8\"":
-					idx, key, p = 10, rest[1:6], p+7
-				case len(rest) >= 8 && string(rest[:8]) == "\"uint16\"":
-					idx, key, p = 11, rest[1:7], p+8
-				case len(rest) >= 8 && string(rest[:8]) == "\"uint32\"":
-					idx, key, p = 12, rest[1:7], p+8
-				case len(rest) >= 8 && string(rest[:8]) == "\"uint64\"":
-					idx, key, p = 13, rest[1:7], p+8
+			case 't':
+				if len(rest) > 5 {
+					switch rest[5] {
+					case '"':
+						switch rest[1] {
+						case 'u':
+							if len(rest) >= 6 && string(rest[:6]) == "\"uint\"" {
+								idx, key, p = 9, rest[1:5], p+6
+							}
+						case 'q':
+							if len(rest) >= 6 && string(rest[:6]) == "\"qint\"" {
+								idx, key, p = 19, rest[1:5], p+6
+							}
+						}
+					case '8':
+						if len(rest) >= 7 && string(rest[:7]) == "\"uint8\"" {
+							idx, key, p = 10, rest[1:6], p+7
+						}
+					case '1':
+						if len(rest) >= 8 && string(rest[:8]) == "\"uint16\"" {
+							idx, key, p = 11, rest[1:7], p+8
+						}
+					case '3':
+						if len(rest) >= 8 && string(rest[:8]) == "\"uint32\"" {
+							idx, key, p = 12, rest[1:7], p+8
+						}
+					case '6':
+						if len(rest) >= 8 && string(rest[:8]) == "\"uint64\"" {
+							idx, key, p = 13, rest[1:7], p+8
+						}
+					case 'i':
+						if len(rest) >= 9 && string(rest[:9]) == "\"oz_time\"" {
+							idx, key, p = 30, rest[1:8], p+9
+						}
+					}
 				}
-			case 'f':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"float32\"":
-					idx, key, p = 14, rest[1:8], p+9
-				case len(rest) >= 9 && string(rest[:9]) == "\"float64\"":
-					idx, key, p = 15, rest[1:8], p+9
+			case 'a':
+				if len(rest) > 6 {
+					switch rest[6] {
+					case '3':
+						if len(rest) >= 9 && string(rest[:9]) == "\"float32\"" {
+							idx, key, p = 14, rest[1:8], p+9
+						}
+					case '6':
+						if len(rest) >= 9 && string(rest[:9]) == "\"float64\"" {
+							idx, key, p = 15, rest[1:8], p+9
+						}
+					case 'e':
+						if len(rest) >= 9 && string(rest[:9]) == "\"renamed\"" {
+							idx, key, p = 24, rest[1:8], p+9
+						}
+					case 'g':
+						if len(rest) >= 10 && string(rest[:10]) == "\"Untagged\"" {
+							idx, key, p = 25, rest[1:9], p+10
+						}
+					}
 				}
-			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"string\"":
-					idx, key, p = 16, rest[1:7], p+8
-				}
-			case 'n':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"named\"":
-					idx, key, p = 17, rest[1:6], p+7
-				case len(rest) >= 13 && string(rest[:13]) == "\"named_level\"":
-					idx, key, p = 18, rest[1:12], p+13
-				}
-			case 'q':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"qint\"":
-					idx, key, p = 19, rest[1:5], p+6
-				case len(rest) >= 7 && string(rest[:7]) == "\"qbool\"":
-					idx, key, p = 20, rest[1:6], p+7
-				case len(rest) >= 9 && string(rest[:9]) == "\"qstring\"":
-					idx, key, p = 21, rest[1:8], p+9
-				case len(rest) >= 8 && string(rest[:8]) == "\"qfloat\"":
-					idx, key, p = 22, rest[1:7], p+8
-				case len(rest) >= 6 && string(rest[:6]) == "\"qptr\"":
-					idx, key, p = 23, rest[1:5], p+6
-				}
-			case 'r':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"renamed\"":
-					idx, key, p = 24, rest[1:8], p+9
-				}
-			case 'U':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"Untagged\"":
-					idx, key, p = 25, rest[1:9], p+10
+			case 'i':
+				switch rest[2] {
+				case 't':
+					if len(rest) >= 8 && string(rest[:8]) == "\"string\"" {
+						idx, key, p = 16, rest[1:7], p+8
+					}
+				case 'e':
+					if len(rest) >= 8 && string(rest[:8]) == "\"oe_int\"" {
+						idx, key, p = 27, rest[1:7], p+8
+					}
+				case 'z':
+					if len(rest) >= 10 && string(rest[:10]) == "\"oz_inner\"" {
+						idx, key, p = 31, rest[1:9], p+10
+					}
 				}
 			case 'o':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"oe_string\"":
-					idx, key, p = 26, rest[1:10], p+11
-				case len(rest) >= 8 && string(rest[:8]) == "\"oe_int\"":
-					idx, key, p = 27, rest[1:7], p+8
-				case len(rest) >= 8 && string(rest[:8]) == "\"oe_ptr\"":
+				switch rest[2] {
+				case 'b':
+					if len(rest) >= 7 && string(rest[:7]) == "\"qbool\"" {
+						idx, key, p = 20, rest[1:6], p+7
+					}
+				case 'f':
+					if len(rest) >= 8 && string(rest[:8]) == "\"qfloat\"" {
+						idx, key, p = 22, rest[1:7], p+8
+					}
+				}
+			case 'r':
+				switch rest[2] {
+				case 's':
+					if len(rest) >= 9 && string(rest[:9]) == "\"qstring\"" {
+						idx, key, p = 21, rest[1:8], p+9
+					}
+				case 'p':
+					if len(rest) >= 6 && string(rest[:6]) == "\"qptr\"" {
+						idx, key, p = 23, rest[1:5], p+6
+					}
+				}
+			case 's':
+				switch rest[2] {
+				case 'e':
+					if len(rest) > 5 {
+						switch rest[5] {
+						case 't':
+							if len(rest) >= 11 && string(rest[:11]) == "\"oe_string\"" {
+								idx, key, p = 26, rest[1:10], p+11
+							}
+						case 'l':
+							if len(rest) >= 10 && string(rest[:10]) == "\"oe_slice\"" {
+								idx, key, p = 29, rest[1:9], p+10
+							}
+						}
+					}
+				case 'z':
+					if len(rest) >= 11 && string(rest[:11]) == "\"oz_string\"" {
+						idx, key, p = 32, rest[1:10], p+11
+					}
+				}
+			case 'p':
+				if len(rest) >= 8 && string(rest[:8]) == "\"oe_ptr\"" {
 					idx, key, p = 28, rest[1:7], p+8
-				case len(rest) >= 10 && string(rest[:10]) == "\"oe_slice\"":
-					idx, key, p = 29, rest[1:9], p+10
-				case len(rest) >= 9 && string(rest[:9]) == "\"oz_time\"":
-					idx, key, p = 30, rest[1:8], p+9
-				case len(rest) >= 10 && string(rest[:10]) == "\"oz_inner\"":
-					idx, key, p = 31, rest[1:9], p+10
-				case len(rest) >= 11 && string(rest[:11]) == "\"oz_string\"":
-					idx, key, p = 32, rest[1:10], p+11
 				}
 			}
 		}
@@ -4621,80 +4751,155 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'b':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"bytes\"":
-					idx, p = 0, p+7
-				case len(rest) >= 12 && string(rest[:12]) == "\"byte_array\"":
-					idx, p = 2, p+12
+				if len(rest) > 5 {
+					switch rest[5] {
+					case 's':
+						if len(rest) >= 7 && string(rest[:7]) == "\"bytes\"" {
+							idx, p = 0, p+7
+						}
+					case '_':
+						if len(rest) >= 12 && string(rest[:12]) == "\"byte_array\"" {
+							idx, p = 2, p+12
+						}
+					}
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"named_flags\"":
-					idx, p = 1, p+13
-				case len(rest) >= 8 && string(rest[:8]) == "\"nested\"":
-					idx, p = 8, p+8
-				case len(rest) >= 11 && string(rest[:11]) == "\"named_map\"":
-					idx, p = 11, p+11
-				case len(rest) >= 8 && string(rest[:8]) == "\"number\"":
-					idx, p = 19, p+8
+				if len(rest) > 2 {
+					switch rest[2] {
+					case 'a':
+						if len(rest) > 7 {
+							switch rest[7] {
+							case 'f':
+								if len(rest) >= 13 && string(rest[:13]) == "\"named_flags\"" {
+									idx, p = 1, p+13
+								}
+							case 'm':
+								if len(rest) >= 11 && string(rest[:11]) == "\"named_map\"" {
+									idx, p = 11, p+11
+								}
+							}
+						}
+					case 'e':
+						if len(rest) >= 8 && string(rest[:8]) == "\"nested\"" {
+							idx, p = 8, p+8
+						}
+					case 'u':
+						if len(rest) >= 8 && string(rest[:8]) == "\"number\"" {
+							idx, p = 19, p+8
+						}
+					}
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"int_array\"":
-					idx, p = 3, p+11
-				case len(rest) >= 6 && string(rest[:6]) == "\"ints\"":
-					idx, p = 4, p+6
-				case len(rest) >= 8 && string(rest[:8]) == "\"inners\"":
-					idx, p = 6, p+8
-				case len(rest) >= 12 && string(rest[:12]) == "\"inner_ptrs\"":
-					idx, p = 7, p+12
-				case len(rest) >= 11 && string(rest[:11]) == "\"inner_map\"":
-					idx, p = 10, p+11
-				case len(rest) >= 7 && string(rest[:7]) == "\"inner\"":
-					idx, p = 13, p+7
-				case len(rest) >= 11 && string(rest[:11]) == "\"inner_ptr\"":
-					idx, p = 14, p+11
+				if len(rest) > 4 {
+					switch rest[4] {
+					case '_':
+						if len(rest) >= 11 && string(rest[:11]) == "\"int_array\"" {
+							idx, p = 3, p+11
+						}
+					case 's':
+						if len(rest) >= 6 && string(rest[:6]) == "\"ints\"" {
+							idx, p = 4, p+6
+						}
+					case 'e':
+						if len(rest) > 6 {
+							switch rest[6] {
+							case 's':
+								if len(rest) >= 8 && string(rest[:8]) == "\"inners\"" {
+									idx, p = 6, p+8
+								}
+							case '_':
+								if len(rest) > 7 {
+									switch rest[7] {
+									case 'p':
+										if len(rest) > 10 {
+											switch rest[10] {
+											case 's':
+												if len(rest) >= 12 && string(rest[:12]) == "\"inner_ptrs\"" {
+													idx, p = 7, p+12
+												}
+											case '"':
+												if len(rest) >= 11 && string(rest[:11]) == "\"inner_ptr\"" {
+													idx, p = 14, p+11
+												}
+											}
+										}
+									case 'm':
+										if len(rest) >= 11 && string(rest[:11]) == "\"inner_map\"" {
+											idx, p = 10, p+11
+										}
+									}
+								}
+							case '"':
+								if len(rest) >= 7 && string(rest[:7]) == "\"inner\"" {
+									idx, p = 13, p+7
+								}
+							}
+						}
+					}
 				}
 			case 's':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"strings\"":
-					idx, p = 5, p+9
-				case len(rest) >= 12 && string(rest[:12]) == "\"string_map\"":
-					idx, p = 9, p+12
+				if len(rest) > 7 {
+					switch rest[7] {
+					case 's':
+						if len(rest) >= 9 && string(rest[:9]) == "\"strings\"" {
+							idx, p = 5, p+9
+						}
+					case '_':
+						if len(rest) >= 12 && string(rest[:12]) == "\"string_map\"" {
+							idx, p = 9, p+12
+						}
+					}
 				}
 			case 'c':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"color_map\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"color_map\"" {
 					idx, p = 12, p+11
 				}
 			case 'd':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"deep_ptr\"":
-					idx, p = 15, p+10
-				case len(rest) >= 5 && string(rest[:5]) == "\"dur\"":
-					idx, p = 22, p+5
+				if len(rest) > 2 {
+					switch rest[2] {
+					case 'e':
+						if len(rest) >= 10 && string(rest[:10]) == "\"deep_ptr\"" {
+							idx, p = 15, p+10
+						}
+					case 'u':
+						if len(rest) >= 5 && string(rest[:5]) == "\"dur\"" {
+							idx, p = 22, p+5
+						}
+					}
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"any\"":
-					idx, p = 16, p+5
-				case len(rest) >= 6 && string(rest[:6]) == "\"anys\"":
-					idx, p = 17, p+6
+				if len(rest) > 4 {
+					switch rest[4] {
+					case '"':
+						if len(rest) >= 5 && string(rest[:5]) == "\"any\"" {
+							idx, p = 16, p+5
+						}
+					case 's':
+						if len(rest) >= 6 && string(rest[:6]) == "\"anys\"" {
+							idx, p = 17, p+6
+						}
+					}
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"raw\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"raw\"" {
 					idx, p = 18, p+5
 				}
 			case 't':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"time\"":
-					idx, p = 20, p+6
-				case len(rest) >= 10 && string(rest[:10]) == "\"time_ptr\"":
-					idx, p = 21, p+10
+				if len(rest) > 5 {
+					switch rest[5] {
+					case '"':
+						if len(rest) >= 6 && string(rest[:6]) == "\"time\"" {
+							idx, p = 20, p+6
+						}
+					case '_':
+						if len(rest) >= 10 && string(rest[:10]) == "\"time_ptr\"" {
+							idx, p = 21, p+10
+						}
+					}
 				}
 			}
 		}
@@ -5675,80 +5880,155 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'b':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"bytes\"":
-					idx, key, p = 0, rest[1:6], p+7
-				case len(rest) >= 12 && string(rest[:12]) == "\"byte_array\"":
-					idx, key, p = 2, rest[1:11], p+12
+				if len(rest) > 5 {
+					switch rest[5] {
+					case 's':
+						if len(rest) >= 7 && string(rest[:7]) == "\"bytes\"" {
+							idx, key, p = 0, rest[1:6], p+7
+						}
+					case '_':
+						if len(rest) >= 12 && string(rest[:12]) == "\"byte_array\"" {
+							idx, key, p = 2, rest[1:11], p+12
+						}
+					}
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"named_flags\"":
-					idx, key, p = 1, rest[1:12], p+13
-				case len(rest) >= 8 && string(rest[:8]) == "\"nested\"":
-					idx, key, p = 8, rest[1:7], p+8
-				case len(rest) >= 11 && string(rest[:11]) == "\"named_map\"":
-					idx, key, p = 11, rest[1:10], p+11
-				case len(rest) >= 8 && string(rest[:8]) == "\"number\"":
-					idx, key, p = 19, rest[1:7], p+8
+				if len(rest) > 2 {
+					switch rest[2] {
+					case 'a':
+						if len(rest) > 7 {
+							switch rest[7] {
+							case 'f':
+								if len(rest) >= 13 && string(rest[:13]) == "\"named_flags\"" {
+									idx, key, p = 1, rest[1:12], p+13
+								}
+							case 'm':
+								if len(rest) >= 11 && string(rest[:11]) == "\"named_map\"" {
+									idx, key, p = 11, rest[1:10], p+11
+								}
+							}
+						}
+					case 'e':
+						if len(rest) >= 8 && string(rest[:8]) == "\"nested\"" {
+							idx, key, p = 8, rest[1:7], p+8
+						}
+					case 'u':
+						if len(rest) >= 8 && string(rest[:8]) == "\"number\"" {
+							idx, key, p = 19, rest[1:7], p+8
+						}
+					}
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"int_array\"":
-					idx, key, p = 3, rest[1:10], p+11
-				case len(rest) >= 6 && string(rest[:6]) == "\"ints\"":
-					idx, key, p = 4, rest[1:5], p+6
-				case len(rest) >= 8 && string(rest[:8]) == "\"inners\"":
-					idx, key, p = 6, rest[1:7], p+8
-				case len(rest) >= 12 && string(rest[:12]) == "\"inner_ptrs\"":
-					idx, key, p = 7, rest[1:11], p+12
-				case len(rest) >= 11 && string(rest[:11]) == "\"inner_map\"":
-					idx, key, p = 10, rest[1:10], p+11
-				case len(rest) >= 7 && string(rest[:7]) == "\"inner\"":
-					idx, key, p = 13, rest[1:6], p+7
-				case len(rest) >= 11 && string(rest[:11]) == "\"inner_ptr\"":
-					idx, key, p = 14, rest[1:10], p+11
+				if len(rest) > 4 {
+					switch rest[4] {
+					case '_':
+						if len(rest) >= 11 && string(rest[:11]) == "\"int_array\"" {
+							idx, key, p = 3, rest[1:10], p+11
+						}
+					case 's':
+						if len(rest) >= 6 && string(rest[:6]) == "\"ints\"" {
+							idx, key, p = 4, rest[1:5], p+6
+						}
+					case 'e':
+						if len(rest) > 6 {
+							switch rest[6] {
+							case 's':
+								if len(rest) >= 8 && string(rest[:8]) == "\"inners\"" {
+									idx, key, p = 6, rest[1:7], p+8
+								}
+							case '_':
+								if len(rest) > 7 {
+									switch rest[7] {
+									case 'p':
+										if len(rest) > 10 {
+											switch rest[10] {
+											case 's':
+												if len(rest) >= 12 && string(rest[:12]) == "\"inner_ptrs\"" {
+													idx, key, p = 7, rest[1:11], p+12
+												}
+											case '"':
+												if len(rest) >= 11 && string(rest[:11]) == "\"inner_ptr\"" {
+													idx, key, p = 14, rest[1:10], p+11
+												}
+											}
+										}
+									case 'm':
+										if len(rest) >= 11 && string(rest[:11]) == "\"inner_map\"" {
+											idx, key, p = 10, rest[1:10], p+11
+										}
+									}
+								}
+							case '"':
+								if len(rest) >= 7 && string(rest[:7]) == "\"inner\"" {
+									idx, key, p = 13, rest[1:6], p+7
+								}
+							}
+						}
+					}
 				}
 			case 's':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"strings\"":
-					idx, key, p = 5, rest[1:8], p+9
-				case len(rest) >= 12 && string(rest[:12]) == "\"string_map\"":
-					idx, key, p = 9, rest[1:11], p+12
+				if len(rest) > 7 {
+					switch rest[7] {
+					case 's':
+						if len(rest) >= 9 && string(rest[:9]) == "\"strings\"" {
+							idx, key, p = 5, rest[1:8], p+9
+						}
+					case '_':
+						if len(rest) >= 12 && string(rest[:12]) == "\"string_map\"" {
+							idx, key, p = 9, rest[1:11], p+12
+						}
+					}
 				}
 			case 'c':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"color_map\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"color_map\"" {
 					idx, key, p = 12, rest[1:10], p+11
 				}
 			case 'd':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"deep_ptr\"":
-					idx, key, p = 15, rest[1:9], p+10
-				case len(rest) >= 5 && string(rest[:5]) == "\"dur\"":
-					idx, key, p = 22, rest[1:4], p+5
+				if len(rest) > 2 {
+					switch rest[2] {
+					case 'e':
+						if len(rest) >= 10 && string(rest[:10]) == "\"deep_ptr\"" {
+							idx, key, p = 15, rest[1:9], p+10
+						}
+					case 'u':
+						if len(rest) >= 5 && string(rest[:5]) == "\"dur\"" {
+							idx, key, p = 22, rest[1:4], p+5
+						}
+					}
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"any\"":
-					idx, key, p = 16, rest[1:4], p+5
-				case len(rest) >= 6 && string(rest[:6]) == "\"anys\"":
-					idx, key, p = 17, rest[1:5], p+6
+				if len(rest) > 4 {
+					switch rest[4] {
+					case '"':
+						if len(rest) >= 5 && string(rest[:5]) == "\"any\"" {
+							idx, key, p = 16, rest[1:4], p+5
+						}
+					case 's':
+						if len(rest) >= 6 && string(rest[:6]) == "\"anys\"" {
+							idx, key, p = 17, rest[1:5], p+6
+						}
+					}
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"raw\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"raw\"" {
 					idx, key, p = 18, rest[1:4], p+5
 				}
 			case 't':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"time\"":
-					idx, key, p = 20, rest[1:5], p+6
-				case len(rest) >= 10 && string(rest[:10]) == "\"time_ptr\"":
-					idx, key, p = 21, rest[1:9], p+10
+				if len(rest) > 5 {
+					switch rest[5] {
+					case '"':
+						if len(rest) >= 6 && string(rest[:6]) == "\"time\"" {
+							idx, key, p = 20, rest[1:5], p+6
+						}
+					case '_':
+						if len(rest) >= 10 && string(rest[:10]) == "\"time_ptr\"" {
+							idx, key, p = 21, rest[1:9], p+10
+						}
+					}
 				}
 			}
 		}
@@ -8023,16 +8303,15 @@ func (v *Recursive) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"name\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
 					idx, p = 0, p+6
 				}
 			case 'c':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"children\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"children\"" {
 					idx, p = 1, p+10
 				}
 			}
@@ -8179,16 +8458,15 @@ func (v *Recursive) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"name\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
 					idx, key, p = 0, rest[1:5], p+6
 				}
 			case 'c':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"children\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"children\"" {
 					idx, key, p = 1, rest[1:9], p+10
 				}
 			}

@@ -225,6 +225,12 @@ func AppendFloat(dst []byte, v float64, bits int) ([]byte, error) {
 			format = 'e'
 		}
 	}
+	if format == 'f' && bits == 64 {
+		// A short decimal is printed without Ryu; see ftoa.go.
+		if out, ok := appendShortFloat(dst, v); ok {
+			return out, nil
+		}
+	}
 	dst = strconv.AppendFloat(dst, v, format, -1, bits)
 	if format == 'e' {
 		// Clean up e-09 to e-9.

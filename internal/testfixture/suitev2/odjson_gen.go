@@ -52,14 +52,9 @@ func (v *Raw) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'x':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"x\"":
-					idx, p = 0, p+3
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 3 && string(rest[:3]) == "\"x\"" {
+			idx, p = 0, p+3
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -133,14 +128,9 @@ func (v *Raw) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'x':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"x\"":
-					idx, key, p = 0, rest[1:2], p+3
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 3 && string(rest[:3]) == "\"x\"" {
+			idx, key, p = 0, rest[1:2], p+3
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -390,14 +380,9 @@ func (v *Value) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'x':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"x\"":
-					idx, p = 0, p+3
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 3 && string(rest[:3]) == "\"x\"" {
+			idx, p = 0, p+3
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -478,14 +463,9 @@ func (v *Value) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'x':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"x\"":
-					idx, key, p = 0, rest[1:2], p+3
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 3 && string(rest[:3]) == "\"x\"" {
+			idx, key, p = 0, rest[1:2], p+3
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -745,14 +725,9 @@ func (v *Typed) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'x':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"x\"":
-					idx, p = 0, p+3
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 3 && string(rest[:3]) == "\"x\"" {
+			idx, p = 0, p+3
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -826,14 +801,9 @@ func (v *Typed) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'x':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"x\"":
-					idx, key, p = 0, rest[1:2], p+3
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 3 && string(rest[:3]) == "\"x\"" {
+			idx, key, p = 0, rest[1:2], p+3
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -1136,41 +1106,35 @@ func (v *Inner) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 's':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"s\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"s\"" {
 					idx, p = 0, p+3
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"n\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"n\"" {
 					idx, p = 1, p+3
 				}
 			case 'b':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"b\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"b\"" {
 					idx, p = 2, p+3
 				}
 			case 'l':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"l\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"l\"" {
 					idx, p = 3, p+3
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"m\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"m\"" {
 					idx, p = 4, p+3
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"a\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"a\"" {
 					idx, p = 5, p+3
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"p\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"p\"" {
 					idx, p = 6, p+3
 				}
 			}
@@ -1435,41 +1399,35 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 's':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"s\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"s\"" {
 					idx, key, p = 0, rest[1:2], p+3
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"n\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"n\"" {
 					idx, key, p = 1, rest[1:2], p+3
 				}
 			case 'b':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"b\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"b\"" {
 					idx, key, p = 2, rest[1:2], p+3
 				}
 			case 'l':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"l\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"l\"" {
 					idx, key, p = 3, rest[1:2], p+3
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"m\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"m\"" {
 					idx, key, p = 4, rest[1:2], p+3
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"a\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"a\"" {
 					idx, key, p = 5, rest[1:2], p+3
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 3 && string(rest[:3]) == "\"p\"":
+				if len(rest) >= 3 && string(rest[:3]) == "\"p\"" {
 					idx, key, p = 6, rest[1:2], p+3
 				}
 			}

@@ -130,36 +130,31 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 't':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"thing\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"thing\"" {
 					idx, p = 0, p+7
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"ptr\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"ptr\"" {
 					idx, p = 1, p+5
 				}
 			case 'w':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"wrapper\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"wrapper\"" {
 					idx, p = 2, p+9
 				}
 			case 'l':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"list\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"list\"" {
 					idx, p = 3, p+6
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"map\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"map\"" {
 					idx, p = 4, p+5
 				}
 			case 'd':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"deep\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"deep\"" {
 					idx, p = 5, p+6
 				}
 			}
@@ -408,36 +403,31 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 't':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"thing\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"thing\"" {
 					idx, key, p = 0, rest[1:6], p+7
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"ptr\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"ptr\"" {
 					idx, key, p = 1, rest[1:4], p+5
 				}
 			case 'w':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"wrapper\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"wrapper\"" {
 					idx, key, p = 2, rest[1:8], p+9
 				}
 			case 'l':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"list\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"list\"" {
 					idx, key, p = 3, rest[1:5], p+6
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"map\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"map\"" {
 					idx, key, p = 4, rest[1:4], p+5
 				}
 			case 'd':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"deep\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"deep\"" {
 					idx, key, p = 5, rest[1:5], p+6
 				}
 			}
@@ -1041,16 +1031,15 @@ func odjsonOtherThingParse(data []byte, v *other.Thing, p int, sc *odjsonrt.Stri
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				switch {
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
+				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
 					idx, p = 0, p+4
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"name\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
 					idx, p = 1, p+6
 				}
 			}
@@ -1151,16 +1140,15 @@ func odjsonOtherThingParseV2(data []byte, v *other.Thing, p int, sc *odjsonrt.St
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				switch {
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
+				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
 					idx, key, p = 0, rest[1:3], p+4
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"name\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
 					idx, key, p = 1, rest[1:5], p+6
 				}
 			}
@@ -1411,21 +1399,19 @@ func odjsonOtherWrapperParse(data []byte, v *other.Wrapper, p int, sc *odjsonrt.
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 't':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"thing\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"thing\"" {
 					idx, p = 0, p+7
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"ptr\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"ptr\"" {
 					idx, p = 1, p+5
 				}
 			case 'l':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"list\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"list\"" {
 					idx, p = 2, p+6
 				}
 			}
@@ -1563,21 +1549,19 @@ func odjsonOtherWrapperParseV2(data []byte, v *other.Wrapper, p int, sc *odjsonr
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 't':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"thing\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"thing\"" {
 					idx, key, p = 0, rest[1:6], p+7
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"ptr\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"ptr\"" {
 					idx, key, p = 1, rest[1:4], p+5
 				}
 			case 'l':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"list\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"list\"" {
 					idx, key, p = 2, rest[1:5], p+6
 				}
 			}

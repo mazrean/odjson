@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mazrean/odjson/internal/analyzer"
 )
@@ -84,7 +85,7 @@ func (g *generator) encodeStruct(b *block, s *analyzer.StructInfo) {
 			}
 		}
 		body := func(b *block) {
-			g.emit(b, assign(dst, spread(id("append"), dst, str(","+jsonString(f.JSONName, g.opts.EscapeHTML)+":"))))
+			g.appendLit(b, ","+jsonString(f.JSONName, g.opts.EscapeHTML)+":")
 			if f.AsString {
 				g.encodeQuoted(b, f.Type, selector(f), true)
 			} else {
@@ -105,6 +106,25 @@ func (g *generator) encodeStruct(b *block, s *analyzer.StructInfo) {
 		g.emit(b, appendChars("}"))
 	})
 	g.emit(b, ret(dst, nilV))
+}
+
+// appendLit emits dst = append(dst, lit...), in pieces of at most sixteen
+// bytes. The compiler turns an append of a constant that long into a couple
+// of moves it emits inline; a longer one becomes a call to memmove, and a
+// struct's member names are appended often enough for those calls to show
+// in the encode profile.
+func (g *generator) appendLit(b *block, lit string) {
+	const piece = 16
+	for len(lit) > 0 {
+		n := min(len(lit), piece)
+		// Back off to a rune boundary, so that a non-ASCII name is still
+		// readable in the generated file.
+		for n < len(lit) && !utf8.RuneStart(lit[n]) {
+			n--
+		}
+		g.emit(b, assign(dst, spread(id("append"), dst, str(lit[:n]))))
+		lit = lit[n:]
+	}
 }
 
 // encodeQuoted implements the ",string" tag option.
