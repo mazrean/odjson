@@ -529,7 +529,11 @@ func ParseAnyCached(data []byte, p int, c *StringCache) (any, int, error) {
 // booleans rather than one mode so that [ParseAnyV2] stays a single call
 // the compiler inlines into generated code.
 func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, int, error) {
-	var stack []anyFrame
+	// The values that reach an interface are shallow: an object or two
+	// with an array of numbers inside. Room for a few levels on the stack
+	// keeps the container stack itself from being an allocation per value.
+	var inline [4]anyFrame
+	stack := inline[:0]
 	var v any
 
 	for {
