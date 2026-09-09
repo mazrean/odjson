@@ -616,10 +616,10 @@ func parseAny(data []byte, p int, sc *StringCache, mode parseMode) (any, int, er
 			if err != nil {
 				return nil, next, err
 			}
-			if i := int(f); next-p <= 3 && data[p] != '-' && float64(i) == f {
-				// A small non-negative integer literal (at most three
-				// digits, so no fraction, exponent or sign): boxed once at
-				// init instead of once per value.
+			if i := int(f); f >= 0 && f < float64(len(smallAny)) && float64(i) == f && data[p] != '-' {
+				// A small non-negative integer, however it was spelled:
+				// boxed once at init instead of once per value. The sign
+				// test keeps -0 its own value.
 				v = smallAny[i]
 			} else {
 				v = f
