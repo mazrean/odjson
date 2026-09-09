@@ -24,24 +24,33 @@ Because every major Go JSON library honours those interfaces —
 user already has, and makes it faster. It does not replace them.
 
 **Where the win actually is** (measured, see `bench/`): the direct functions,
-always. `-methods` is a second, conditional win — it makes `encoding/json`
-1.06-1.45x *faster* on three of four measurements and `encoding/json/v2` 1.36x
-faster on the small decode, 1.03x on the large one and 8-15% slower on both
-encodes, but it cannot win on sonic or go-json, and `bench/floor` proves why
-rather than asserting it: with a `MarshalJSON` that costs nothing, sonic still
-spends 107us on the twitter payload against 102us for its own reflection path,
-and go-json 347us against 239us. The interface floor is above the target, so
-no generated code can close it. The same floor argument settles the json/v2
-encode rows: a `MarshalerTo` that costs nothing measures 365us / 808ns
-against a reflection baseline of 400us / 1.03us, so no generated encoder gets
-to 1.3x there either, and on the decode side every name read through
-`jsontext.Decoder`'s public API pays a duplicate-name namespace insert that
-json/v2's own decoder disables behind `export` (see "What the decode side
-pays" in `README.md`). Do not re-open those questions without re-running
-`bench/floor` and `bench/ab`. It stays **off by default** for that reason:
-the recommendation is not uniform across libraries, so the user has to make
-it. Keep the benchmark section of `README.md` honest about this, and
-re-measure before changing the default.
+always. `-methods` is a second win on the two standard libraries — it makes
+`encoding/json/v2` 1.4-2.7x *faster* on all four measurements and
+`encoding/json` 1.06-1.39x faster on three of four — but it cannot win on
+sonic or go-json, and `bench/floor` proves why rather than asserting it: with
+a `MarshalJSON` that costs nothing, sonic still spends 107us on the twitter
+payload against 102us for its own reflection path, and go-json 347us against
+239us. The interface floor is above the target, so no generated code can
+close it. Do not re-open that question without re-running `bench/floor`. It
+stays **off by default** for that reason: the recommendation is not uniform
+across libraries, so the user has to make it. Keep the benchmark section of
+`README.md` honest about this, and re-measure before changing the default.
+
+The json/v2 numbers rest on `odjsonrt/direct.go`, **the direct path**: for a
+top-level value under a plain `json.Marshal` / `json.Unmarshal` the generated
+methods write into and read from the coder's own buffer through
+reflect-computed offsets and `unsafe`, because `jsontext`'s public API charges
+a floor (365us / 808ns for a marshaler that costs nothing) and a per-name
+duplicate check that put 1.3x out of reach (see "The direct path" and "What
+the decode side pays" in `README.md`). It is gated to the Go minor version it
+was verified against (1.27), checked by type at init, self-tested through
+json/v2 before use, and compiled out by `-tags odjson_safe`; every generated
+method keeps the public API path as its fallback. **On a new Go minor,
+re-verify the layout against `jsontext`'s source and widen the gate in
+`calibrateDirect`; never widen it blind.** Anything parsed on the direct path
+goes through the `*Strict` runtime parsers, which must reject exactly what
+`jsontext` rejects (invalid UTF-8, unpaired surrogates, duplicate names at any
+depth); `internal/testfixture/v2parity` is the guard.
 
 The generated `MarshalJSONTo`/`UnmarshalJSONFrom` deliberately follow
 `encoding/json/v2`'s semantics rather than `encoding/json`'s (nil slices encode

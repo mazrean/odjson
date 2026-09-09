@@ -251,8 +251,8 @@ typed, the per-call overhead case).
 
 | library | baseline | with generated methods | change |
 | --- | --- | --- | --- |
-| encoding/json | 392 µs | 433 µs | 1.10× slower |
-| encoding/json/v2 | 400 µs | 458 µs | 1.15× slower |
+| encoding/json | 389 µs | 431 µs | 1.11× slower |
+| encoding/json/v2 | 382 µs | **140 µs** | **2.73× faster** |
 | sonic | 98 µs | 285 µs | 2.92× slower |
 | go-json | 235 µs | 548 µs | 2.33× slower |
 | **odjson direct** | — | **179 µs** — 296 KiB, 105 allocs | **2.23× faster than encoding/json** |
@@ -261,8 +261,8 @@ typed, the per-call overhead case).
 
 | library | baseline | with generated methods | change |
 | --- | --- | --- | --- |
-| encoding/json | 1.02 µs | 958 ns | 1.06× faster |
-| encoding/json/v2 | 1.03 µs | 1.11 µs | 1.08× slower |
+| encoding/json | 1.00 µs | 944 ns | 1.06× faster |
+| encoding/json/v2 | 1.01 µs | **388 ns** | **2.61× faster** |
 | sonic | 275 ns | 673 ns | 2.45× slower |
 | go-json | 374 ns | 1.02 µs | 2.74× slower |
 | **odjson direct** | — | **262 ns** — 416 B, 1 allocs | **3.86× faster than encoding/json** |
@@ -271,8 +271,8 @@ typed, the per-call overhead case).
 
 | library | baseline | with generated methods | change |
 | --- | --- | --- | --- |
-| encoding/json | 1.54 ms | 1.32 ms | 1.17× faster |
-| encoding/json/v2 | 1.12 ms | 1.09 ms | 1.03× faster |
+| encoding/json | 1.48 ms | 1.24 ms | 1.20× faster |
+| encoding/json/v2 | 1.10 ms | **769 µs** | **1.43× faster** |
 | sonic | 484 µs | 868 µs | 1.79× slower |
 | go-json | 671 µs | 1.10 ms | 1.64× slower |
 | **odjson direct** | — | **585 µs** — 413 KiB, 4551 allocs | **2.49× faster than encoding/json** |
@@ -281,8 +281,8 @@ typed, the per-call overhead case).
 
 | library | baseline | with generated methods | change |
 | --- | --- | --- | --- |
-| encoding/json | 2.31 µs | 1.59 µs | 1.45× faster |
-| encoding/json/v2 | 1.91 µs | 1.40 µs | 1.36× faster |
+| encoding/json | 2.29 µs | 1.65 µs | 1.39× faster |
+| encoding/json/v2 | 1.91 µs | **826 ns** | **2.31× faster** |
 | sonic | 961 ns | 1.21 µs | 1.26× slower |
 | go-json | 781 ns | 1.08 µs | 1.39× slower |
 | **odjson direct** | — | **737 ns** — 544 B, 13 allocs | **3.03× faster than encoding/json** |
@@ -311,14 +311,22 @@ Against `goccy/go-json` the direct functions win all four outright (184 vs
 on all four measurements, and faster than `sonic` on the small payload in both
 directions. That is odjson's core contribution and it needs no interfaces.
 
-**`-methods` on `encoding/json` and `encoding/json/v2`: 5 of 8 wins, and the
-three losses are structural.** The `encoding/json` and `encoding/json/v2` rows
-above come from `bench/ab`, which measures the generated codec, the reflection
-baseline and the interface floor in a single process — comparing them across
-processes moves the small differences by more than their size.
+**`-methods` on `encoding/json/v2`: all four rows, 1.4×–2.7×.** On
+`encoding/json`: three of four, and the loss is structural. The
+`encoding/json` and `encoding/json/v2` rows above come from `bench/ab`, which
+measures the generated codec, the reflection baseline and the interface floor
+in a single process — comparing them across processes moves the small
+differences by more than their size.
 
-For a value-driven `MarshalerTo`, `gen = floor + odjson's own encode`, so the
-room left for odjson is `plain - floor`:
+The `json/v2` rows are what they are because of the direct path described
+below: under a plain `json.Marshal` / `json.Unmarshal` the generated method
+appends into, or parses out of, the coder's own buffer, the way `json/v2`'s
+reflection codec does, and nothing in `jsontext`'s public API runs at all.
+Everything that follows in this section is about the public API path, which
+is what `encoding/json` call sites and every non-default situation still use.
+
+For a value-driven `MarshalerTo` on that path, `gen = floor + odjson's own
+encode`, so the room left for odjson is `plain - floor`:
 
 | | floor | reflection | room | odjson's part | rate the room demands |
 | --- | --- | --- | --- | --- | --- |
@@ -326,11 +334,10 @@ room left for odjson is `plain - floor`:
 | `encoding/json/v2` Marshal `twitter` | 359 µs | 388 µs | 29 µs | 108 µs | 8.8 GB/s |
 | `encoding/json/v2` Marshal `small` | 802 ns | 1.02 µs | 217 ns | 303 ns | — |
 
-All three remaining losses are marshal rows, and no `MarshalerTo` can turn
-them into 1.3× wins: a marshaler that costs nothing still measures 365 µs on
-`twitter` and 808 ns on `small` under `json/v2`, and reflection divided by 1.3
-is 307 µs and 794 ns. The two `twitter` ones are also settled by the last
-column: sonic's AVX2 and JIT compiled encoder writes this
+No `MarshalerTo` on the public API can turn those rows into 1.3× wins: a
+marshaler that costs nothing still measures 365 µs on `twitter` and 808 ns on
+`small` under `json/v2`, and reflection divided by 1.3 is 307 µs and 794 ns.
+The two `twitter` ones are also settled by the last column: sonic's AVX2 and JIT compiled encoder writes this
 document at 2.2–2.7 GB/s, so a budget of 3.9 or 8.8 GB/s is not a tuning
 target, it is outside what any Go encoder does. A token-driven `MarshalerTo`
 would not pay the reformat at all, but it pays per member instead, and at this
@@ -352,14 +359,14 @@ what turned the row from a loss into a win.
 `TestDuplicateNamesRejectedLikeJSONV2` in `internal/testfixture/v2parity` is the
 guard on that equivalence.
 
-**`-methods` now pays off on `encoding/json`.** On Go 1.27 `encoding/json` is
+**`-methods` pays off on `encoding/json` too.** On Go 1.27 `encoding/json` is
 implemented on top of `encoding/json/v2`, so it picks up the generated
 `MarshalJSONTo` / `UnmarshalJSONFrom` — and with those tuned for the streaming
 contract (see below) an unchanged `json.Marshal` / `json.Unmarshal` call site is
-**1.06×–1.45× faster** on three of the four measurements, and 10% behind on the
-fourth. Under `encoding/json/v2` itself decoding is **1.36× faster** on the
-small document and 1.03× on the 616 KiB one, and encoding is 8–15% behind on
-both.
+**1.06×–1.39× faster** on three of the four measurements, and 11% behind on the
+fourth. `encoding/json` configures its coders with its own flags (HTML
+escaping, legacy error reporting), which the direct path declines, so those
+rows measure the public API path.
 
 **It still does not pay off on sonic or go-json.** Those call `MarshalJSON`,
 get a `[]byte` back, and re-validate it; their own encoders are reflection-free
@@ -418,6 +425,54 @@ Interpolating puts a token-driven encoder at about 1.13× reflection there,
 which is where the value-driven form already is. Neither shape wins this
 payload, so the simpler one was kept.
 
+### The direct path
+
+`json/v2`'s own codecs never call `WriteValue` or `ReadValue`. They append
+into the encoder's buffer, read out of the decoder's buffer, and update the
+state machine by hand, through an internal export that the linker refuses to
+let any other module reach (`go:linkname` to
+`encoding/json/internal.AllowInternalUse` is rejected at link time). The
+sections below measure what that costs a `MarshalerTo` / `UnmarshalerFrom`
+that stays on the public API: on `twitter`, a floor above reflection divided
+by 1.3 for encoding, and a duplicate-name check on every member for decoding.
+
+`odjsonrt/direct.go` reaches the same state without the export. At init it
+looks the coder's fields up by name through `reflect`, checks their types,
+and learns the state machine's values around a single top-level value by
+observing a probe run through the public API inside real `json.Marshal` and
+`json.Unmarshal` calls. The generated methods then ask `BeginDirectEncode` /
+`BeginDirectDecode` whether the situation is the one that was learned:
+
+- a **top-level** value (`StackDepth() == 0`, state machine at its initial
+  entry), so no delimiter and no name stack is involved;
+- a **buffered** coder (`json.Marshal` to bytes, `json.Unmarshal` from
+  bytes), so nothing has to be flushed or fetched;
+- the coder's option flags **equal to a plain call's**, so no indentation,
+  escaping or legacy semantics have to be reproduced.
+
+When all three hold, `MarshalJSONTo` appends the value straight into the
+encoder's buffer under `ModeV2` (json/v2's own escaping, invalid UTF-8
+rejected) and `UnmarshalJSONFrom` parses the decoder's unread input with the
+byte oriented `odjsonParseV2`, which validates everything `jsontext` would
+have: grammar, UTF-8, unpaired surrogates and duplicate names at every depth.
+Then the coder is advanced past the value. In every other situation — a
+nested value, an `io.Writer` / `io.Reader`, any option, `encoding/json` — the
+methods take the public API path documented below, unchanged.
+
+It is guarded three times over: the layout lookup and type checks at init, a
+gate on the Go minor version it was verified against (1.27; a newer toolchain
+gets the public API path until the layout is re-verified), and a self test at
+init that runs the direct path through `json/v2` and compares its answers with
+the public API's, including rejection of trailing data. Any failure disables
+it for the process; `odjsonrt.DirectEnabled` reports the outcome, and building
+with `-tags odjson_safe` compiles it out. The generated code carries the
+public API path in every case, so disabling costs speed and nothing else.
+
+What it is worth (`bench/ab`, medians of 5): `json/v2` + `-methods` goes from
+0.87× / 0.93× / 1.03× / 1.36× to **2.73× / 2.61× / 1.43× / 2.31×** on
+Marshal `twitter` / Marshal `small` / Unmarshal `twitter` / Unmarshal `small`,
+with one allocation per encode.
+
 ### What the decode side pays, and what was removed
 
 The decoder has a tax of its own. Every object member name that goes through
@@ -451,10 +506,12 @@ to **1.45×** on the small decode. The ceiling on `twitter` is set by the 65%
 above: with odjson's own share at zero, the row would read about 1.35×, and
 with its share halved again, which is what remains realistic, about 1.1×.
 
-The whole-value path is the reason a struct with `-methods` carries two
-decoders besides the `encoding/json` one: `odjsonParseFrom`, which drives the
-decoder, and `odjsonParseV2`, which parses bytes under json/v2's rules. Which
-one runs is decided at runtime, per value, by the buffer test above. A
+The whole-value path and the direct path are the reason a struct with
+`-methods` carries two decoders besides the `encoding/json` one:
+`odjsonParseFrom`, which drives the decoder, and `odjsonParseV2`, which parses
+bytes under json/v2's rules and rejects what `jsontext` would have. Which one
+runs is decided at runtime, per value, by the direct path's checks and then
+the buffer test above. A
 streaming decoder over an `io.Reader` starts with a 64 byte buffer that rarely
 ends in a bracket, so it is driven token by token and keeps its memory bounded;
 when a chunk does end in a bracket, `ReadValue` fetches the rest of that value,

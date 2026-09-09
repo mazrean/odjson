@@ -157,7 +157,9 @@ on field-dense ones, so the value-driven form was kept; the token-driven
 *decoder* won on every shape, so that one was adopted for large values; a
 later measurement in `ab` showed a single `ReadValue` plus a trusted byte
 parser winning on small ones, which is what `odjsonrt.WholeValue` now selects
-below 4 KiB. Keep it as the record
+below 4 KiB, and the direct path in `odjsonrt/direct.go` now bypasses both
+for a top-level value under a plain `json.Marshal` / `json.Unmarshal`. Keep it
+as the record
 behind the root README's "what the drop-in path costs" section; delete it only
 together with that section.
 
