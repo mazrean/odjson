@@ -486,6 +486,16 @@ func ParseInto(data []byte, p int, v any) (int, error) {
 	return next, nil
 }
 
+// smallAny holds the float64 values 0 through 999 boxed as any, so that the
+// small integers real documents are full of (array indices, counts, flags)
+// do not each allocate when decoded into an any.
+var smallAny = func() (t [1000]any) {
+	for i := range t {
+		t[i] = float64(i)
+	}
+	return
+}()
+
 // anyFrame is one level of the container stack used by [ParseAny]. A frame
 // with a non-nil obj describes an object, otherwise it describes an array.
 type anyFrame struct {
@@ -563,7 +573,9 @@ func parseAny(data []byte, p int, sc *StringCache, mode parseMode) (any, int, er
 				v = []any{}
 				break
 			}
-			stack = append(stack, anyFrame{arr: []any{}})
+			// Room for a few elements up front: the arrays that reach an
+			// any are mostly short, and this makes each one allocation.
+			stack = append(stack, anyFrame{arr: make([]any, 0, 4)})
 			continue
 		case '"':
 			var s string
@@ -604,7 +616,15 @@ func parseAny(data []byte, p int, sc *StringCache, mode parseMode) (any, int, er
 			if err != nil {
 				return nil, next, err
 			}
-			v, p = f, next
+			if i := int(f); next-p <= 3 && data[p] != '-' && float64(i) == f {
+				// A small non-negative integer literal (at most three
+				// digits, so no fraction, exponent or sign): boxed once at
+				// init instead of once per value.
+				v = smallAny[i]
+			} else {
+				v = f
+			}
+			p = next
 		}
 
 		// A value has been decoded; attach it and close finished containers.
