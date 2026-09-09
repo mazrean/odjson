@@ -184,12 +184,14 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 		g.pf("")
 		if s.Local {
 			g.pf("// odjsonParseV2 is odjsonParse under encoding/json/v2's semantics, for")
-			g.pf("// input a jsontext.Decoder has already validated.")
-			g.pf("func (v *%s) odjsonParseV2(data []byte, p int, %s *odjsonrt.StringCache) (int, error) {", s.Expr, cache)
+			g.pf("// input a jsontext.Decoder has already validated when strict is false,")
+			g.pf("// and for bytes nobody has looked at when it is true.")
+			g.pf("func (v *%s) odjsonParseV2(data []byte, p int, %s *odjsonrt.StringCache, strict bool) (int, error) {", s.Expr, cache)
 		} else {
 			g.pf("// %sParseV2 is %sParse under encoding/json/v2's semantics, for", s.Helper, s.Helper)
-			g.pf("// input a jsontext.Decoder has already validated.")
-			g.pf("func %sParseV2(data []byte, v *%s, p int, %s *odjsonrt.StringCache) (int, error) {", s.Helper, s.Expr, cache)
+			g.pf("// input a jsontext.Decoder has already validated when strict is false,")
+			g.pf("// and for bytes nobody has looked at when it is true.")
+			g.pf("func %sParseV2(data []byte, v *%s, p int, %s *odjsonrt.StringCache, strict bool) (int, error) {", s.Helper, s.Expr, cache)
 		}
 		g.decodeStruct(s, ctx{data: "data", pos: "p", ret: "p", v2: true, cache: cache, strict: true})
 		g.pf("}")
@@ -308,7 +310,7 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 	g.pf("\t// what jsontext would have.")
 	g.pf("\tif data, ok := odjsonrt.BeginDirectDecode(dec); ok {")
 	g.pf("\t\tvar end int")
-	g.pf("\t\tif end, err = v.odjsonParseV2(data, 0, %s); err == nil {", cache)
+	g.pf("\t\tif end, err = v.odjsonParseV2(data, 0, %s, true); err == nil {", cache)
 	g.pf("\t\t\todjsonrt.EndDirectDecode(dec, end)")
 	g.pf("\t\t}")
 	g.pf("\t} else {")

@@ -173,8 +173,8 @@ func ParseUnmarshalerStrict(data []byte, p int, u json.Unmarshaler) (int, error)
 }
 
 // ParseIntoV2 is [ParseInto] with encoding/json/v2 as the fallback decoder.
-func ParseIntoV2(data []byte, p int, v any) (int, error) {
-	raw, next, err := ParseRawStrict(data, p)
+func ParseIntoV2(data []byte, p int, v any, strict bool) (int, error) {
+	raw, next, err := ParseRawV2(data, p, strict)
 	if err != nil {
 		return next, err
 	}
@@ -321,4 +321,98 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 			break
 		}
 	}
+}
+
+// The V2 helpers are what the generated odjsonParseV2 calls. Its strict
+// argument says whether the bytes still need json/v2's checks: true on the
+// direct path, where nothing has looked at them, and false when they came out
+// of a jsontext.Decoder, which has already applied whatever the caller asked
+// for, including AllowDuplicateNames and AllowInvalidUTF8. Checking again in
+// that case would refuse what the caller explicitly allowed.
+
+// ParseStringV2 is [ParseStringStrict] under strict and [ParseStringWith]
+// otherwise.
+func ParseStringV2(data []byte, p int, c *StringCache, strict bool) (string, int, error) {
+	if strict {
+		return ParseStringStrict(data, p, c)
+	}
+	return ParseStringWith(data, p, c)
+}
+
+// ParseStringInnerV2 is [ParseStringInnerStrict] under strict and
+// [ParseStringInner] otherwise.
+func ParseStringInnerV2(data []byte, p int, strict bool) ([]byte, int, error) {
+	if strict {
+		return ParseStringInnerStrict(data, p)
+	}
+	return ParseStringInner(data, p)
+}
+
+// ParseKeyV2 is [ParseKeyStrict] under strict and [ParseKey] otherwise.
+func ParseKeyV2(data []byte, p int, strict bool) (key []byte, next int, err error) {
+	if strict {
+		return ParseKeyStrict(data, p)
+	}
+	key, _, next, err = ParseKey(data, p)
+	return key, next, err
+}
+
+// ParseBase64V2 is [ParseBase64Strict] under strict and [ParseBase64]
+// otherwise.
+func ParseBase64V2(data []byte, p int, strict bool) ([]byte, int, error) {
+	if strict {
+		return ParseBase64Strict(data, p)
+	}
+	return ParseBase64(data, p)
+}
+
+// ParseNumberStringV2 is [ParseNumberStringStrict] under strict and
+// [ParseNumberString] otherwise.
+func ParseNumberStringV2(data []byte, p int, strict bool) (string, int, error) {
+	if strict {
+		return ParseNumberStringStrict(data, p)
+	}
+	return ParseNumberString(data, p)
+}
+
+// ParseTextUnmarshalerV2 is [ParseTextUnmarshalerStrict] under strict and
+// [ParseTextUnmarshaler] otherwise.
+func ParseTextUnmarshalerV2(data []byte, p int, u encoding.TextUnmarshaler, strict bool) (int, error) {
+	if strict {
+		return ParseTextUnmarshalerStrict(data, p, u)
+	}
+	return ParseTextUnmarshaler(data, p, u)
+}
+
+// ParseRawV2 is [ParseRawStrict] under strict and [ParseRaw] otherwise.
+func ParseRawV2(data []byte, p int, strict bool) (raw []byte, next int, err error) {
+	if strict {
+		return ParseRawStrict(data, p)
+	}
+	return ParseRaw(data, p)
+}
+
+// ParseUnmarshalerV2 is [ParseUnmarshalerStrict] under strict and
+// [ParseUnmarshaler] otherwise.
+func ParseUnmarshalerV2(data []byte, p int, u json.Unmarshaler, strict bool) (int, error) {
+	if strict {
+		return ParseUnmarshalerStrict(data, p, u)
+	}
+	return ParseUnmarshaler(data, p, u)
+}
+
+// ParseAnyV2 is [ParseAnyStrict] under strict and [ParseAnyWith] otherwise.
+func ParseAnyV2(data []byte, p int, c *StringCache, strict bool) (any, int, error) {
+	if strict {
+		return parseAny(data, p, c, parseStrict)
+	}
+	return parseAny(data, p, c, parseTrusted)
+}
+
+// SkipValueV2 is [SkipValueStrict] under strict and [SkipValue] otherwise.
+func SkipValueV2(data []byte, p int, strict bool) (int, error) {
+	if strict {
+		return SkipValueStrict(data, p)
+	}
+	return SkipValue(data, p)
 }

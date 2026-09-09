@@ -42,11 +42,11 @@ import (
 type directLayout struct {
 	ok bool
 
-	encBuf, encLast, encWr, encFlags               uintptr
-	decBuf, decPrevEnd, decPrevStart, decPeekPos   uintptr
-	decLast, decRd, decFlags                       uintptr
-	encBefore, encAfter, decBefore, decAfter       uint64
-	encDefaultFlags, decDefaultFlags               [2]uint64
+	encBuf, encLast, encWr, encFlags             uintptr
+	decBuf, decPrevEnd, decPrevStart, decPeekPos uintptr
+	decLast, decRd, decFlags                     uintptr
+	encBefore, encAfter, decBefore, decAfter     uint64
+	encDefaultFlags, decDefaultFlags             [2]uint64
 }
 
 var direct directLayout
@@ -55,10 +55,10 @@ func init() {
 	direct = calibrateDirect()
 }
 
-func u64At(p unsafe.Pointer, off uintptr) *uint64     { return (*uint64)(unsafe.Add(p, off)) }
-func bytesAt(p unsafe.Pointer, off uintptr) *[]byte   { return (*[]byte)(unsafe.Add(p, off)) }
-func intAt(p unsafe.Pointer, off uintptr) *int        { return (*int)(unsafe.Add(p, off)) }
-func ifaceAt(p unsafe.Pointer, off uintptr) *any      { return (*any)(unsafe.Add(p, off)) }
+func u64At(p unsafe.Pointer, off uintptr) *uint64      { return (*uint64)(unsafe.Add(p, off)) }
+func bytesAt(p unsafe.Pointer, off uintptr) *[]byte    { return (*[]byte)(unsafe.Add(p, off)) }
+func intAt(p unsafe.Pointer, off uintptr) *int         { return (*int)(unsafe.Add(p, off)) }
+func ifaceAt(p unsafe.Pointer, off uintptr) *any       { return (*any)(unsafe.Add(p, off)) }
 func flagsAt(p unsafe.Pointer, off uintptr) *[2]uint64 { return (*[2]uint64)(unsafe.Add(p, off)) }
 
 // fieldOffset walks t by field name, through embedded structs, and returns the

@@ -2,6 +2,8 @@ package gen_test
 
 import (
 	"bytes"
+	jsonv1 "encoding/json"
+	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"fmt"
 	"io"
@@ -63,11 +65,11 @@ func sameValue(t *testing.T, doc string, fill bool, decode func([]byte, any) err
 	if errWant != nil {
 		return
 	}
-	got, err := jsonv2.Marshal(g)
+	got, err := jsonv2.Marshal(g, jsontext.AllowInvalidUTF8(true))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := jsonv2.Marshal(p)
+	want, err := jsonv2.Marshal(p, jsontext.AllowInvalidUTF8(true))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,6 +93,42 @@ func TestNullZeroesLikeJSONV2(t *testing.T) {
 		`{"int":1}`,
 	} {
 		sameValue(t, doc, true, func(b []byte, v any) error { return jsonv2.Unmarshal(b, v) })
+	}
+}
+
+// TestLenientOptionsReachTheFallback checks that what the caller allowed stays
+// allowed on every path the generated decoder can take. The direct path
+// declines a decoder with options, and the path it falls back to must not
+// then reject what jsontext, configured by the caller, has already accepted:
+// duplicate names under AllowDuplicateNames, invalid UTF-8 under
+// AllowInvalidUTF8, and both under encoding/json, whose decoder carries both.
+func TestLenientOptionsReachTheFallback(t *testing.T) {
+	docs := []string{
+		`{"int":1,"int":2}`,
+		`{"nested":{"id":1,"id":2}}`,
+		`{"unknown":{"a":1,"a":2},"int":3}`,
+		`{"map":{"a":1,"a":2}}`,
+		`{"any":{"a":1,"a":2}}`,
+		`{"nesteds":[{"id":1,"id":2}]}`,
+		"{\"string\":\"a\xffb\"}",
+		"{\"strings\":[\"\xff\"]}",
+		"{\"nested\":{\"note\":\"\xff\"}}",
+		"{\"unknown\":\"\xff\",\"int\":4}",
+		`{"string":"\ud800"}`,
+	}
+	for _, doc := range docs {
+		sameValue(t, doc, false, func(b []byte, v any) error {
+			return jsonv2.Unmarshal(b, v, jsontext.AllowDuplicateNames(true), jsontext.AllowInvalidUTF8(true))
+		})
+		sameValue(t, doc, false, func(b []byte, v any) error { return jsonv1.Unmarshal(b, v) })
+	}
+	// Without the options, the same documents are rejected on every path.
+	for _, doc := range docs {
+		sameValue(t, doc, false, func(b []byte, v any) error { return jsonv2.Unmarshal(b, v) })
+		var g gen.Zoo
+		if err := jsonv2.Unmarshal([]byte(doc), &g); err == nil {
+			t.Errorf("%q accepted without lenient options", doc)
+		}
 	}
 }
 

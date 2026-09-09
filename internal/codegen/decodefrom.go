@@ -49,9 +49,9 @@ func (g *generator) decodeStructFrom(s *analyzer.StructInfo) {
 	g.pf("\t\t\treturn err")
 	g.pf("\t\t}")
 	if s.Local {
-		g.pf("\t\t_, err = v.odjsonParseV2(val, 0, %s)", cache)
+		g.pf("\t\t_, err = v.odjsonParseV2(val, 0, %s, false)", cache)
 	} else {
-		g.pf("\t\t_, err = %sParseV2(val, v, 0, %s)", s.Helper, cache)
+		g.pf("\t\t_, err = %sParseV2(val, v, 0, %s, false)", s.Helper, cache)
 	}
 	g.pf("\t\treturn err")
 	g.pf("\t}")

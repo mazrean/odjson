@@ -124,8 +124,9 @@ func (v *Nested) odjsonParse(data []byte, p int) (int, error) {
 }
 
 // odjsonParseV2 is odjsonParse under encoding/json/v2's semantics, for
-// input a jsontext.Decoder has already validated.
-func (v *Nested) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, error) {
+// input a jsontext.Decoder has already validated when strict is false,
+// and for bytes nobody has looked at when it is true.
+func (v *Nested) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict bool) (int, error) {
 	var err error
 	_ = err
 	p = odjsonrt.SkipSpace(data, p)
@@ -149,7 +150,7 @@ func (v *Nested) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (in
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
-		key, p, err = odjsonrt.ParseKeyStrict(data, p)
+		key, p, err = odjsonrt.ParseKeyV2(data, p, strict)
 		if err != nil {
 			return p, err
 		}
@@ -162,7 +163,7 @@ func (v *Nested) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (in
 		}
 		switch idx {
 		case 0:
-			if seen[0]&(1<<0) != 0 {
+			if strict && seen[0]&(1<<0) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 0
@@ -179,7 +180,7 @@ func (v *Nested) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (in
 				v.ID = int(x9)
 			}
 		case 1:
-			if seen[0]&(1<<1) != 0 {
+			if strict && seen[0]&(1<<1) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 1
@@ -189,21 +190,23 @@ func (v *Nested) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (in
 				v.Note = ""
 			} else {
 				var x12 string
-				x12, p, err = odjsonrt.ParseStringStrict(data, p, sc)
+				x12, p, err = odjsonrt.ParseStringV2(data, p, sc, strict)
 				if err != nil {
 					return p, err
 				}
 				v.Note = x12
 			}
 		default:
-			for _, u := range unknown {
-				if string(u) == string(key) {
-					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			if strict {
+				for _, u := range unknown {
+					if string(u) == string(key) {
+						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+					}
 				}
+				unknown = append(unknown, key)
 			}
-			unknown = append(unknown, key)
 			p = odjsonrt.SkipSpace(data, p)
-			p, err = odjsonrt.SkipValueStrict(data, p)
+			p, err = odjsonrt.SkipValueV2(data, p, strict)
 			if err != nil {
 				return p, err
 			}
@@ -234,7 +237,7 @@ func (v *Nested) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 		if val, err = dec.ReadValue(); err != nil {
 			return err
 		}
-		_, err = v.odjsonParseV2(val, 0, sc)
+		_, err = v.odjsonParseV2(val, 0, sc, false)
 		return err
 	}
 	switch odjsonrt.NextKind(dec) {
@@ -395,7 +398,7 @@ func (v *Nested) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// what jsontext would have.
 	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc); err == nil {
+		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
 			odjsonrt.EndDirectDecode(dec, end)
 		}
 	} else {
@@ -1725,8 +1728,9 @@ func (v *Zoo) odjsonParse(data []byte, p int) (int, error) {
 }
 
 // odjsonParseV2 is odjsonParse under encoding/json/v2's semantics, for
-// input a jsontext.Decoder has already validated.
-func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, error) {
+// input a jsontext.Decoder has already validated when strict is false,
+// and for bytes nobody has looked at when it is true.
+func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict bool) (int, error) {
 	var err error
 	_ = err
 	p = odjsonrt.SkipSpace(data, p)
@@ -1750,7 +1754,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
-		key, p, err = odjsonrt.ParseKeyStrict(data, p)
+		key, p, err = odjsonrt.ParseKeyV2(data, p, strict)
 		if err != nil {
 			return p, err
 		}
@@ -1825,7 +1829,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 		}
 		switch idx {
 		case 0:
-			if seen[0]&(1<<0) != 0 {
+			if strict && seen[0]&(1<<0) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 0
@@ -1842,7 +1846,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Bool = x170
 			}
 		case 1:
-			if seen[0]&(1<<1) != 0 {
+			if strict && seen[0]&(1<<1) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 1
@@ -1859,7 +1863,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Int = int(x173)
 			}
 		case 2:
-			if seen[0]&(1<<2) != 0 {
+			if strict && seen[0]&(1<<2) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 2
@@ -1876,7 +1880,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Uint64 = x176
 			}
 		case 3:
-			if seen[0]&(1<<3) != 0 {
+			if strict && seen[0]&(1<<3) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 3
@@ -1893,7 +1897,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Float64 = x179
 			}
 		case 4:
-			if seen[0]&(1<<4) != 0 {
+			if strict && seen[0]&(1<<4) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 4
@@ -1903,14 +1907,14 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.String = ""
 			} else {
 				var x182 string
-				x182, p, err = odjsonrt.ParseStringStrict(data, p, sc)
+				x182, p, err = odjsonrt.ParseStringV2(data, p, sc, strict)
 				if err != nil {
 					return p, err
 				}
 				v.String = x182
 			}
 		case 5:
-			if seen[0]&(1<<5) != 0 {
+			if strict && seen[0]&(1<<5) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 5
@@ -1920,14 +1924,14 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Named = ""
 			} else {
 				var x185 string
-				x185, p, err = odjsonrt.ParseStringStrict(data, p, sc)
+				x185, p, err = odjsonrt.ParseStringV2(data, p, sc, strict)
 				if err != nil {
 					return p, err
 				}
 				v.Named = Color(x185)
 			}
 		case 6:
-			if seen[0]&(1<<6) != 0 {
+			if strict && seen[0]&(1<<6) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 6
@@ -1984,7 +1988,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Slice = s188
 			}
 		case 7:
-			if seen[0]&(1<<7) != 0 {
+			if strict && seen[0]&(1<<7) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 7
@@ -2013,7 +2017,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 							e196 = ""
 						} else {
 							var x199 string
-							x199, p, err = odjsonrt.ParseStringStrict(data, p, sc)
+							x199, p, err = odjsonrt.ParseStringV2(data, p, sc, strict)
 							if err != nil {
 								return p, err
 							}
@@ -2041,7 +2045,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Strings = s195
 			}
 		case 8:
-			if seen[0]&(1<<8) != 0 {
+			if strict && seen[0]&(1<<8) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 8
@@ -2051,14 +2055,14 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Bytes = nil
 			} else {
 				var x202 []byte
-				x202, p, err = odjsonrt.ParseBase64Strict(data, p)
+				x202, p, err = odjsonrt.ParseBase64V2(data, p, strict)
 				if err != nil {
 					return p, err
 				}
 				v.Bytes = x202
 			}
 		case 9:
-			if seen[0]&(1<<9) != 0 {
+			if strict && seen[0]&(1<<9) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 9
@@ -2068,14 +2072,14 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.NamedBag = nil
 			} else {
 				var x205 []byte
-				x205, p, err = odjsonrt.ParseBase64Strict(data, p)
+				x205, p, err = odjsonrt.ParseBase64V2(data, p, strict)
 				if err != nil {
 					return p, err
 				}
 				v.NamedBag = Bag(x205)
 			}
 		case 10:
-			if seen[0]&(1<<10) != 0 {
+			if strict && seen[0]&(1<<10) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 10
@@ -2131,7 +2135,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				}
 			}
 		case 11:
-			if seen[0]&(1<<11) != 0 {
+			if strict && seen[0]&(1<<11) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 11
@@ -2149,7 +2153,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 					m215 = make(map[string]int)
 				}
 				var seen218 map[string]struct{}
-				if len(m215) > 0 {
+				if strict && len(m215) > 0 {
 					seen218 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
@@ -2160,11 +2164,12 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 						var k216 []byte
 						p = odjsonrt.SkipSpace(data, p)
 						kp219 := p
-						k216, p, err = odjsonrt.ParseKeyStrict(data, p)
+						k216, p, err = odjsonrt.ParseKeyV2(data, p, strict)
 						if err != nil {
 							return p, err
 						}
-						if seen218 == nil {
+						if !strict {
+						} else if seen218 == nil {
 							if _, dup := m215[string(k216)]; dup {
 								return p, odjsonrt.ErrDuplicateName(data, kp219, k216)
 							}
@@ -2206,7 +2211,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Map = m215
 			}
 		case 12:
-			if seen[0]&(1<<12) != 0 {
+			if strict && seen[0]&(1<<12) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 12
@@ -2224,7 +2229,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 					m225 = make(map[string]string)
 				}
 				var seen228 map[string]struct{}
-				if len(m225) > 0 {
+				if strict && len(m225) > 0 {
 					seen228 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
@@ -2235,11 +2240,12 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 						var k226 []byte
 						p = odjsonrt.SkipSpace(data, p)
 						kp229 := p
-						k226, p, err = odjsonrt.ParseKeyStrict(data, p)
+						k226, p, err = odjsonrt.ParseKeyV2(data, p, strict)
 						if err != nil {
 							return p, err
 						}
-						if seen228 == nil {
+						if !strict {
+						} else if seen228 == nil {
 							if _, dup := m225[string(k226)]; dup {
 								return p, odjsonrt.ErrDuplicateName(data, kp229, k226)
 							}
@@ -2256,7 +2262,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 							mv227 = ""
 						} else {
 							var x232 string
-							x232, p, err = odjsonrt.ParseStringStrict(data, p, sc)
+							x232, p, err = odjsonrt.ParseStringV2(data, p, sc, strict)
 							if err != nil {
 								return p, err
 							}
@@ -2281,16 +2287,16 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.StrMap = m225
 			}
 		case 13:
-			if seen[0]&(1<<13) != 0 {
+			if strict && seen[0]&(1<<13) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 13
-			p, err = v.Nested.odjsonParseV2(data, p, sc)
+			p, err = v.Nested.odjsonParseV2(data, p, sc, strict)
 			if err != nil {
 				return p, err
 			}
 		case 14:
-			if seen[0]&(1<<14) != 0 {
+			if strict && seen[0]&(1<<14) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 14
@@ -2302,13 +2308,13 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				if v.NestedPtr == nil {
 					v.NestedPtr = new(Nested)
 				}
-				p, err = (*v.NestedPtr).odjsonParseV2(data, p, sc)
+				p, err = (*v.NestedPtr).odjsonParseV2(data, p, sc, strict)
 				if err != nil {
 					return p, err
 				}
 			}
 		case 15:
-			if seen[0]&(1<<15) != 0 {
+			if strict && seen[0]&(1<<15) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 15
@@ -2331,7 +2337,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 					}
 					for {
 						var e238 Nested
-						p, err = e238.odjsonParseV2(data, p, sc)
+						p, err = e238.odjsonParseV2(data, p, sc, strict)
 						if err != nil {
 							return p, err
 						}
@@ -2357,7 +2363,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Nesteds = s237
 			}
 		case 16:
-			if seen[0]&(1<<16) != 0 {
+			if strict && seen[0]&(1<<16) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 16
@@ -2375,7 +2381,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 					m241 = make(map[string]Nested)
 				}
 				var seen244 map[string]struct{}
-				if len(m241) > 0 {
+				if strict && len(m241) > 0 {
 					seen244 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
@@ -2386,11 +2392,12 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 						var k242 []byte
 						p = odjsonrt.SkipSpace(data, p)
 						kp245 := p
-						k242, p, err = odjsonrt.ParseKeyStrict(data, p)
+						k242, p, err = odjsonrt.ParseKeyV2(data, p, strict)
 						if err != nil {
 							return p, err
 						}
-						if seen244 == nil {
+						if !strict {
+						} else if seen244 == nil {
 							if _, dup := m241[string(k242)]; dup {
 								return p, odjsonrt.ErrDuplicateName(data, kp245, k242)
 							}
@@ -2401,7 +2408,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 							seen244[string(k242)] = struct{}{}
 						}
 						var mv243 Nested
-						p, err = mv243.odjsonParseV2(data, p, sc)
+						p, err = mv243.odjsonParseV2(data, p, sc, strict)
 						if err != nil {
 							return p, err
 						}
@@ -2424,7 +2431,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.NestedMap = m241
 			}
 		case 17:
-			if seen[0]&(1<<17) != 0 {
+			if strict && seen[0]&(1<<17) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 17
@@ -2434,14 +2441,14 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Any = nil
 			} else {
 				var a248 any
-				a248, p, err = odjsonrt.ParseAnyStrict(data, p, sc)
+				a248, p, err = odjsonrt.ParseAnyV2(data, p, sc, strict)
 				if err != nil {
 					return p, err
 				}
 				v.Any = a248
 			}
 		case 18:
-			if seen[0]&(1<<18) != 0 {
+			if strict && seen[0]&(1<<18) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 18
@@ -2470,7 +2477,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 							e252 = nil
 						} else {
 							var a255 any
-							a255, p, err = odjsonrt.ParseAnyStrict(data, p, sc)
+							a255, p, err = odjsonrt.ParseAnyV2(data, p, sc, strict)
 							if err != nil {
 								return p, err
 							}
@@ -2498,16 +2505,16 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Anys = s251
 			}
 		case 19:
-			if seen[0]&(1<<19) != 0 {
+			if strict && seen[0]&(1<<19) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 19
-			p, err = odjsonrt.ParseUnmarshalerStrict(data, p, &v.Raw)
+			p, err = odjsonrt.ParseUnmarshalerV2(data, p, &v.Raw, strict)
 			if err != nil {
 				return p, err
 			}
 		case 20:
-			if seen[0]&(1<<20) != 0 {
+			if strict && seen[0]&(1<<20) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 20
@@ -2517,14 +2524,14 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Number = ""
 			} else {
 				var x258 string
-				x258, p, err = odjsonrt.ParseNumberStringStrict(data, p)
+				x258, p, err = odjsonrt.ParseNumberStringV2(data, p, strict)
 				if err != nil {
 					return p, err
 				}
 				v.Number = json.Number(x258)
 			}
 		case 21:
-			if seen[0]&(1<<21) != 0 {
+			if strict && seen[0]&(1<<21) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 21
@@ -2533,13 +2540,13 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				p = np259
 				v.Time = time.Time{}
 			} else {
-				p, err = odjsonrt.ParseUnmarshalerStrict(data, p, &v.Time)
+				p, err = odjsonrt.ParseUnmarshalerV2(data, p, &v.Time, strict)
 				if err != nil {
 					return p, err
 				}
 			}
 		case 22:
-			if seen[0]&(1<<22) != 0 {
+			if strict && seen[0]&(1<<22) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 22
@@ -2565,7 +2572,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				}
 			}
 		case 23:
-			if seen[0]&(1<<23) != 0 {
+			if strict && seen[0]&(1<<23) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 23
@@ -2575,7 +2582,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.Quoted = 0
 			} else {
 				var inner266 []byte
-				inner266, p, err = odjsonrt.ParseStringInnerStrict(data, p)
+				inner266, p, err = odjsonrt.ParseStringInnerV2(data, p, strict)
 				if err != nil {
 					return p, err
 				}
@@ -2597,7 +2604,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				}
 			}
 		case 24:
-			if seen[0]&(1<<24) != 0 {
+			if strict && seen[0]&(1<<24) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 24
@@ -2614,7 +2621,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.OmitBool = x275
 			}
 		case 25:
-			if seen[0]&(1<<25) != 0 {
+			if strict && seen[0]&(1<<25) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 25
@@ -2631,7 +2638,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.OmitInt = int(x278)
 			}
 		case 26:
-			if seen[0]&(1<<26) != 0 {
+			if strict && seen[0]&(1<<26) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 26
@@ -2648,7 +2655,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.OmitFloat = x281
 			}
 		case 27:
-			if seen[0]&(1<<27) != 0 {
+			if strict && seen[0]&(1<<27) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 27
@@ -2658,14 +2665,14 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.OmitString = ""
 			} else {
 				var x284 string
-				x284, p, err = odjsonrt.ParseStringStrict(data, p, sc)
+				x284, p, err = odjsonrt.ParseStringV2(data, p, sc, strict)
 				if err != nil {
 					return p, err
 				}
 				v.OmitString = x284
 			}
 		case 28:
-			if seen[0]&(1<<28) != 0 {
+			if strict && seen[0]&(1<<28) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 28
@@ -2722,7 +2729,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.OmitSlice = s287
 			}
 		case 29:
-			if seen[0]&(1<<29) != 0 {
+			if strict && seen[0]&(1<<29) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 29
@@ -2740,7 +2747,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 					m294 = make(map[string]int)
 				}
 				var seen297 map[string]struct{}
-				if len(m294) > 0 {
+				if strict && len(m294) > 0 {
 					seen297 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
@@ -2751,11 +2758,12 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 						var k295 []byte
 						p = odjsonrt.SkipSpace(data, p)
 						kp298 := p
-						k295, p, err = odjsonrt.ParseKeyStrict(data, p)
+						k295, p, err = odjsonrt.ParseKeyV2(data, p, strict)
 						if err != nil {
 							return p, err
 						}
-						if seen297 == nil {
+						if !strict {
+						} else if seen297 == nil {
 							if _, dup := m294[string(k295)]; dup {
 								return p, odjsonrt.ErrDuplicateName(data, kp298, k295)
 							}
@@ -2797,7 +2805,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				v.OmitMap = m294
 			}
 		case 30:
-			if seen[0]&(1<<30) != 0 {
+			if strict && seen[0]&(1<<30) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 30
@@ -2823,7 +2831,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				}
 			}
 		case 31:
-			if seen[0]&(1<<31) != 0 {
+			if strict && seen[0]&(1<<31) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 31
@@ -2832,29 +2840,31 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				p = np307
 				v.ZeroTime = time.Time{}
 			} else {
-				p, err = odjsonrt.ParseUnmarshalerStrict(data, p, &v.ZeroTime)
+				p, err = odjsonrt.ParseUnmarshalerV2(data, p, &v.ZeroTime, strict)
 				if err != nil {
 					return p, err
 				}
 			}
 		case 32:
-			if seen[0]&(1<<32) != 0 {
+			if strict && seen[0]&(1<<32) != 0 {
 				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 			}
 			seen[0] |= 1 << 32
-			p, err = v.ZeroNested.odjsonParseV2(data, p, sc)
+			p, err = v.ZeroNested.odjsonParseV2(data, p, sc, strict)
 			if err != nil {
 				return p, err
 			}
 		default:
-			for _, u := range unknown {
-				if string(u) == string(key) {
-					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+			if strict {
+				for _, u := range unknown {
+					if string(u) == string(key) {
+						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+					}
 				}
+				unknown = append(unknown, key)
 			}
-			unknown = append(unknown, key)
 			p = odjsonrt.SkipSpace(data, p)
-			p, err = odjsonrt.SkipValueStrict(data, p)
+			p, err = odjsonrt.SkipValueV2(data, p, strict)
 			if err != nil {
 				return p, err
 			}
@@ -2885,7 +2895,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 		if val, err = dec.ReadValue(); err != nil {
 			return err
 		}
-		_, err = v.odjsonParseV2(val, 0, sc)
+		_, err = v.odjsonParseV2(val, 0, sc, false)
 		return err
 	}
 	switch odjsonrt.NextKind(dec) {
@@ -4084,7 +4094,7 @@ func (v *Zoo) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// what jsontext would have.
 	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc); err == nil {
+		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
 			odjsonrt.EndDirectDecode(dec, end)
 		}
 	} else {
