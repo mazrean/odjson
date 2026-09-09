@@ -56,16 +56,15 @@ func (v *Deep) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'd':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"" {
 					idx, p = 0, p+11
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"shared\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"shared\"" {
 					idx, p = 1, p+8
 				}
 			}
@@ -170,16 +169,15 @@ func (v *Deep) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'd':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"" {
 					idx, key, p = 0, rest[1:10], p+11
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"shared\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"shared\"" {
 					idx, key, p = 1, rest[1:7], p+8
 				}
 			}
@@ -484,21 +482,19 @@ func (v *Mid) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'd':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"" {
 					idx, p = 0, p+11
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"shared\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"shared\"" {
 					idx, p = 1, p+8
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"mid_only\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"mid_only\"" {
 					idx, p = 2, p+10
 				}
 			}
@@ -623,21 +619,19 @@ func (v *Mid) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'd':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"" {
 					idx, key, p = 0, rest[1:10], p+11
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"shared\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"shared\"" {
 					idx, key, p = 1, rest[1:7], p+8
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"mid_only\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"mid_only\"" {
 					idx, key, p = 2, rest[1:9], p+10
 				}
 			}
@@ -983,16 +977,15 @@ func (v *LeftConflict) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache)
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'C':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"Clash\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"Clash\"" {
 					idx, p = 0, p+7
 				}
 			case 'l':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"left\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"left\"" {
 					idx, p = 1, p+6
 				}
 			}
@@ -1097,16 +1090,15 @@ func (v *LeftConflict) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'C':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"Clash\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"Clash\"" {
 					idx, key, p = 0, rest[1:6], p+7
 				}
 			case 'l':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"left\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"left\"" {
 					idx, key, p = 1, rest[1:5], p+6
 				}
 			}
@@ -1409,16 +1401,15 @@ func (v *RightConflict) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'C':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"Clash\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"Clash\"" {
 					idx, p = 0, p+7
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"right\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"right\"" {
 					idx, p = 1, p+7
 				}
 			}
@@ -1523,16 +1514,15 @@ func (v *RightConflict) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCac
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'C':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"Clash\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"Clash\"" {
 					idx, key, p = 0, rest[1:6], p+7
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"right\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"right\"" {
 					idx, key, p = 1, rest[1:6], p+7
 				}
 			}
@@ -1830,14 +1820,9 @@ func (v *UntaggedSide) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache)
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'W':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"Winner\"":
-					idx, p = 0, p+8
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 8 && string(rest[:8]) == "\"Winner\"" {
+			idx, p = 0, p+8
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -1924,14 +1909,9 @@ func (v *UntaggedSide) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'W':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"Winner\"":
-					idx, key, p = 0, rest[1:7], p+8
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 8 && string(rest[:8]) == "\"Winner\"" {
+			idx, key, p = 0, rest[1:7], p+8
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -2188,14 +2168,9 @@ func (v *TaggedSide) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'W':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"Winner\"":
-					idx, p = 0, p+8
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 8 && string(rest[:8]) == "\"Winner\"" {
+			idx, p = 0, p+8
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -2282,14 +2257,9 @@ func (v *TaggedSide) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'W':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"Winner\"":
-					idx, key, p = 0, rest[1:7], p+8
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 8 && string(rest[:8]) == "\"Winner\"" {
+			idx, key, p = 0, rest[1:7], p+8
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -2543,14 +2513,9 @@ func (v *PtrPart) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'p':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"ptr_only\"":
-					idx, p = 0, p+10
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 10 && string(rest[:10]) == "\"ptr_only\"" {
+			idx, p = 0, p+10
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -2642,14 +2607,9 @@ func (v *PtrPart) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'p':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"ptr_only\"":
-					idx, key, p = 0, rest[1:9], p+10
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 10 && string(rest[:10]) == "\"ptr_only\"" {
+			idx, key, p = 0, rest[1:9], p+10
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -2908,14 +2868,9 @@ func (v *Named) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'v':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"value\"":
-					idx, p = 0, p+7
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 7 && string(rest[:7]) == "\"value\"" {
+			idx, p = 0, p+7
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -3007,14 +2962,9 @@ func (v *Named) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'v':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"value\"":
-					idx, key, p = 0, rest[1:6], p+7
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 7 && string(rest[:7]) == "\"value\"" {
+			idx, key, p = 0, rest[1:6], p+7
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -3317,56 +3267,47 @@ func (v *Promoted) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'd':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"" {
 					idx, p = 0, p+11
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"shared\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"shared\"" {
 					idx, p = 1, p+8
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"mid_only\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"mid_only\"" {
 					idx, p = 2, p+10
 				}
 			case 'l':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"left\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"left\"" {
 					idx, p = 3, p+6
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"right\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"right\"" {
 					idx, p = 4, p+7
 				}
 			case 'W':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"Winner\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"Winner\"" {
 					idx, p = 5, p+8
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"ptr_only\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"ptr_only\"" {
 					idx, p = 6, p+10
 				}
 			case 'L':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"Label\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"Label\"" {
 					idx, p = 7, p+7
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"named\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"named\"" {
 					idx, p = 8, p+7
 				}
 			case 'o':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"own\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"own\"" {
 					idx, p = 9, p+5
 				}
 			}
@@ -3598,56 +3539,47 @@ func (v *Promoted) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'd':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"" {
 					idx, key, p = 0, rest[1:10], p+11
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"shared\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"shared\"" {
 					idx, key, p = 1, rest[1:7], p+8
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"mid_only\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"mid_only\"" {
 					idx, key, p = 2, rest[1:9], p+10
 				}
 			case 'l':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"left\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"left\"" {
 					idx, key, p = 3, rest[1:5], p+6
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"right\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"right\"" {
 					idx, key, p = 4, rest[1:6], p+7
 				}
 			case 'W':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"Winner\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"Winner\"" {
 					idx, key, p = 5, rest[1:7], p+8
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"ptr_only\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"ptr_only\"" {
 					idx, key, p = 6, rest[1:9], p+10
 				}
 			case 'L':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"Label\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"Label\"" {
 					idx, key, p = 7, rest[1:6], p+7
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"named\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"named\"" {
 					idx, key, p = 8, rest[1:6], p+7
 				}
 			case 'o':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"own\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"own\"" {
 					idx, key, p = 9, rest[1:4], p+5
 				}
 			}
@@ -4248,16 +4180,15 @@ func (v *ShallowWins) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'd':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"" {
 					idx, p = 0, p+11
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"shared\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"shared\"" {
 					idx, p = 1, p+8
 				}
 			}
@@ -4367,16 +4298,15 @@ func (v *ShallowWins) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'd':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"deep_only\"" {
 					idx, key, p = 0, rest[1:10], p+11
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"shared\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"shared\"" {
 					idx, key, p = 1, rest[1:7], p+8
 				}
 			}

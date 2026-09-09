@@ -3,6 +3,7 @@ package codegen
 import (
 	"go/ast"
 	"go/token"
+	"slices"
 	"unicode/utf8"
 
 	"github.com/mazrean/odjson/internal/analyzer"
@@ -205,59 +206,119 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 
 // rawKeys emits the fast path of member name matching: every field whose
 // name can appear verbatim in a document is compared, quotes included,
-// against the bytes at p, dispatched on the name's first byte. A hit sets
-// idx (and key, where the strict path needs it for its duplicate error) and
-// moves p past the closing quote, having scanned nothing;
-// anything else (an escaped or folded spelling, an unknown name, a
-// malformed key) leaves idx at -1 for the general path. The comparisons are
-// against constants of a few bytes, which the compiler turns into word
-// loads, so a known name costs one byte switch and one or two compares.
+// against the bytes at p. A hit sets idx (and key, where the strict path
+// needs it for its duplicate error) and moves p past the closing quote,
+// having scanned nothing; anything else (an escaped or folded spelling, an
+// unknown name, a malformed key) leaves idx at -1 for the general path.
+//
+// The names are told apart by a decision tree over byte positions: each
+// node switches on the byte that splits its candidates into the most
+// groups, and a leaf holds one name and makes the one full comparison.
+// A wide struct with a shared prefix (profile_sidebar_fill_color,
+// profile_sidebar_border_color, ...) would otherwise compare its way down
+// a list of a dozen names, each a call to memequal.
 func (g *generator) rawKeys(b *block, s *analyzer.StructInfo, c ctx) {
-	type cand struct {
-		idx  int
-		name string
-	}
-	var order []byte
-	groups := map[byte][]cand{}
+	var cands []rawCand
 	for i, f := range s.Fields {
-		if !rawKeyable(f.JSONName) {
-			continue
+		if rawKeyable(f.JSONName) {
+			cands = append(cands, rawCand{i, `"` + f.JSONName + `"`})
 		}
-		first := f.JSONName[0]
-		if _, ok := groups[first]; !ok {
-			order = append(order, first)
-		}
-		groups[first] = append(groups[first], cand{i, f.JSONName})
 	}
-	if len(order) == 0 {
+	if len(cands) == 0 {
 		return
 	}
 	rest := id("rest")
-	g.ifStmt(b, define(rest, slice(data, p, nil)), bin(call(id("len"), rest), token.GTR, num(1)), func(b *block) {
-		g.switchStmt(b, index(rest, num(1)), func(sw *block) {
+	g.emit(b, define(rest, slice(data, p, nil)))
+	g.rawKeyTree(b, cands, c, 0, nil)
+}
+
+// rawCand is one name the raw match can hit: its field index and the name
+// as it appears in a document, quotes included.
+type rawCand struct {
+	idx    int
+	quoted string
+}
+
+// rawKeyTree emits the matcher for cands. known is the length rest has
+// been checked to exceed, and used the positions already switched on above
+// this node, which cannot split the group again.
+func (g *generator) rawKeyTree(b *block, cands []rawCand, c ctx, known int, used []int) {
+	rest := id("rest")
+	if len(cands) == 1 {
+		k := cands[0]
+		l := int64(len(k.quoted))
+		var conds []ast.Expr
+		if int(l) > known {
+			conds = append(conds, bin(call(id("len"), rest), token.GEQ, num(l)))
+		}
+		conds = append(conds, bin(call(id("string"), slice(rest, nil, num(l))), token.EQL, str(k.quoted)))
+		g.ifStmt(b, nil, and(conds...), func(b *block) {
+			if c.strict {
+				g.emit(b, assignN(token.ASSIGN, []ast.Expr{idx, key, p},
+					num(int64(k.idx)), slice(rest, num(1), num(l-1)), bin(p, token.ADD, num(l))))
+			} else {
+				g.emit(b, assignN(token.ASSIGN, []ast.Expr{idx, p},
+					num(int64(k.idx)), bin(p, token.ADD, num(l))))
+			}
+		})
+		return
+	}
+	j := rawSplit(cands, used)
+	var order []byte
+	groups := map[byte][]rawCand{}
+	for _, k := range cands {
+		by := k.quoted[j]
+		if _, ok := groups[by]; !ok {
+			order = append(order, by)
+		}
+		groups[by] = append(groups[by], k)
+	}
+	node := func(b *block, known int) {
+		g.switchStmt(b, index(rest, num(int64(j))), func(sw *block) {
 			for _, by := range order {
 				g.caseClause(sw, []ast.Expr{chr(by)}, func(b *block) {
-					g.switchStmt(b, nil, func(sw *block) {
-						for _, k := range groups[by] {
-							l := int64(len(k.name) + 2)
-							cond := and(
-								bin(call(id("len"), rest), token.GEQ, num(l)),
-								bin(call(id("string"), slice(rest, nil, num(l))), token.EQL, str(`"`+k.name+`"`)))
-							g.caseClause(sw, []ast.Expr{cond}, func(b *block) {
-								if c.strict {
-									g.emit(b, assignN(token.ASSIGN, []ast.Expr{idx, key, p},
-										num(int64(k.idx)), slice(rest, num(1), num(l-1)), bin(p, token.ADD, num(l))))
-								} else {
-									g.emit(b, assignN(token.ASSIGN, []ast.Expr{idx, p},
-										num(int64(k.idx)), bin(p, token.ADD, num(l))))
-								}
-							})
-						}
-					})
+					g.rawKeyTree(b, groups[by], c, known, append(used[:len(used):len(used)], j))
 				})
 			}
 		})
+	}
+	if j <= known {
+		node(b, known)
+		return
+	}
+	g.ifStmt(b, nil, bin(call(id("len"), rest), token.GTR, num(int64(j))), func(b *block) {
+		node(b, j)
 	})
+}
+
+// rawSplit picks the byte position that splits cands into the most groups.
+// Every candidate has a byte at each position up to the closing quote of
+// the shortest name, and that quote position alone always separates the
+// shortest from the rest, so a split exists as long as the names differ.
+// Ties go to the lowest position, which is the one most likely to be in
+// the document at all.
+func rawSplit(cands []rawCand, used []int) int {
+	limit := len(cands[0].quoted)
+	for _, k := range cands[1:] {
+		limit = min(limit, len(k.quoted))
+	}
+	best, bestN := -1, 1
+	for j := 1; j < limit; j++ {
+		if slices.Contains(used, j) {
+			continue
+		}
+		seen := map[byte]bool{}
+		for _, k := range cands {
+			seen[k.quoted[j]] = true
+		}
+		if len(seen) > bestN {
+			best, bestN = j, len(seen)
+		}
+	}
+	if best < 0 {
+		panic("odjson: raw key names do not differ: " + cands[0].quoted)
+	}
+	return best
 }
 
 // rawKeyable reports whether name can be compared against a document's

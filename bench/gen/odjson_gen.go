@@ -152,46 +152,76 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				switch {
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
-					idx, p = 0, p+4
-				case len(rest) >= 5 && string(rest[:5]) == "\"ids\"":
-					idx, p = 1, p+5
+				if len(rest) > 3 {
+					switch rest[3] {
+					case '"':
+						if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
+							idx, p = 0, p+4
+						}
+					case 's':
+						if len(rest) >= 5 && string(rest[:5]) == "\"ids\"" {
+							idx, p = 1, p+5
+						}
+					}
 				}
 			case 't':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"title\"":
-					idx, p = 2, p+7
-				case len(rest) >= 8 && string(rest[:8]) == "\"titles\"":
-					idx, p = 3, p+8
+				if len(rest) > 6 {
+					switch rest[6] {
+					case '"':
+						if len(rest) >= 7 && string(rest[:7]) == "\"title\"" {
+							idx, p = 2, p+7
+						}
+					case 's':
+						if len(rest) >= 8 && string(rest[:8]) == "\"titles\"" {
+							idx, p = 3, p+8
+						}
+					}
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"price\"":
-					idx, p = 4, p+7
-				case len(rest) >= 8 && string(rest[:8]) == "\"prices\"":
-					idx, p = 5, p+8
+				if len(rest) > 6 {
+					switch rest[6] {
+					case '"':
+						if len(rest) >= 7 && string(rest[:7]) == "\"price\"" {
+							idx, p = 4, p+7
+						}
+					case 's':
+						if len(rest) >= 8 && string(rest[:8]) == "\"prices\"" {
+							idx, p = 5, p+8
+						}
+					}
 				}
 			case 'h':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"hot\"":
-					idx, p = 6, p+5
-				case len(rest) >= 6 && string(rest[:6]) == "\"hots\"":
-					idx, p = 7, p+6
+				if len(rest) > 4 {
+					switch rest[4] {
+					case '"':
+						if len(rest) >= 5 && string(rest[:5]) == "\"hot\"" {
+							idx, p = 6, p+5
+						}
+					case 's':
+						if len(rest) >= 6 && string(rest[:6]) == "\"hots\"" {
+							idx, p = 7, p+6
+						}
+					}
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"author\"":
-					idx, p = 8, p+8
-				case len(rest) >= 9 && string(rest[:9]) == "\"authors\"":
-					idx, p = 9, p+9
+				if len(rest) > 7 {
+					switch rest[7] {
+					case '"':
+						if len(rest) >= 8 && string(rest[:8]) == "\"author\"" {
+							idx, p = 8, p+8
+						}
+					case 's':
+						if len(rest) >= 9 && string(rest[:9]) == "\"authors\"" {
+							idx, p = 9, p+9
+						}
+					}
 				}
 			case 'w':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"weights\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"weights\"" {
 					idx, p = 10, p+9
 				}
 			}
@@ -672,46 +702,76 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				switch {
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
-					idx, key, p = 0, rest[1:3], p+4
-				case len(rest) >= 5 && string(rest[:5]) == "\"ids\"":
-					idx, key, p = 1, rest[1:4], p+5
+				if len(rest) > 3 {
+					switch rest[3] {
+					case '"':
+						if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
+							idx, key, p = 0, rest[1:3], p+4
+						}
+					case 's':
+						if len(rest) >= 5 && string(rest[:5]) == "\"ids\"" {
+							idx, key, p = 1, rest[1:4], p+5
+						}
+					}
 				}
 			case 't':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"title\"":
-					idx, key, p = 2, rest[1:6], p+7
-				case len(rest) >= 8 && string(rest[:8]) == "\"titles\"":
-					idx, key, p = 3, rest[1:7], p+8
+				if len(rest) > 6 {
+					switch rest[6] {
+					case '"':
+						if len(rest) >= 7 && string(rest[:7]) == "\"title\"" {
+							idx, key, p = 2, rest[1:6], p+7
+						}
+					case 's':
+						if len(rest) >= 8 && string(rest[:8]) == "\"titles\"" {
+							idx, key, p = 3, rest[1:7], p+8
+						}
+					}
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"price\"":
-					idx, key, p = 4, rest[1:6], p+7
-				case len(rest) >= 8 && string(rest[:8]) == "\"prices\"":
-					idx, key, p = 5, rest[1:7], p+8
+				if len(rest) > 6 {
+					switch rest[6] {
+					case '"':
+						if len(rest) >= 7 && string(rest[:7]) == "\"price\"" {
+							idx, key, p = 4, rest[1:6], p+7
+						}
+					case 's':
+						if len(rest) >= 8 && string(rest[:8]) == "\"prices\"" {
+							idx, key, p = 5, rest[1:7], p+8
+						}
+					}
 				}
 			case 'h':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"hot\"":
-					idx, key, p = 6, rest[1:4], p+5
-				case len(rest) >= 6 && string(rest[:6]) == "\"hots\"":
-					idx, key, p = 7, rest[1:5], p+6
+				if len(rest) > 4 {
+					switch rest[4] {
+					case '"':
+						if len(rest) >= 5 && string(rest[:5]) == "\"hot\"" {
+							idx, key, p = 6, rest[1:4], p+5
+						}
+					case 's':
+						if len(rest) >= 6 && string(rest[:6]) == "\"hots\"" {
+							idx, key, p = 7, rest[1:5], p+6
+						}
+					}
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"author\"":
-					idx, key, p = 8, rest[1:7], p+8
-				case len(rest) >= 9 && string(rest[:9]) == "\"authors\"":
-					idx, key, p = 9, rest[1:8], p+9
+				if len(rest) > 7 {
+					switch rest[7] {
+					case '"':
+						if len(rest) >= 8 && string(rest[:8]) == "\"author\"" {
+							idx, key, p = 8, rest[1:7], p+8
+						}
+					case 's':
+						if len(rest) >= 9 && string(rest[:9]) == "\"authors\"" {
+							idx, key, p = 9, rest[1:8], p+9
+						}
+					}
 				}
 			case 'w':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"weights\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"weights\"" {
 					idx, key, p = 10, rest[1:8], p+9
 				}
 			}
@@ -1863,21 +1923,19 @@ func (v *Author) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"name\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
 					idx, p = 0, p+6
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"age\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"age\"" {
 					idx, p = 1, p+5
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"male\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"male\"" {
 					idx, p = 2, p+6
 				}
 			}
@@ -1999,21 +2057,19 @@ func (v *Author) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"name\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
 					idx, key, p = 0, rest[1:5], p+6
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"age\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"age\"" {
 					idx, key, p = 1, rest[1:4], p+5
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"male\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"male\"" {
 					idx, key, p = 2, rest[1:5], p+6
 				}
 			}
@@ -2378,13 +2434,15 @@ func (v *TwitterStruct) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 's':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"statuses\"":
+		rest := data[p:]
+		if len(rest) > 2 {
+			switch rest[2] {
+			case 't':
+				if len(rest) >= 10 && string(rest[:10]) == "\"statuses\"" {
 					idx, p = 0, p+10
-				case len(rest) >= 17 && string(rest[:17]) == "\"search_metadata\"":
+				}
+			case 'e':
+				if len(rest) >= 17 && string(rest[:17]) == "\"search_metadata\"" {
 					idx, p = 1, p+17
 				}
 			}
@@ -2507,13 +2565,15 @@ func (v *TwitterStruct) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCac
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 's':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"statuses\"":
+		rest := data[p:]
+		if len(rest) > 2 {
+			switch rest[2] {
+			case 't':
+				if len(rest) >= 10 && string(rest[:10]) == "\"statuses\"" {
 					idx, key, p = 0, rest[1:9], p+10
-				case len(rest) >= 17 && string(rest[:17]) == "\"search_metadata\"":
+				}
+			case 'e':
+				if len(rest) >= 17 && string(rest[:17]) == "\"search_metadata\"" {
 					idx, key, p = 1, rest[1:16], p+17
 				}
 			}
@@ -2961,81 +3021,126 @@ func (v *Statuses) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'c':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"coordinates\"":
-					idx, p = 0, p+13
-				case len(rest) >= 12 && string(rest[:12]) == "\"created_at\"":
-					idx, p = 3, p+12
-				case len(rest) >= 14 && string(rest[:14]) == "\"contributors\"":
-					idx, p = 7, p+14
+				if len(rest) > 3 {
+					switch rest[3] {
+					case 'o':
+						if len(rest) >= 13 && string(rest[:13]) == "\"coordinates\"" {
+							idx, p = 0, p+13
+						}
+					case 'e':
+						if len(rest) >= 12 && string(rest[:12]) == "\"created_at\"" {
+							idx, p = 3, p+12
+						}
+					case 'n':
+						if len(rest) >= 14 && string(rest[:14]) == "\"contributors\"" {
+							idx, p = 7, p+14
+						}
+					}
 				}
 			case 'f':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"favorited\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"favorited\"" {
 					idx, p = 1, p+11
 				}
 			case 't':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"truncated\"":
-					idx, p = 2, p+11
-				case len(rest) >= 6 && string(rest[:6]) == "\"text\"":
-					idx, p = 8, p+6
+				if len(rest) > 2 {
+					switch rest[2] {
+					case 'r':
+						if len(rest) >= 11 && string(rest[:11]) == "\"truncated\"" {
+							idx, p = 2, p+11
+						}
+					case 'e':
+						if len(rest) >= 6 && string(rest[:6]) == "\"text\"" {
+							idx, p = 8, p+6
+						}
+					}
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"id_str\"":
-					idx, p = 4, p+8
-				case len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_user_id_str\"":
-					idx, p = 6, p+25
-				case len(rest) >= 27 && string(rest[:27]) == "\"in_reply_to_status_id_str\"":
-					idx, p = 11, p+27
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
-					idx, p = 12, p+4
-				case len(rest) >= 21 && string(rest[:21]) == "\"in_reply_to_user_id\"":
-					idx, p = 15, p+21
-				case len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_screen_name\"":
-					idx, p = 18, p+25
-				case len(rest) >= 23 && string(rest[:23]) == "\"in_reply_to_status_id\"":
-					idx, p = 20, p+23
+				if len(rest) > 2 {
+					switch rest[2] {
+					case 'd':
+						if len(rest) > 3 {
+							switch rest[3] {
+							case '_':
+								if len(rest) >= 8 && string(rest[:8]) == "\"id_str\"" {
+									idx, p = 4, p+8
+								}
+							case '"':
+								if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
+									idx, p = 12, p+4
+								}
+							}
+						}
+					case 'n':
+						if len(rest) > 20 {
+							switch rest[20] {
+							case '_':
+								if len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_user_id_str\"" {
+									idx, p = 6, p+25
+								}
+							case 'i':
+								if len(rest) > 22 {
+									switch rest[22] {
+									case '_':
+										if len(rest) >= 27 && string(rest[:27]) == "\"in_reply_to_status_id_str\"" {
+											idx, p = 11, p+27
+										}
+									case '"':
+										if len(rest) >= 23 && string(rest[:23]) == "\"in_reply_to_status_id\"" {
+											idx, p = 20, p+23
+										}
+									}
+								}
+							case '"':
+								if len(rest) >= 21 && string(rest[:21]) == "\"in_reply_to_user_id\"" {
+									idx, p = 15, p+21
+								}
+							case 'n':
+								if len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_screen_name\"" {
+									idx, p = 18, p+25
+								}
+							}
+						}
+					}
 				}
 			case 'e':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"entities\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"entities\"" {
 					idx, p = 5, p+10
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"metadata\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"metadata\"" {
 					idx, p = 9, p+10
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 15 && string(rest[:15]) == "\"retweet_count\"":
-					idx, p = 10, p+15
-				case len(rest) >= 11 && string(rest[:11]) == "\"retweeted\"":
-					idx, p = 14, p+11
+				if len(rest) > 8 {
+					switch rest[8] {
+					case '_':
+						if len(rest) >= 15 && string(rest[:15]) == "\"retweet_count\"" {
+							idx, p = 10, p+15
+						}
+					case 'e':
+						if len(rest) >= 11 && string(rest[:11]) == "\"retweeted\"" {
+							idx, p = 14, p+11
+						}
+					}
 				}
 			case 'g':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"geo\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"geo\"" {
 					idx, p = 13, p+5
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"place\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"place\"" {
 					idx, p = 16, p+7
 				}
 			case 'u':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"user\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"user\"" {
 					idx, p = 17, p+6
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"source\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"source\"" {
 					idx, p = 19, p+8
 				}
 			}
@@ -3403,81 +3508,126 @@ func (v *Statuses) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'c':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"coordinates\"":
-					idx, key, p = 0, rest[1:12], p+13
-				case len(rest) >= 12 && string(rest[:12]) == "\"created_at\"":
-					idx, key, p = 3, rest[1:11], p+12
-				case len(rest) >= 14 && string(rest[:14]) == "\"contributors\"":
-					idx, key, p = 7, rest[1:13], p+14
+				if len(rest) > 3 {
+					switch rest[3] {
+					case 'o':
+						if len(rest) >= 13 && string(rest[:13]) == "\"coordinates\"" {
+							idx, key, p = 0, rest[1:12], p+13
+						}
+					case 'e':
+						if len(rest) >= 12 && string(rest[:12]) == "\"created_at\"" {
+							idx, key, p = 3, rest[1:11], p+12
+						}
+					case 'n':
+						if len(rest) >= 14 && string(rest[:14]) == "\"contributors\"" {
+							idx, key, p = 7, rest[1:13], p+14
+						}
+					}
 				}
 			case 'f':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"favorited\"":
+				if len(rest) >= 11 && string(rest[:11]) == "\"favorited\"" {
 					idx, key, p = 1, rest[1:10], p+11
 				}
 			case 't':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"truncated\"":
-					idx, key, p = 2, rest[1:10], p+11
-				case len(rest) >= 6 && string(rest[:6]) == "\"text\"":
-					idx, key, p = 8, rest[1:5], p+6
+				if len(rest) > 2 {
+					switch rest[2] {
+					case 'r':
+						if len(rest) >= 11 && string(rest[:11]) == "\"truncated\"" {
+							idx, key, p = 2, rest[1:10], p+11
+						}
+					case 'e':
+						if len(rest) >= 6 && string(rest[:6]) == "\"text\"" {
+							idx, key, p = 8, rest[1:5], p+6
+						}
+					}
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"id_str\"":
-					idx, key, p = 4, rest[1:7], p+8
-				case len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_user_id_str\"":
-					idx, key, p = 6, rest[1:24], p+25
-				case len(rest) >= 27 && string(rest[:27]) == "\"in_reply_to_status_id_str\"":
-					idx, key, p = 11, rest[1:26], p+27
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
-					idx, key, p = 12, rest[1:3], p+4
-				case len(rest) >= 21 && string(rest[:21]) == "\"in_reply_to_user_id\"":
-					idx, key, p = 15, rest[1:20], p+21
-				case len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_screen_name\"":
-					idx, key, p = 18, rest[1:24], p+25
-				case len(rest) >= 23 && string(rest[:23]) == "\"in_reply_to_status_id\"":
-					idx, key, p = 20, rest[1:22], p+23
+				if len(rest) > 2 {
+					switch rest[2] {
+					case 'd':
+						if len(rest) > 3 {
+							switch rest[3] {
+							case '_':
+								if len(rest) >= 8 && string(rest[:8]) == "\"id_str\"" {
+									idx, key, p = 4, rest[1:7], p+8
+								}
+							case '"':
+								if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
+									idx, key, p = 12, rest[1:3], p+4
+								}
+							}
+						}
+					case 'n':
+						if len(rest) > 20 {
+							switch rest[20] {
+							case '_':
+								if len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_user_id_str\"" {
+									idx, key, p = 6, rest[1:24], p+25
+								}
+							case 'i':
+								if len(rest) > 22 {
+									switch rest[22] {
+									case '_':
+										if len(rest) >= 27 && string(rest[:27]) == "\"in_reply_to_status_id_str\"" {
+											idx, key, p = 11, rest[1:26], p+27
+										}
+									case '"':
+										if len(rest) >= 23 && string(rest[:23]) == "\"in_reply_to_status_id\"" {
+											idx, key, p = 20, rest[1:22], p+23
+										}
+									}
+								}
+							case '"':
+								if len(rest) >= 21 && string(rest[:21]) == "\"in_reply_to_user_id\"" {
+									idx, key, p = 15, rest[1:20], p+21
+								}
+							case 'n':
+								if len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_screen_name\"" {
+									idx, key, p = 18, rest[1:24], p+25
+								}
+							}
+						}
+					}
 				}
 			case 'e':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"entities\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"entities\"" {
 					idx, key, p = 5, rest[1:9], p+10
 				}
 			case 'm':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"metadata\"":
+				if len(rest) >= 10 && string(rest[:10]) == "\"metadata\"" {
 					idx, key, p = 9, rest[1:9], p+10
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 15 && string(rest[:15]) == "\"retweet_count\"":
-					idx, key, p = 10, rest[1:14], p+15
-				case len(rest) >= 11 && string(rest[:11]) == "\"retweeted\"":
-					idx, key, p = 14, rest[1:10], p+11
+				if len(rest) > 8 {
+					switch rest[8] {
+					case '_':
+						if len(rest) >= 15 && string(rest[:15]) == "\"retweet_count\"" {
+							idx, key, p = 10, rest[1:14], p+15
+						}
+					case 'e':
+						if len(rest) >= 11 && string(rest[:11]) == "\"retweeted\"" {
+							idx, key, p = 14, rest[1:10], p+11
+						}
+					}
 				}
 			case 'g':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"geo\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"geo\"" {
 					idx, key, p = 13, rest[1:4], p+5
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"place\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"place\"" {
 					idx, key, p = 16, rest[1:6], p+7
 				}
 			case 'u':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"user\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"user\"" {
 					idx, key, p = 17, rest[1:5], p+6
 				}
 			case 's':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"source\"":
+				if len(rest) >= 8 && string(rest[:8]) == "\"source\"" {
 					idx, key, p = 19, rest[1:7], p+8
 				}
 			}
@@ -4552,19 +4702,20 @@ func (v *Entities) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'u':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"urls\"":
+		rest := data[p:]
+		if len(rest) > 2 {
+			switch rest[2] {
+			case 'r':
+				if len(rest) >= 6 && string(rest[:6]) == "\"urls\"" {
 					idx, p = 0, p+6
-				case len(rest) >= 15 && string(rest[:15]) == "\"user_mentions\"":
-					idx, p = 2, p+15
 				}
-			case 'h':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"hashtags\"":
+			case 'a':
+				if len(rest) >= 10 && string(rest[:10]) == "\"hashtags\"" {
 					idx, p = 1, p+10
+				}
+			case 's':
+				if len(rest) >= 15 && string(rest[:15]) == "\"user_mentions\"" {
+					idx, p = 2, p+15
 				}
 			}
 		}
@@ -4787,19 +4938,20 @@ func (v *Entities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'u':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"urls\"":
+		rest := data[p:]
+		if len(rest) > 2 {
+			switch rest[2] {
+			case 'r':
+				if len(rest) >= 6 && string(rest[:6]) == "\"urls\"" {
 					idx, key, p = 0, rest[1:5], p+6
-				case len(rest) >= 15 && string(rest[:15]) == "\"user_mentions\"":
-					idx, key, p = 2, rest[1:14], p+15
 				}
-			case 'h':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"hashtags\"":
+			case 'a':
+				if len(rest) >= 10 && string(rest[:10]) == "\"hashtags\"" {
 					idx, key, p = 1, rest[1:9], p+10
+				}
+			case 's':
+				if len(rest) >= 15 && string(rest[:15]) == "\"user_mentions\"" {
+					idx, key, p = 2, rest[1:14], p+15
 				}
 			}
 		}
@@ -5361,16 +5513,15 @@ func (v *Hashtags) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 't':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"text\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"text\"" {
 					idx, p = 0, p+6
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"indices\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"indices\"" {
 					idx, p = 1, p+9
 				}
 			}
@@ -5511,16 +5662,15 @@ func (v *Hashtags) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 't':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"text\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"text\"" {
 					idx, key, p = 0, rest[1:5], p+6
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"indices\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"indices\"" {
 					idx, key, p = 1, rest[1:8], p+9
 				}
 			}
@@ -5916,16 +6066,15 @@ func (v *Metadata) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				switch {
-				case len(rest) >= 19 && string(rest[:19]) == "\"iso_language_code\"":
+				if len(rest) >= 19 && string(rest[:19]) == "\"iso_language_code\"" {
 					idx, p = 0, p+19
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"result_type\"":
+				if len(rest) >= 13 && string(rest[:13]) == "\"result_type\"" {
 					idx, p = 1, p+13
 				}
 			}
@@ -6021,16 +6170,15 @@ func (v *Metadata) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				switch {
-				case len(rest) >= 19 && string(rest[:19]) == "\"iso_language_code\"":
+				if len(rest) >= 19 && string(rest[:19]) == "\"iso_language_code\"" {
 					idx, key, p = 0, rest[1:18], p+19
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"result_type\"":
+				if len(rest) >= 13 && string(rest[:13]) == "\"result_type\"" {
 					idx, key, p = 1, rest[1:12], p+13
 				}
 			}
@@ -6483,124 +6631,226 @@ func (v *User) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'p':
-				switch {
-				case len(rest) >= 28 && string(rest[:28]) == "\"profile_sidebar_fill_color\"":
-					idx, p = 0, p+28
-				case len(rest) >= 30 && string(rest[:30]) == "\"profile_sidebar_border_color\"":
-					idx, p = 1, p+30
-				case len(rest) >= 25 && string(rest[:25]) == "\"profile_background_tile\"":
-					idx, p = 2, p+25
-				case len(rest) >= 19 && string(rest[:19]) == "\"profile_image_url\"":
-					idx, p = 4, p+19
-				case len(rest) >= 20 && string(rest[:20]) == "\"profile_link_color\"":
-					idx, p = 8, p+20
-				case len(rest) >= 25 && string(rest[:25]) == "\"profile_image_url_https\"":
-					idx, p = 16, p+25
-				case len(rest) >= 30 && string(rest[:30]) == "\"profile_use_background_image\"":
-					idx, p = 19, p+30
-				case len(rest) >= 20 && string(rest[:20]) == "\"profile_text_color\"":
-					idx, p = 21, p+20
-				case len(rest) >= 11 && string(rest[:11]) == "\"protected\"":
-					idx, p = 24, p+11
-				case len(rest) >= 36 && string(rest[:36]) == "\"profile_background_image_url_https\"":
-					idx, p = 26, p+36
-				case len(rest) >= 26 && string(rest[:26]) == "\"profile_background_color\"":
-					idx, p = 27, p+26
-				case len(rest) >= 30 && string(rest[:30]) == "\"profile_background_image_url\"":
-					idx, p = 33, p+30
+		rest := data[p:]
+		if len(rest) > 3 {
+			switch rest[3] {
+			case 'o':
+				if len(rest) > 9 {
+					switch rest[9] {
+					case 's':
+						if len(rest) > 17 {
+							switch rest[17] {
+							case 'f':
+								if len(rest) >= 28 && string(rest[:28]) == "\"profile_sidebar_fill_color\"" {
+									idx, p = 0, p+28
+								}
+							case 'b':
+								if len(rest) >= 30 && string(rest[:30]) == "\"profile_sidebar_border_color\"" {
+									idx, p = 1, p+30
+								}
+							}
+						}
+					case 'b':
+						if len(rest) > 20 {
+							switch rest[20] {
+							case 't':
+								if len(rest) >= 25 && string(rest[:25]) == "\"profile_background_tile\"" {
+									idx, p = 2, p+25
+								}
+							case 'i':
+								if len(rest) > 29 {
+									switch rest[29] {
+									case '_':
+										if len(rest) >= 36 && string(rest[:36]) == "\"profile_background_image_url_https\"" {
+											idx, p = 26, p+36
+										}
+									case '"':
+										if len(rest) >= 30 && string(rest[:30]) == "\"profile_background_image_url\"" {
+											idx, p = 33, p+30
+										}
+									}
+								}
+							case 'c':
+								if len(rest) >= 26 && string(rest[:26]) == "\"profile_background_color\"" {
+									idx, p = 27, p+26
+								}
+							}
+						}
+					case 'i':
+						if len(rest) > 18 {
+							switch rest[18] {
+							case '"':
+								if len(rest) >= 19 && string(rest[:19]) == "\"profile_image_url\"" {
+									idx, p = 4, p+19
+								}
+							case '_':
+								if len(rest) >= 25 && string(rest[:25]) == "\"profile_image_url_https\"" {
+									idx, p = 16, p+25
+								}
+							}
+						}
+					case 'l':
+						switch rest[1] {
+						case 'p':
+							if len(rest) >= 20 && string(rest[:20]) == "\"profile_link_color\"" {
+								idx, p = 8, p+20
+							}
+						case 'g':
+							if len(rest) >= 13 && string(rest[:13]) == "\"geo_enabled\"" {
+								idx, p = 29, p+13
+							}
+						}
+					case 'u':
+						if len(rest) >= 30 && string(rest[:30]) == "\"profile_use_background_image\"" {
+							idx, p = 19, p+30
+						}
+					case 't':
+						if len(rest) >= 20 && string(rest[:20]) == "\"profile_text_color\"" {
+							idx, p = 21, p+20
+						}
+					case 'd':
+						if len(rest) >= 11 && string(rest[:11]) == "\"protected\"" {
+							idx, p = 24, p+11
+						}
+					case '_':
+						if len(rest) >= 23 && string(rest[:23]) == "\"show_all_inline_media\"" {
+							idx, p = 37, p+23
+						}
+					}
 				}
-			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"name\"":
-					idx, p = 3, p+6
-				case len(rest) >= 15 && string(rest[:15]) == "\"notifications\"":
-					idx, p = 25, p+15
-				}
-			case 'c':
-				switch {
-				case len(rest) >= 12 && string(rest[:12]) == "\"created_at\"":
-					idx, p = 5, p+12
-				case len(rest) >= 22 && string(rest[:22]) == "\"contributors_enabled\"":
-					idx, p = 13, p+22
-				}
-			case 'l':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"location\"":
-					idx, p = 6, p+10
-				case len(rest) >= 14 && string(rest[:14]) == "\"listed_count\"":
-					idx, p = 20, p+14
-				case len(rest) >= 6 && string(rest[:6]) == "\"lang\"":
-					idx, p = 22, p+6
-				}
-			case 'f':
-				switch {
-				case len(rest) >= 21 && string(rest[:21]) == "\"follow_request_sent\"":
-					idx, p = 7, p+21
-				case len(rest) >= 18 && string(rest[:18]) == "\"favourites_count\"":
-					idx, p = 14, p+18
-				case len(rest) >= 17 && string(rest[:17]) == "\"followers_count\"":
-					idx, p = 23, p+17
-				case len(rest) >= 15 && string(rest[:15]) == "\"friends_count\"":
-					idx, p = 35, p+15
-				case len(rest) >= 11 && string(rest[:11]) == "\"following\"":
-					idx, p = 36, p+11
-				}
-			case 'i':
-				switch {
-				case len(rest) >= 15 && string(rest[:15]) == "\"is_translator\"":
-					idx, p = 9, p+15
-				case len(rest) >= 8 && string(rest[:8]) == "\"id_str\"":
-					idx, p = 10, p+8
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
-					idx, p = 18, p+4
+			case 'm':
+				switch rest[1] {
+				case 'n':
+					if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
+						idx, p = 3, p+6
+					}
+				case 't':
+					if len(rest) >= 11 && string(rest[:11]) == "\"time_zone\"" {
+						idx, p = 30, p+11
+					}
 				}
 			case 'e':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"entities\"":
-					idx, p = 11, p+10
+				if len(rest) >= 12 && string(rest[:12]) == "\"created_at\"" {
+					idx, p = 5, p+12
 				}
-			case 'd':
-				switch {
-				case len(rest) >= 17 && string(rest[:17]) == "\"default_profile\"":
-					idx, p = 12, p+17
-				case len(rest) >= 13 && string(rest[:13]) == "\"description\"":
-					idx, p = 31, p+13
-				case len(rest) >= 23 && string(rest[:23]) == "\"default_profile_image\"":
-					idx, p = 32, p+23
+			case 'c':
+				switch rest[1] {
+				case 'l':
+					if len(rest) >= 10 && string(rest[:10]) == "\"location\"" {
+						idx, p = 6, p+10
+					}
+				case 'u':
+					if len(rest) >= 12 && string(rest[:12]) == "\"utc_offset\"" {
+						idx, p = 17, p+12
+					}
 				}
-			case 'u':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"url\"":
-					idx, p = 15, p+5
-				case len(rest) >= 12 && string(rest[:12]) == "\"utc_offset\"":
-					idx, p = 17, p+12
+			case 'l':
+				switch rest[1] {
+				case 'f':
+					if len(rest) > 7 {
+						switch rest[7] {
+						case '_':
+							if len(rest) >= 21 && string(rest[:21]) == "\"follow_request_sent\"" {
+								idx, p = 7, p+21
+							}
+						case 'e':
+							if len(rest) >= 17 && string(rest[:17]) == "\"followers_count\"" {
+								idx, p = 23, p+17
+							}
+						case 'i':
+							if len(rest) >= 11 && string(rest[:11]) == "\"following\"" {
+								idx, p = 36, p+11
+							}
+						}
+					}
+				case 'u':
+					if len(rest) >= 5 && string(rest[:5]) == "\"url\"" {
+						idx, p = 15, p+5
+					}
 				}
-			case 'v':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"verified\"":
-					idx, p = 28, p+10
-				}
-			case 'g':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"geo_enabled\"":
-					idx, p = 29, p+13
+			case '_':
+				switch rest[2] {
+				case 's':
+					if len(rest) >= 15 && string(rest[:15]) == "\"is_translator\"" {
+						idx, p = 9, p+15
+					}
+				case 'd':
+					if len(rest) >= 8 && string(rest[:8]) == "\"id_str\"" {
+						idx, p = 10, p+8
+					}
 				}
 			case 't':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"time_zone\"":
-					idx, p = 30, p+11
+				switch rest[1] {
+				case 'e':
+					if len(rest) >= 10 && string(rest[:10]) == "\"entities\"" {
+						idx, p = 11, p+10
+					}
+				case 'n':
+					if len(rest) >= 15 && string(rest[:15]) == "\"notifications\"" {
+						idx, p = 25, p+15
+					}
+				}
+			case 'f':
+				if len(rest) > 16 {
+					switch rest[16] {
+					case '"':
+						if len(rest) >= 17 && string(rest[:17]) == "\"default_profile\"" {
+							idx, p = 12, p+17
+						}
+					case '_':
+						if len(rest) >= 23 && string(rest[:23]) == "\"default_profile_image\"" {
+							idx, p = 32, p+23
+						}
+					}
+				}
+			case 'n':
+				switch rest[1] {
+				case 'c':
+					if len(rest) >= 22 && string(rest[:22]) == "\"contributors_enabled\"" {
+						idx, p = 13, p+22
+					}
+				case 'l':
+					if len(rest) >= 6 && string(rest[:6]) == "\"lang\"" {
+						idx, p = 22, p+6
+					}
+				}
+			case 'v':
+				if len(rest) >= 18 && string(rest[:18]) == "\"favourites_count\"" {
+					idx, p = 14, p+18
+				}
+			case '"':
+				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
+					idx, p = 18, p+4
 				}
 			case 's':
-				switch {
-				case len(rest) >= 16 && string(rest[:16]) == "\"statuses_count\"":
+				switch rest[1] {
+				case 'l':
+					if len(rest) >= 14 && string(rest[:14]) == "\"listed_count\"" {
+						idx, p = 20, p+14
+					}
+				case 'd':
+					if len(rest) >= 13 && string(rest[:13]) == "\"description\"" {
+						idx, p = 31, p+13
+					}
+				}
+			case 'r':
+				switch rest[1] {
+				case 'v':
+					if len(rest) >= 10 && string(rest[:10]) == "\"verified\"" {
+						idx, p = 28, p+10
+					}
+				case 's':
+					if len(rest) >= 13 && string(rest[:13]) == "\"screen_name\"" {
+						idx, p = 38, p+13
+					}
+				}
+			case 'a':
+				if len(rest) >= 16 && string(rest[:16]) == "\"statuses_count\"" {
 					idx, p = 34, p+16
-				case len(rest) >= 23 && string(rest[:23]) == "\"show_all_inline_media\"":
-					idx, p = 37, p+23
-				case len(rest) >= 13 && string(rest[:13]) == "\"screen_name\"":
-					idx, p = 38, p+13
+				}
+			case 'i':
+				if len(rest) >= 15 && string(rest[:15]) == "\"friends_count\"" {
+					idx, p = 35, p+15
 				}
 			}
 		}
@@ -7289,124 +7539,226 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'p':
-				switch {
-				case len(rest) >= 28 && string(rest[:28]) == "\"profile_sidebar_fill_color\"":
-					idx, key, p = 0, rest[1:27], p+28
-				case len(rest) >= 30 && string(rest[:30]) == "\"profile_sidebar_border_color\"":
-					idx, key, p = 1, rest[1:29], p+30
-				case len(rest) >= 25 && string(rest[:25]) == "\"profile_background_tile\"":
-					idx, key, p = 2, rest[1:24], p+25
-				case len(rest) >= 19 && string(rest[:19]) == "\"profile_image_url\"":
-					idx, key, p = 4, rest[1:18], p+19
-				case len(rest) >= 20 && string(rest[:20]) == "\"profile_link_color\"":
-					idx, key, p = 8, rest[1:19], p+20
-				case len(rest) >= 25 && string(rest[:25]) == "\"profile_image_url_https\"":
-					idx, key, p = 16, rest[1:24], p+25
-				case len(rest) >= 30 && string(rest[:30]) == "\"profile_use_background_image\"":
-					idx, key, p = 19, rest[1:29], p+30
-				case len(rest) >= 20 && string(rest[:20]) == "\"profile_text_color\"":
-					idx, key, p = 21, rest[1:19], p+20
-				case len(rest) >= 11 && string(rest[:11]) == "\"protected\"":
-					idx, key, p = 24, rest[1:10], p+11
-				case len(rest) >= 36 && string(rest[:36]) == "\"profile_background_image_url_https\"":
-					idx, key, p = 26, rest[1:35], p+36
-				case len(rest) >= 26 && string(rest[:26]) == "\"profile_background_color\"":
-					idx, key, p = 27, rest[1:25], p+26
-				case len(rest) >= 30 && string(rest[:30]) == "\"profile_background_image_url\"":
-					idx, key, p = 33, rest[1:29], p+30
+		rest := data[p:]
+		if len(rest) > 3 {
+			switch rest[3] {
+			case 'o':
+				if len(rest) > 9 {
+					switch rest[9] {
+					case 's':
+						if len(rest) > 17 {
+							switch rest[17] {
+							case 'f':
+								if len(rest) >= 28 && string(rest[:28]) == "\"profile_sidebar_fill_color\"" {
+									idx, key, p = 0, rest[1:27], p+28
+								}
+							case 'b':
+								if len(rest) >= 30 && string(rest[:30]) == "\"profile_sidebar_border_color\"" {
+									idx, key, p = 1, rest[1:29], p+30
+								}
+							}
+						}
+					case 'b':
+						if len(rest) > 20 {
+							switch rest[20] {
+							case 't':
+								if len(rest) >= 25 && string(rest[:25]) == "\"profile_background_tile\"" {
+									idx, key, p = 2, rest[1:24], p+25
+								}
+							case 'i':
+								if len(rest) > 29 {
+									switch rest[29] {
+									case '_':
+										if len(rest) >= 36 && string(rest[:36]) == "\"profile_background_image_url_https\"" {
+											idx, key, p = 26, rest[1:35], p+36
+										}
+									case '"':
+										if len(rest) >= 30 && string(rest[:30]) == "\"profile_background_image_url\"" {
+											idx, key, p = 33, rest[1:29], p+30
+										}
+									}
+								}
+							case 'c':
+								if len(rest) >= 26 && string(rest[:26]) == "\"profile_background_color\"" {
+									idx, key, p = 27, rest[1:25], p+26
+								}
+							}
+						}
+					case 'i':
+						if len(rest) > 18 {
+							switch rest[18] {
+							case '"':
+								if len(rest) >= 19 && string(rest[:19]) == "\"profile_image_url\"" {
+									idx, key, p = 4, rest[1:18], p+19
+								}
+							case '_':
+								if len(rest) >= 25 && string(rest[:25]) == "\"profile_image_url_https\"" {
+									idx, key, p = 16, rest[1:24], p+25
+								}
+							}
+						}
+					case 'l':
+						switch rest[1] {
+						case 'p':
+							if len(rest) >= 20 && string(rest[:20]) == "\"profile_link_color\"" {
+								idx, key, p = 8, rest[1:19], p+20
+							}
+						case 'g':
+							if len(rest) >= 13 && string(rest[:13]) == "\"geo_enabled\"" {
+								idx, key, p = 29, rest[1:12], p+13
+							}
+						}
+					case 'u':
+						if len(rest) >= 30 && string(rest[:30]) == "\"profile_use_background_image\"" {
+							idx, key, p = 19, rest[1:29], p+30
+						}
+					case 't':
+						if len(rest) >= 20 && string(rest[:20]) == "\"profile_text_color\"" {
+							idx, key, p = 21, rest[1:19], p+20
+						}
+					case 'd':
+						if len(rest) >= 11 && string(rest[:11]) == "\"protected\"" {
+							idx, key, p = 24, rest[1:10], p+11
+						}
+					case '_':
+						if len(rest) >= 23 && string(rest[:23]) == "\"show_all_inline_media\"" {
+							idx, key, p = 37, rest[1:22], p+23
+						}
+					}
 				}
-			case 'n':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"name\"":
-					idx, key, p = 3, rest[1:5], p+6
-				case len(rest) >= 15 && string(rest[:15]) == "\"notifications\"":
-					idx, key, p = 25, rest[1:14], p+15
-				}
-			case 'c':
-				switch {
-				case len(rest) >= 12 && string(rest[:12]) == "\"created_at\"":
-					idx, key, p = 5, rest[1:11], p+12
-				case len(rest) >= 22 && string(rest[:22]) == "\"contributors_enabled\"":
-					idx, key, p = 13, rest[1:21], p+22
-				}
-			case 'l':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"location\"":
-					idx, key, p = 6, rest[1:9], p+10
-				case len(rest) >= 14 && string(rest[:14]) == "\"listed_count\"":
-					idx, key, p = 20, rest[1:13], p+14
-				case len(rest) >= 6 && string(rest[:6]) == "\"lang\"":
-					idx, key, p = 22, rest[1:5], p+6
-				}
-			case 'f':
-				switch {
-				case len(rest) >= 21 && string(rest[:21]) == "\"follow_request_sent\"":
-					idx, key, p = 7, rest[1:20], p+21
-				case len(rest) >= 18 && string(rest[:18]) == "\"favourites_count\"":
-					idx, key, p = 14, rest[1:17], p+18
-				case len(rest) >= 17 && string(rest[:17]) == "\"followers_count\"":
-					idx, key, p = 23, rest[1:16], p+17
-				case len(rest) >= 15 && string(rest[:15]) == "\"friends_count\"":
-					idx, key, p = 35, rest[1:14], p+15
-				case len(rest) >= 11 && string(rest[:11]) == "\"following\"":
-					idx, key, p = 36, rest[1:10], p+11
-				}
-			case 'i':
-				switch {
-				case len(rest) >= 15 && string(rest[:15]) == "\"is_translator\"":
-					idx, key, p = 9, rest[1:14], p+15
-				case len(rest) >= 8 && string(rest[:8]) == "\"id_str\"":
-					idx, key, p = 10, rest[1:7], p+8
-				case len(rest) >= 4 && string(rest[:4]) == "\"id\"":
-					idx, key, p = 18, rest[1:3], p+4
+			case 'm':
+				switch rest[1] {
+				case 'n':
+					if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
+						idx, key, p = 3, rest[1:5], p+6
+					}
+				case 't':
+					if len(rest) >= 11 && string(rest[:11]) == "\"time_zone\"" {
+						idx, key, p = 30, rest[1:10], p+11
+					}
 				}
 			case 'e':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"entities\"":
-					idx, key, p = 11, rest[1:9], p+10
+				if len(rest) >= 12 && string(rest[:12]) == "\"created_at\"" {
+					idx, key, p = 5, rest[1:11], p+12
 				}
-			case 'd':
-				switch {
-				case len(rest) >= 17 && string(rest[:17]) == "\"default_profile\"":
-					idx, key, p = 12, rest[1:16], p+17
-				case len(rest) >= 13 && string(rest[:13]) == "\"description\"":
-					idx, key, p = 31, rest[1:12], p+13
-				case len(rest) >= 23 && string(rest[:23]) == "\"default_profile_image\"":
-					idx, key, p = 32, rest[1:22], p+23
+			case 'c':
+				switch rest[1] {
+				case 'l':
+					if len(rest) >= 10 && string(rest[:10]) == "\"location\"" {
+						idx, key, p = 6, rest[1:9], p+10
+					}
+				case 'u':
+					if len(rest) >= 12 && string(rest[:12]) == "\"utc_offset\"" {
+						idx, key, p = 17, rest[1:11], p+12
+					}
 				}
-			case 'u':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"url\"":
-					idx, key, p = 15, rest[1:4], p+5
-				case len(rest) >= 12 && string(rest[:12]) == "\"utc_offset\"":
-					idx, key, p = 17, rest[1:11], p+12
+			case 'l':
+				switch rest[1] {
+				case 'f':
+					if len(rest) > 7 {
+						switch rest[7] {
+						case '_':
+							if len(rest) >= 21 && string(rest[:21]) == "\"follow_request_sent\"" {
+								idx, key, p = 7, rest[1:20], p+21
+							}
+						case 'e':
+							if len(rest) >= 17 && string(rest[:17]) == "\"followers_count\"" {
+								idx, key, p = 23, rest[1:16], p+17
+							}
+						case 'i':
+							if len(rest) >= 11 && string(rest[:11]) == "\"following\"" {
+								idx, key, p = 36, rest[1:10], p+11
+							}
+						}
+					}
+				case 'u':
+					if len(rest) >= 5 && string(rest[:5]) == "\"url\"" {
+						idx, key, p = 15, rest[1:4], p+5
+					}
 				}
-			case 'v':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"verified\"":
-					idx, key, p = 28, rest[1:9], p+10
-				}
-			case 'g':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"geo_enabled\"":
-					idx, key, p = 29, rest[1:12], p+13
+			case '_':
+				switch rest[2] {
+				case 's':
+					if len(rest) >= 15 && string(rest[:15]) == "\"is_translator\"" {
+						idx, key, p = 9, rest[1:14], p+15
+					}
+				case 'd':
+					if len(rest) >= 8 && string(rest[:8]) == "\"id_str\"" {
+						idx, key, p = 10, rest[1:7], p+8
+					}
 				}
 			case 't':
-				switch {
-				case len(rest) >= 11 && string(rest[:11]) == "\"time_zone\"":
-					idx, key, p = 30, rest[1:10], p+11
+				switch rest[1] {
+				case 'e':
+					if len(rest) >= 10 && string(rest[:10]) == "\"entities\"" {
+						idx, key, p = 11, rest[1:9], p+10
+					}
+				case 'n':
+					if len(rest) >= 15 && string(rest[:15]) == "\"notifications\"" {
+						idx, key, p = 25, rest[1:14], p+15
+					}
+				}
+			case 'f':
+				if len(rest) > 16 {
+					switch rest[16] {
+					case '"':
+						if len(rest) >= 17 && string(rest[:17]) == "\"default_profile\"" {
+							idx, key, p = 12, rest[1:16], p+17
+						}
+					case '_':
+						if len(rest) >= 23 && string(rest[:23]) == "\"default_profile_image\"" {
+							idx, key, p = 32, rest[1:22], p+23
+						}
+					}
+				}
+			case 'n':
+				switch rest[1] {
+				case 'c':
+					if len(rest) >= 22 && string(rest[:22]) == "\"contributors_enabled\"" {
+						idx, key, p = 13, rest[1:21], p+22
+					}
+				case 'l':
+					if len(rest) >= 6 && string(rest[:6]) == "\"lang\"" {
+						idx, key, p = 22, rest[1:5], p+6
+					}
+				}
+			case 'v':
+				if len(rest) >= 18 && string(rest[:18]) == "\"favourites_count\"" {
+					idx, key, p = 14, rest[1:17], p+18
+				}
+			case '"':
+				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
+					idx, key, p = 18, rest[1:3], p+4
 				}
 			case 's':
-				switch {
-				case len(rest) >= 16 && string(rest[:16]) == "\"statuses_count\"":
+				switch rest[1] {
+				case 'l':
+					if len(rest) >= 14 && string(rest[:14]) == "\"listed_count\"" {
+						idx, key, p = 20, rest[1:13], p+14
+					}
+				case 'd':
+					if len(rest) >= 13 && string(rest[:13]) == "\"description\"" {
+						idx, key, p = 31, rest[1:12], p+13
+					}
+				}
+			case 'r':
+				switch rest[1] {
+				case 'v':
+					if len(rest) >= 10 && string(rest[:10]) == "\"verified\"" {
+						idx, key, p = 28, rest[1:9], p+10
+					}
+				case 's':
+					if len(rest) >= 13 && string(rest[:13]) == "\"screen_name\"" {
+						idx, key, p = 38, rest[1:12], p+13
+					}
+				}
+			case 'a':
+				if len(rest) >= 16 && string(rest[:16]) == "\"statuses_count\"" {
 					idx, key, p = 34, rest[1:15], p+16
-				case len(rest) >= 23 && string(rest[:23]) == "\"show_all_inline_media\"":
-					idx, key, p = 37, rest[1:22], p+23
-				case len(rest) >= 13 && string(rest[:13]) == "\"screen_name\"":
-					idx, key, p = 38, rest[1:12], p+13
+				}
+			case 'i':
+				if len(rest) >= 15 && string(rest[:15]) == "\"friends_count\"" {
+					idx, key, p = 35, rest[1:14], p+15
 				}
 			}
 		}
@@ -9222,16 +9574,15 @@ func (v *UserEntities) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache)
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'u':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"url\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"url\"" {
 					idx, p = 0, p+5
 				}
 			case 'd':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"description\"":
+				if len(rest) >= 13 && string(rest[:13]) == "\"description\"" {
 					idx, p = 1, p+13
 				}
 			}
@@ -9315,16 +9666,15 @@ func (v *UserEntities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'u':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"url\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"url\"" {
 					idx, key, p = 0, rest[1:4], p+5
 				}
 			case 'd':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"description\"":
+				if len(rest) >= 13 && string(rest[:13]) == "\"description\"" {
 					idx, key, p = 1, rest[1:12], p+13
 				}
 			}
@@ -9595,14 +9945,9 @@ func (v *URL) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'u':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"urls\"":
-					idx, p = 0, p+6
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 6 && string(rest[:6]) == "\"urls\"" {
+			idx, p = 0, p+6
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -9715,14 +10060,9 @@ func (v *URL) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'u':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"urls\"":
-					idx, key, p = 0, rest[1:5], p+6
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 6 && string(rest[:6]) == "\"urls\"" {
+			idx, key, p = 0, rest[1:5], p+6
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -10049,21 +10389,19 @@ func (v *Urls) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'e':
-				switch {
-				case len(rest) >= 14 && string(rest[:14]) == "\"expanded_url\"":
+				if len(rest) >= 14 && string(rest[:14]) == "\"expanded_url\"" {
 					idx, p = 0, p+14
 				}
 			case 'u':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"url\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"url\"" {
 					idx, p = 1, p+5
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"indices\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"indices\"" {
 					idx, p = 2, p+9
 				}
 			}
@@ -10218,21 +10556,19 @@ func (v *Urls) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'e':
-				switch {
-				case len(rest) >= 14 && string(rest[:14]) == "\"expanded_url\"":
+				if len(rest) >= 14 && string(rest[:14]) == "\"expanded_url\"" {
 					idx, key, p = 0, rest[1:13], p+14
 				}
 			case 'u':
-				switch {
-				case len(rest) >= 5 && string(rest[:5]) == "\"url\"":
+				if len(rest) >= 5 && string(rest[:5]) == "\"url\"" {
 					idx, key, p = 1, rest[1:4], p+5
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"indices\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"indices\"" {
 					idx, key, p = 2, rest[1:8], p+9
 				}
 			}
@@ -10679,14 +11015,9 @@ func (v *Description) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'u':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"urls\"":
-					idx, p = 0, p+6
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 6 && string(rest[:6]) == "\"urls\"" {
+			idx, p = 0, p+6
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -10807,14 +11138,9 @@ func (v *Description) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
-			switch rest[1] {
-			case 'u':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"urls\"":
-					idx, key, p = 0, rest[1:5], p+6
-				}
-			}
+		rest := data[p:]
+		if len(rest) >= 6 && string(rest[:6]) == "\"urls\"" {
+			idx, key, p = 0, rest[1:5], p+6
 		}
 		if idx >= 0 {
 			if p < len(data) && data[p] == ':' {
@@ -11185,42 +11511,58 @@ func (v *SearchMetadata) odjsonParse(data []byte, p int, sc *odjsonrt.StringCach
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'm':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"max_id\"":
-					idx, p = 0, p+8
-				case len(rest) >= 12 && string(rest[:12]) == "\"max_id_str\"":
-					idx, p = 8, p+12
+				if len(rest) > 7 {
+					switch rest[7] {
+					case '"':
+						if len(rest) >= 8 && string(rest[:8]) == "\"max_id\"" {
+							idx, p = 0, p+8
+						}
+					case '_':
+						if len(rest) >= 12 && string(rest[:12]) == "\"max_id_str\"" {
+							idx, p = 8, p+12
+						}
+					}
 				}
 			case 's':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"since_id\"":
-					idx, p = 1, p+10
-				case len(rest) >= 14 && string(rest[:14]) == "\"since_id_str\"":
-					idx, p = 6, p+14
+				if len(rest) > 9 {
+					switch rest[9] {
+					case '"':
+						if len(rest) >= 10 && string(rest[:10]) == "\"since_id\"" {
+							idx, p = 1, p+10
+						}
+					case '_':
+						if len(rest) >= 14 && string(rest[:14]) == "\"since_id_str\"" {
+							idx, p = 6, p+14
+						}
+					}
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"refresh_url\"":
+				if len(rest) >= 13 && string(rest[:13]) == "\"refresh_url\"" {
 					idx, p = 2, p+13
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 14 && string(rest[:14]) == "\"next_results\"":
+				if len(rest) >= 14 && string(rest[:14]) == "\"next_results\"" {
 					idx, p = 3, p+14
 				}
 			case 'c':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"count\"":
-					idx, p = 4, p+7
-				case len(rest) >= 14 && string(rest[:14]) == "\"completed_in\"":
-					idx, p = 5, p+14
+				if len(rest) > 3 {
+					switch rest[3] {
+					case 'u':
+						if len(rest) >= 7 && string(rest[:7]) == "\"count\"" {
+							idx, p = 4, p+7
+						}
+					case 'm':
+						if len(rest) >= 14 && string(rest[:14]) == "\"completed_in\"" {
+							idx, p = 5, p+14
+						}
+					}
 				}
 			case 'q':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"query\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"query\"" {
 					idx, p = 7, p+7
 				}
 			}
@@ -11427,42 +11769,58 @@ func (v *SearchMetadata) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCa
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'm':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"max_id\"":
-					idx, key, p = 0, rest[1:7], p+8
-				case len(rest) >= 12 && string(rest[:12]) == "\"max_id_str\"":
-					idx, key, p = 8, rest[1:11], p+12
+				if len(rest) > 7 {
+					switch rest[7] {
+					case '"':
+						if len(rest) >= 8 && string(rest[:8]) == "\"max_id\"" {
+							idx, key, p = 0, rest[1:7], p+8
+						}
+					case '_':
+						if len(rest) >= 12 && string(rest[:12]) == "\"max_id_str\"" {
+							idx, key, p = 8, rest[1:11], p+12
+						}
+					}
 				}
 			case 's':
-				switch {
-				case len(rest) >= 10 && string(rest[:10]) == "\"since_id\"":
-					idx, key, p = 1, rest[1:9], p+10
-				case len(rest) >= 14 && string(rest[:14]) == "\"since_id_str\"":
-					idx, key, p = 6, rest[1:13], p+14
+				if len(rest) > 9 {
+					switch rest[9] {
+					case '"':
+						if len(rest) >= 10 && string(rest[:10]) == "\"since_id\"" {
+							idx, key, p = 1, rest[1:9], p+10
+						}
+					case '_':
+						if len(rest) >= 14 && string(rest[:14]) == "\"since_id_str\"" {
+							idx, key, p = 6, rest[1:13], p+14
+						}
+					}
 				}
 			case 'r':
-				switch {
-				case len(rest) >= 13 && string(rest[:13]) == "\"refresh_url\"":
+				if len(rest) >= 13 && string(rest[:13]) == "\"refresh_url\"" {
 					idx, key, p = 2, rest[1:12], p+13
 				}
 			case 'n':
-				switch {
-				case len(rest) >= 14 && string(rest[:14]) == "\"next_results\"":
+				if len(rest) >= 14 && string(rest[:14]) == "\"next_results\"" {
 					idx, key, p = 3, rest[1:13], p+14
 				}
 			case 'c':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"count\"":
-					idx, key, p = 4, rest[1:6], p+7
-				case len(rest) >= 14 && string(rest[:14]) == "\"completed_in\"":
-					idx, key, p = 5, rest[1:13], p+14
+				if len(rest) > 3 {
+					switch rest[3] {
+					case 'u':
+						if len(rest) >= 7 && string(rest[:7]) == "\"count\"" {
+							idx, key, p = 4, rest[1:6], p+7
+						}
+					case 'm':
+						if len(rest) >= 14 && string(rest[:14]) == "\"completed_in\"" {
+							idx, key, p = 5, rest[1:13], p+14
+						}
+					}
 				}
 			case 'q':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"query\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"query\"" {
 					idx, key, p = 7, rest[1:6], p+7
 				}
 			}

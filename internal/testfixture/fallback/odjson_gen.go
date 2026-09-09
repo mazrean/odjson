@@ -103,42 +103,58 @@ func (v *Fallbacks) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'g':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"generic\"":
-					idx, p = 0, p+9
-				case len(rest) >= 13 && string(rest[:13]) == "\"generic_ptr\"":
-					idx, p = 1, p+13
+				if len(rest) > 8 {
+					switch rest[8] {
+					case '"':
+						if len(rest) >= 9 && string(rest[:9]) == "\"generic\"" {
+							idx, p = 0, p+9
+						}
+					case '_':
+						if len(rest) >= 13 && string(rest[:13]) == "\"generic_ptr\"" {
+							idx, p = 1, p+13
+						}
+					}
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"anon\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"anon\"" {
 					idx, p = 2, p+6
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"int_map\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"int_map\"" {
 					idx, p = 3, p+9
 				}
 			case 'c':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"custom\"":
-					idx, p = 4, p+8
-				case len(rest) >= 12 && string(rest[:12]) == "\"custom_ptr\"":
-					idx, p = 5, p+12
+				if len(rest) > 7 {
+					switch rest[7] {
+					case '"':
+						if len(rest) >= 8 && string(rest[:8]) == "\"custom\"" {
+							idx, p = 4, p+8
+						}
+					case '_':
+						if len(rest) >= 12 && string(rest[:12]) == "\"custom_ptr\"" {
+							idx, p = 5, p+12
+						}
+					}
 				}
 			case 't':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"text\"":
-					idx, p = 6, p+6
-				case len(rest) >= 10 && string(rest[:10]) == "\"text_ptr\"":
-					idx, p = 7, p+10
+				if len(rest) > 5 {
+					switch rest[5] {
+					case '"':
+						if len(rest) >= 6 && string(rest[:6]) == "\"text\"" {
+							idx, p = 6, p+6
+						}
+					case '_':
+						if len(rest) >= 10 && string(rest[:10]) == "\"text_ptr\"" {
+							idx, p = 7, p+10
+						}
+					}
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"plain\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"plain\"" {
 					idx, p = 8, p+7
 				}
 			}
@@ -327,42 +343,58 @@ func (v *Fallbacks) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 		p = odjsonrt.SkipSpace(data, p)
 		kp := p
 		idx := -1
-		if rest := data[p:]; len(rest) > 1 {
+		rest := data[p:]
+		if len(rest) > 1 {
 			switch rest[1] {
 			case 'g':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"generic\"":
-					idx, key, p = 0, rest[1:8], p+9
-				case len(rest) >= 13 && string(rest[:13]) == "\"generic_ptr\"":
-					idx, key, p = 1, rest[1:12], p+13
+				if len(rest) > 8 {
+					switch rest[8] {
+					case '"':
+						if len(rest) >= 9 && string(rest[:9]) == "\"generic\"" {
+							idx, key, p = 0, rest[1:8], p+9
+						}
+					case '_':
+						if len(rest) >= 13 && string(rest[:13]) == "\"generic_ptr\"" {
+							idx, key, p = 1, rest[1:12], p+13
+						}
+					}
 				}
 			case 'a':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"anon\"":
+				if len(rest) >= 6 && string(rest[:6]) == "\"anon\"" {
 					idx, key, p = 2, rest[1:5], p+6
 				}
 			case 'i':
-				switch {
-				case len(rest) >= 9 && string(rest[:9]) == "\"int_map\"":
+				if len(rest) >= 9 && string(rest[:9]) == "\"int_map\"" {
 					idx, key, p = 3, rest[1:8], p+9
 				}
 			case 'c':
-				switch {
-				case len(rest) >= 8 && string(rest[:8]) == "\"custom\"":
-					idx, key, p = 4, rest[1:7], p+8
-				case len(rest) >= 12 && string(rest[:12]) == "\"custom_ptr\"":
-					idx, key, p = 5, rest[1:11], p+12
+				if len(rest) > 7 {
+					switch rest[7] {
+					case '"':
+						if len(rest) >= 8 && string(rest[:8]) == "\"custom\"" {
+							idx, key, p = 4, rest[1:7], p+8
+						}
+					case '_':
+						if len(rest) >= 12 && string(rest[:12]) == "\"custom_ptr\"" {
+							idx, key, p = 5, rest[1:11], p+12
+						}
+					}
 				}
 			case 't':
-				switch {
-				case len(rest) >= 6 && string(rest[:6]) == "\"text\"":
-					idx, key, p = 6, rest[1:5], p+6
-				case len(rest) >= 10 && string(rest[:10]) == "\"text_ptr\"":
-					idx, key, p = 7, rest[1:9], p+10
+				if len(rest) > 5 {
+					switch rest[5] {
+					case '"':
+						if len(rest) >= 6 && string(rest[:6]) == "\"text\"" {
+							idx, key, p = 6, rest[1:5], p+6
+						}
+					case '_':
+						if len(rest) >= 10 && string(rest[:10]) == "\"text_ptr\"" {
+							idx, key, p = 7, rest[1:9], p+10
+						}
+					}
 				}
 			case 'p':
-				switch {
-				case len(rest) >= 7 && string(rest[:7]) == "\"plain\"":
+				if len(rest) >= 7 && string(rest[:7]) == "\"plain\"" {
 					idx, key, p = 8, rest[1:6], p+7
 				}
 			}
