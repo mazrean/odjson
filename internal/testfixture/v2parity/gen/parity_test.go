@@ -264,13 +264,13 @@ func TestUnmarshalMatchesJSONV2(t *testing.T) {
 
 // TestV1MethodsKeepV1Semantics checks the other half of the contract: the
 // encoding/json methods on the same type still behave like encoding/json, so
-// enabling -methods does not change what either library produces.
+// the generated file does not change what a v1 call site produces.
 func TestV1MethodsKeepV1Semantics(t *testing.T) {
 	var g gen.Zoo
 	if err := jsonv2.Unmarshal([]byte(`{"slice":null,"map":null,"bytes":null,"omit_int":0}`), &g); err != nil {
 		t.Fatal(err)
 	}
-	direct, err := gen.MarshalZoo(&g)
+	direct, err := g.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
 	}

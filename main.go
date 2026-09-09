@@ -1,11 +1,11 @@
 // Command odjson generates reflection-free JSON encoders and decoders for Go
 // struct types.
 //
-// The generated code implements encoding/json's Marshaler and Unmarshaler (and
-// optionally encoding/json/v2's MarshalerTo and UnmarshalerFrom), so every
-// major JSON library — encoding/json, encoding/json/v2, bytedance/sonic and
-// goccy/go-json — picks it up automatically and gets faster without any change
-// to the call sites.
+// The generated code implements encoding/json's Marshaler and Unmarshaler and
+// encoding/json/v2's MarshalerTo and UnmarshalerFrom, so an unchanged
+// json.Marshal or json.Unmarshal routes through it. It is bolted onto the
+// standard libraries rather than replacing them: delete the generated file and
+// every call site keeps working, at the library's own speed.
 package main
 
 import (
@@ -43,8 +43,6 @@ type config struct {
 	output          string
 	escapeHTML      bool
 	caseInsensitive bool
-	jsonV2          bool
-	methods         bool
 	recursive       bool
 	showVersion     bool
 }
@@ -59,9 +57,7 @@ func run(args []string) error {
 	fs.StringVar(&cfg.types, "type", "", "comma separated list of struct types to generate for (default: every exported struct in the package)")
 	fs.StringVar(&cfg.output, "output", "odjson_gen.go", "name of the generated file, written into each matched package directory")
 	fs.BoolVar(&cfg.escapeHTML, "escape-html", true, "escape <, > and & like encoding/json does by default")
-	fs.BoolVar(&cfg.caseInsensitive, "case-insensitive", true, "fall back to a case-insensitive field match, like encoding/json")
-	fs.BoolVar(&cfg.jsonV2, "jsonv2", true, "also emit the encoding/json/v2 marshaler and unmarshaler methods")
-	fs.BoolVar(&cfg.methods, "methods", false, "also emit MarshalJSON/UnmarshalJSON so existing call sites pick the generated codec up\n\twithout being changed. Off by default: the host library then re-validates the bytes the\n\tmethods return, which costs more than the generated codec saves for every library except\n\tencoding/json on small payloads. Prefer calling Marshal<T>/Unmarshal<T> directly")
+	fs.BoolVar(&cfg.caseInsensitive, "case-insensitive", false, "in UnmarshalJSON, fall back to a case-insensitive field match the way encoding/json v1\n\tdoes. Off by default, matching encoding/json/v2")
 	fs.BoolVar(&cfg.recursive, "recursive", true, "also generate codecs for struct types reachable from the selected types")
 	fs.BoolVar(&cfg.showVersion, "version", false, "print the version and exit")
 	if err := fs.Parse(args); err != nil {
@@ -114,8 +110,6 @@ func run(args []string) error {
 			Recursive:       cfg.recursive,
 			EscapeHTML:      cfg.escapeHTML,
 			CaseInsensitive: cfg.caseInsensitive,
-			JSONV2:          cfg.jsonV2,
-			Methods:         cfg.methods,
 			Command:         command(),
 		}
 		if err := generate.Run(dir, gcfg); err != nil {

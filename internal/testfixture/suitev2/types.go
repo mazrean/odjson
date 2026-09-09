@@ -5,7 +5,7 @@ package suitev2
 
 import "encoding/json"
 
-//go:generate go run github.com/mazrean/odjson -methods
+//go:generate go run github.com/mazrean/odjson
 
 // Raw captures the wrapped value verbatim.
 type Raw struct {

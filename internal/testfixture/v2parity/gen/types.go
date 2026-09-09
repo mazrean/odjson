@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-//go:generate go run github.com/mazrean/odjson -methods
+//go:generate go run github.com/mazrean/odjson
 
 // Color is a named string type.
 type Color string

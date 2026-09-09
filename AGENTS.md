@@ -13,35 +13,43 @@ A struct's field tags tell odjson, at compile time, exactly which JSON fields
 are acceptable. From that it generates dedicated, reflection-free code for each
 struct:
 
-- `MarshalJSON` / `UnmarshalJSON` (`encoding/json` v1 interfaces)
 - `MarshalJSONTo` / `UnmarshalJSONFrom` (`encoding/json/v2` interfaces)
-- direct `MarshalT` / `AppendT` / `UnmarshalT` functions, for callers that want
-  to skip the interface indirection entirely
+- `MarshalJSON` / `UnmarshalJSON` (`encoding/json` v1 interfaces)
 
-Because every major Go JSON library honours those interfaces —
-`encoding/json`, `encoding/json/v2`, `github.com/bytedance/sonic`,
-`github.com/goccy/go-json` — odjson layers *on top of* whichever library the
-user already has, and makes it faster. It does not replace them.
+Those four methods are the **entire** generated API surface. There are no
+exported direct functions: everything a caller reaches goes through the
+standard interfaces, so an unchanged `json.Marshal` / `json.Unmarshal` picks
+the generated codec up, and deleting the generated file undoes all of it. Do
+not re-introduce package level `MarshalT` / `AppendT` / `UnmarshalT`; "keep
+using the standard library, and take it off whenever you like" is the product,
+and a second entry point contradicts it.
 
-**Where the win actually is** (measured, see `bench/`): the direct functions,
-always. `-methods` is a second win on the two standard libraries — it makes
-`encoding/json/v2` 1.5-3.1x *faster* on all four measurements and
-`encoding/json` 1.12-1.6x faster on three of four. On sonic and go-json it
-wins only the small unmarshal rows (1.08x and 1.02x in `bench/ab`), and
-`bench/floor` proves why the rest cannot be won rather than asserting it: with
-a `MarshalJSON` that costs nothing, sonic still spends 105us on the twitter
+**Positioning** (measured, see `bench/`): the target is `encoding/json/v2`
+(1.5-3.1x faster on all four measurements) and `encoding/json` (1.12-1.6x on
+three of four; the twitter encode is 6% behind because v1's coder flags make
+the direct path decline). `github.com/bytedance/sonic` and
+`github.com/goccy/go-json` honour the v1 interfaces too and the generated code
+is correct under them, but odjson does **not** make them faster: it wins only
+their small unmarshal rows (1.08x and 1.02x in `bench/ab`), and `bench/floor`
+proves why the rest cannot be won rather than asserting it: with a
+`MarshalJSON` that costs nothing, sonic still spends 105us on the twitter
 payload against 111us for its own path, and go-json 338us against 239us,
 because sonic validates and go-json compacts whatever a marshaler returns.
 On the decode side the floor is the skip-and-validate pass they make before
 calling `UnmarshalJSON`: 284us and 470us on twitter, against their own 491us
 and 655us, so the generated decoder would have to run 2.5x faster than sonic's
 JIT to break even there. Do not re-open either question without re-running
-`bench/floor` and `bench/ab`. `-methods` stays **off by default** for that
-reason: the recommendation is not uniform across libraries, so the user has
-to make it. Keep the benchmark section of `README.md` honest about this, and
-re-measure before changing the default.
+`bench/floor` and `bench/ab`. In `README.md` those two libraries are
+**comparison baselines only** — their "with odjson" columns stay out of the
+tables, and the claim to keep honest is that json/v2 + odjson beats go-json on
+three of four and sits within 1.2-1.4x of sonic. Re-measure before restating
+any of it.
 
-The byte oriented decoder (`odjsonParse`, behind `UnmarshalT`, `UnmarshalJSON`,
+`-case-insensitive` defaults to **false**, matching json/v2; it only affects
+the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,
+because their parity oracle is `encoding/json` v1, which folds case.
+
+The byte oriented decoder (`odjsonParse`, behind `UnmarshalJSON`,
 the direct path and the whole-value path) matches known member names against
 the document's raw bytes, quotes included, before scanning anything, and
 decodes bools, integers and simple floats inline; the general runtime parsers
@@ -79,8 +87,8 @@ Generation strategy:
 - **Marshal**: direct struct-field-to-bytes appends (same idea as
   `sapphi-red/json-constantiater`).
 - **Unmarshal**: a specialised parser per struct that streams straight into
-  the struct's fields, with no reflection and no intermediate map. With
-  `-methods` each struct gets two more decoders for `UnmarshalJSONFrom`:
+  the struct's fields, with no reflection and no intermediate map. Each
+  struct gets two more decoders for `UnmarshalJSONFrom`:
   `odjsonParseFrom` drives the `jsontext.Decoder` member by member, and
   `odjsonParseV2` parses a byte slice under json/v2's semantics (null
   zeroes, arrays are strict, names are case sensitive). Its `strict`
@@ -121,7 +129,18 @@ Within the root module:
   promotion and conflict resolution, `fallback` covers what the generator hands
   back to reflection, `crosspkg` covers types imported from another package,
   `suite` runs the JSON Test Suite through generated decoders, and
-  `withmethods` covers `-methods`.
+  `withmethods` covers a minimal type reached through every library.
+
+  Because the generated methods are what `encoding/json` now calls, the parity
+  oracle cannot be `json.Marshal` on the fixture type itself. Each affected
+  fixture declares its types a second time in a sibling `plain` package that
+  odjson never runs on, and `plainref.Of` reads a value as that twin;
+  `plainref.SameLayout`, asserted by a `TestSameLayout` in each fixture, is
+  what keeps the two declarations from drifting. Where no field type carries a
+  generated codec (`fallback`, `crosspkg`) a locally defined type is enough
+  and no `plain` package exists. Parity tests call `MarshalJSON` /
+  `UnmarshalJSON` directly, because `json.Marshal` would reach the v2 methods
+  and their v2 semantics instead.
 
 Every fixture's generated file is committed, and `internal/generate`'s tests
 regenerate each one and fail on any difference. Regenerate with

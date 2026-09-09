@@ -3,7 +3,7 @@
 // odjson's generated codec.
 package withmethods
 
-//go:generate go run github.com/mazrean/odjson -methods
+//go:generate go run github.com/mazrean/odjson
 
 // Address is nested inside Person.
 type Address struct {

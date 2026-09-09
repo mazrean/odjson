@@ -1,8 +1,7 @@
-// Package embed exercises encoding/json's field promotion and conflict
-// resolution rules through odjson's generated codecs.
-package embed
-
-//go:generate go run github.com/mazrean/odjson -case-insensitive
+// Package plain declares embed's types a second time, with no generated codec
+// attached, so encoding/json's own promotion rules can be observed. See
+// [github.com/mazrean/odjson/internal/testfixture/plainref].
+package plain
 
 // Label is an embedded non-struct named type, which is promoted as a single
 // field named after the type.

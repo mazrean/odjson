@@ -5,4 +5,4 @@ package gen
 
 // The benchmarks measure both modes, so the methods are generated here even
 // though they are not the default.
-//go:generate go run github.com/mazrean/odjson -methods
+//go:generate go run github.com/mazrean/odjson

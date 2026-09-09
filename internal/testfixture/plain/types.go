@@ -1,14 +1,14 @@
-// Package testfixture holds struct types exercising every field shape the
-// odjson generator supports. The generated codecs are compared against
-// encoding/json in the codegen tests.
-package testfixture
+// Package plain declares testfixture's types a second time, with no generated
+// codec attached. It is the reflection oracle: encoding/json marshals and
+// unmarshals these declarations the ordinary way, and testfixture's tests
+// compare that against what the generated methods do. See
+// [github.com/mazrean/odjson/internal/testfixture/plainref].
+package plain
 
 import (
 	"encoding/json"
 	"time"
 )
-
-//go:generate go run github.com/mazrean/odjson -case-insensitive
 
 // Color is a named string type.
 type Color string

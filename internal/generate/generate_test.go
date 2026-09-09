@@ -13,18 +13,18 @@ import (
 // committed output has drifted from what the current generator produces.
 func TestFixturesAreUpToDate(t *testing.T) {
 	cases := []struct {
-		dir     string
-		methods bool
-		command string
+		dir             string
+		caseInsensitive bool
+		command         string
 	}{
-		{dir: "../testfixture", methods: false, command: "odjson"},
-		{dir: "../testfixture/embed", methods: false, command: "odjson"},
-		{dir: "../testfixture/fallback", methods: false, command: "odjson"},
-		{dir: "../testfixture/crosspkg", methods: false, command: "odjson"},
-		{dir: "../testfixture/suite", methods: false, command: "odjson"},
-		{dir: "../testfixture/suitev2", methods: true, command: "odjson -methods"},
-		{dir: "../testfixture/v2parity/gen", methods: true, command: "odjson -methods"},
-		{dir: "../testfixture/withmethods", methods: true, command: "odjson -methods"},
+		{dir: "../testfixture", caseInsensitive: true, command: "odjson -case-insensitive"},
+		{dir: "../testfixture/embed", caseInsensitive: true, command: "odjson -case-insensitive"},
+		{dir: "../testfixture/fallback", command: "odjson"},
+		{dir: "../testfixture/crosspkg", command: "odjson"},
+		{dir: "../testfixture/suite", command: "odjson"},
+		{dir: "../testfixture/suitev2", command: "odjson"},
+		{dir: "../testfixture/v2parity/gen", command: "odjson"},
+		{dir: "../testfixture/withmethods", command: "odjson"},
 	}
 
 	for _, tc := range cases {
@@ -33,9 +33,7 @@ func TestFixturesAreUpToDate(t *testing.T) {
 				Output:          "odjson_gen.go",
 				Recursive:       true,
 				EscapeHTML:      true,
-				CaseInsensitive: true,
-				JSONV2:          true,
-				Methods:         tc.methods,
+				CaseInsensitive: tc.caseInsensitive,
 				Command:         tc.command,
 			}
 			got, err := generate.Source(tc.dir, cfg)
@@ -63,8 +61,6 @@ func TestGenerationIsIdempotent(t *testing.T) {
 		Recursive:       true,
 		EscapeHTML:      true,
 		CaseInsensitive: true,
-		JSONV2:          true,
-		Methods:         true,
 		Command:         "odjson",
 	}
 	first, err := generate.Source("../testfixture/withmethods", cfg)

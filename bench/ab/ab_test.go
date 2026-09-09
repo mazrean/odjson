@@ -261,18 +261,18 @@ func BenchmarkUnmarshalSmall(b *testing.B) {
 	b.Run("go-json", func(b *testing.B) { runUnmarshal(b, ss, data, gojson.Unmarshal) })
 }
 
-// BenchmarkDirectVsSonicStd puts odjson's direct decoder next to sonic
-// configured to produce the same bytes, in the same process.
-func BenchmarkDirectVsSonicStd(b *testing.B) {
-	b.Run("twitter/odjson-direct", func(b *testing.B) {
-		v := new(gen.TwitterStruct)
-		if err := gen.UnmarshalTwitterStruct(twitterJSON, v); err != nil {
+// BenchmarkOdjsonVsSonicStd puts an unchanged encoding/json/v2 call site
+// carrying odjson's generated methods next to sonic configured to produce the
+// same bytes, in the same process.
+func BenchmarkOdjsonVsSonicStd(b *testing.B) {
+	b.Run("twitter/json-v2+odjson", func(b *testing.B) {
+		if err := jsonv2.Unmarshal(twitterJSON, new(gen.TwitterStruct)); err != nil {
 			b.Fatal(err)
 		}
 		b.ReportAllocs()
 		b.SetBytes(int64(len(twitterJSON)))
 		for b.Loop() {
-			if err := gen.UnmarshalTwitterStruct(twitterJSON, new(gen.TwitterStruct)); err != nil {
+			if err := jsonv2.Unmarshal(twitterJSON, new(gen.TwitterStruct)); err != nil {
 				b.Fatal(err)
 			}
 		}

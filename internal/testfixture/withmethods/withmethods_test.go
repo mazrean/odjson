@@ -25,10 +25,10 @@ func sample() Person {
 }
 
 // TestLibrariesAgree checks that both stdlib entry points route through the
-// generated codec and produce the same bytes as the direct API.
+// generated codec and produce the same bytes as MarshalJSON does on its own.
 func TestLibrariesAgree(t *testing.T) {
 	v := sample()
-	direct, err := MarshalPerson(&v)
+	direct, err := v.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestLibrariesAgree(t *testing.T) {
 
 func TestDecodeThroughLibraries(t *testing.T) {
 	want := sample()
-	data, err := MarshalPerson(&want)
+	data, err := want.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestUnmarshalNullIsNoOp(t *testing.T) {
 // encoded by the generated helper rather than by reflection.
 func TestNestedValueUsesGeneratedCodec(t *testing.T) {
 	a := Address{Street: "s"}
-	got, err := MarshalAddress(&a)
+	got, err := a.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
 	}

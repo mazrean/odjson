@@ -5,15 +5,44 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"github.com/mazrean/odjson/internal/testfixture/embed/plain"
+	"github.com/mazrean/odjson/internal/testfixture/plainref"
 )
 
-func marshalParity[T any](t *testing.T, name string, v T, appendFn func([]byte, *T) ([]byte, error)) {
+// The generated methods stand between json.Marshal and these types, so package
+// plain's identical declarations are what encoding/json is left to promote
+// fields on. TestSameLayout keeps the two in step.
+var (
+	promotedRef    = plainref.Of[Promoted, plain.Promoted]
+	shallowWinsRef = plainref.Of[ShallowWins, plain.ShallowWins]
+)
+
+func TestSameLayout(t *testing.T) {
+	cases := []struct {
+		name string
+		a, b reflect.Type
+	}{
+		{"Promoted", reflect.TypeFor[Promoted](), reflect.TypeFor[plain.Promoted]()},
+		{"ShallowWins", reflect.TypeFor[ShallowWins](), reflect.TypeFor[plain.ShallowWins]()},
+	}
+	for _, tc := range cases {
+		if err := plainref.SameLayout(tc.a, tc.b); err != nil {
+			t.Errorf("%s: %v", tc.name, err)
+		}
+	}
+}
+
+// marshalParity compares the generated MarshalJSON against encoding/json's own
+// promotion rules. The method is called directly because json.Marshal prefers
+// MarshalJSONTo, which follows json/v2's semantics instead.
+func marshalParity[T, R any](t *testing.T, name string, v T, ref func(*T) *R) {
 	t.Helper()
-	want, err := json.Marshal(v)
+	want, err := json.Marshal(ref(&v))
 	if err != nil {
 		t.Fatalf("%s: encoding/json: %v", name, err)
 	}
-	got, err := appendFn(nil, &v)
+	got, err := any(v).(json.Marshaler).MarshalJSON()
 	if err != nil {
 		t.Fatalf("%s: odjson: %v", name, err)
 	}
@@ -22,11 +51,11 @@ func marshalParity[T any](t *testing.T, name string, v T, appendFn func([]byte, 
 	}
 }
 
-func unmarshalParity[T any](t *testing.T, name, in string, unmarshalFn func([]byte, *T) error) {
+func unmarshalParity[T, R any](t *testing.T, name, in string, ref func(*T) *R) {
 	t.Helper()
 	var a, b T
-	errA := json.Unmarshal([]byte(in), &a)
-	errB := unmarshalFn([]byte(in), &b)
+	errA := json.Unmarshal([]byte(in), ref(&a))
+	errB := any(&b).(json.Unmarshaler).UnmarshalJSON([]byte(in))
 	if (errA != nil) != (errB != nil) {
 		t.Errorf("%s: error mismatch for %s: encoding/json=%v odjson=%v", name, in, errA, errB)
 		return
@@ -56,14 +85,14 @@ func sample() Promoted {
 }
 
 func TestMarshalPromoted(t *testing.T) {
-	marshalParity(t, "full", sample(), AppendPromoted)
+	marshalParity(t, "full", sample(), promotedRef)
 
 	nilPtr := sample()
 	nilPtr.PtrPart = nil
-	marshalParity(t, "nil-embedded-pointer", nilPtr, AppendPromoted)
+	marshalParity(t, "nil-embedded-pointer", nilPtr, promotedRef)
 
-	marshalParity(t, "zero", Promoted{}, AppendPromoted)
-	marshalParity(t, "shallow-wins", ShallowWins{Deep: Deep{DeepOnly: "d", Shared: "ignored"}, Shared: 5}, AppendShallowWins)
+	marshalParity(t, "zero", Promoted{}, promotedRef)
+	marshalParity(t, "shallow-wins", ShallowWins{Deep: Deep{DeepOnly: "d", Shared: "ignored"}, Shared: 5}, shallowWinsRef)
 }
 
 func TestUnmarshalPromoted(t *testing.T) {
@@ -76,16 +105,16 @@ func TestUnmarshalPromoted(t *testing.T) {
 		`{"Label":"x"}`,
 	}
 	for _, in := range inputs {
-		unmarshalParity(t, "promoted", in, UnmarshalPromoted)
+		unmarshalParity(t, "promoted", in, promotedRef)
 	}
-	unmarshalParity(t, "shallow", `{"shared":3,"deep_only":"d"}`, UnmarshalShallowWins)
+	unmarshalParity(t, "shallow", `{"shared":3,"deep_only":"d"}`, shallowWinsRef)
 }
 
 // TestFieldSetMatchesEncodingJSON is a direct read of the promoted member set:
 // the generated encoder and encoding/json must agree on which names exist.
 func TestFieldSetMatchesEncodingJSON(t *testing.T) {
 	v := sample()
-	b, err := json.Marshal(v)
+	b, err := json.Marshal(promotedRef(&v))
 	if err != nil {
 		t.Fatal(err)
 	}
