@@ -24,17 +24,24 @@ Because every major Go JSON library honours those interfaces —
 user already has, and makes it faster. It does not replace them.
 
 **Where the win actually is** (measured, see `bench/`): the direct functions,
-always. `-methods` is a second, conditional win — as of the streaming-path work
-it makes `encoding/json` 1.08-1.17x *faster* on three of four measurements and
-`encoding/json/v2` roughly break even, but it cannot win on sonic or go-json,
-and `bench/floor` proves why rather than asserting it: with a `MarshalJSON`
-that costs nothing, sonic still spends 107us on the twitter payload against
-102us for its own reflection path, and go-json 347us against 239us. The
-interface floor is above the target, so no generated code can close it. Do not
-re-open that question without re-running `bench/floor`. It stays
-**off by default** for that reason: the recommendation is not uniform across
-libraries, so the user has to make it. Keep the benchmark section of
-`README.md` honest about this, and re-measure before changing the default.
+always. `-methods` is a second, conditional win — it makes `encoding/json`
+1.06-1.45x *faster* on three of four measurements and `encoding/json/v2` 1.36x
+faster on the small decode, 1.03x on the large one and 8-15% slower on both
+encodes, but it cannot win on sonic or go-json, and `bench/floor` proves why
+rather than asserting it: with a `MarshalJSON` that costs nothing, sonic still
+spends 107us on the twitter payload against 102us for its own reflection path,
+and go-json 347us against 239us. The interface floor is above the target, so
+no generated code can close it. The same floor argument settles the json/v2
+encode rows: a `MarshalerTo` that costs nothing measures 365us / 808ns
+against a reflection baseline of 400us / 1.03us, so no generated encoder gets
+to 1.3x there either, and on the decode side every name read through
+`jsontext.Decoder`'s public API pays a duplicate-name namespace insert that
+json/v2's own decoder disables behind `export` (see "What the decode side
+pays" in `README.md`). Do not re-open those questions without re-running
+`bench/floor` and `bench/ab`. It stays **off by default** for that reason:
+the recommendation is not uniform across libraries, so the user has to make
+it. Keep the benchmark section of `README.md` honest about this, and
+re-measure before changing the default.
 
 The generated `MarshalJSONTo`/`UnmarshalJSONFrom` deliberately follow
 `encoding/json/v2`'s semantics rather than `encoding/json`'s (nil slices encode
@@ -49,7 +56,13 @@ Generation strategy:
 - **Marshal**: direct struct-field-to-bytes appends (same idea as
   `sapphi-red/json-constantiater`).
 - **Unmarshal**: a specialised parser per struct that streams straight into
-  the struct's fields, with no reflection and no intermediate map.
+  the struct's fields, with no reflection and no intermediate map. With
+  `-methods` each struct gets two more decoders for `UnmarshalJSONFrom`:
+  `odjsonParseFrom` drives the `jsontext.Decoder` member by member, and
+  `odjsonParseV2` parses bytes the decoder has already validated, under
+  json/v2's semantics (null zeroes, arrays are strict, names are case
+  sensitive). `odjsonrt.WholeValue` picks between them per value at runtime:
+  small values are read whole, large ones are driven token by token.
 
 ## Repository layout
 

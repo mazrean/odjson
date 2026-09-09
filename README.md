@@ -251,8 +251,8 @@ typed, the per-call overhead case).
 
 | library | baseline | with generated methods | change |
 | --- | --- | --- | --- |
-| encoding/json | 399 µs | 396 µs | 1.01× faster |
-| encoding/json/v2 | 388 µs | 432 µs | 1.11× slower |
+| encoding/json | 392 µs | 433 µs | 1.10× slower |
+| encoding/json/v2 | 400 µs | 458 µs | 1.15× slower |
 | sonic | 98 µs | 285 µs | 2.92× slower |
 | go-json | 235 µs | 548 µs | 2.33× slower |
 | **odjson direct** | — | **179 µs** — 296 KiB, 105 allocs | **2.23× faster than encoding/json** |
@@ -261,8 +261,8 @@ typed, the per-call overhead case).
 
 | library | baseline | with generated methods | change |
 | --- | --- | --- | --- |
-| encoding/json | 1.01 µs | 884 ns | 1.14× faster |
-| encoding/json/v2 | 1.01 µs | 1.04 µs | 1.03× slower |
+| encoding/json | 1.02 µs | 958 ns | 1.06× faster |
+| encoding/json/v2 | 1.03 µs | 1.11 µs | 1.08× slower |
 | sonic | 275 ns | 673 ns | 2.45× slower |
 | go-json | 374 ns | 1.02 µs | 2.74× slower |
 | **odjson direct** | — | **262 ns** — 416 B, 1 allocs | **3.86× faster than encoding/json** |
@@ -271,8 +271,8 @@ typed, the per-call overhead case).
 
 | library | baseline | with generated methods | change |
 | --- | --- | --- | --- |
-| encoding/json | 1.46 ms | 1.29 ms | 1.13× faster |
-| encoding/json/v2 | 1.08 ms | 1.07 ms | no change |
+| encoding/json | 1.54 ms | 1.32 ms | 1.17× faster |
+| encoding/json/v2 | 1.12 ms | 1.09 ms | 1.03× faster |
 | sonic | 484 µs | 868 µs | 1.79× slower |
 | go-json | 671 µs | 1.10 ms | 1.64× slower |
 | **odjson direct** | — | **585 µs** — 413 KiB, 4551 allocs | **2.49× faster than encoding/json** |
@@ -281,8 +281,8 @@ typed, the per-call overhead case).
 
 | library | baseline | with generated methods | change |
 | --- | --- | --- | --- |
-| encoding/json | 2.23 µs | 1.87 µs | 1.19× faster |
-| encoding/json/v2 | 1.85 µs | 1.64 µs | 1.13× faster |
+| encoding/json | 2.31 µs | 1.59 µs | 1.45× faster |
+| encoding/json/v2 | 1.91 µs | 1.40 µs | 1.36× faster |
 | sonic | 961 ns | 1.21 µs | 1.26× slower |
 | go-json | 781 ns | 1.08 µs | 1.39× slower |
 | **odjson direct** | — | **737 ns** — 544 B, 13 allocs | **3.03× faster than encoding/json** |
@@ -312,10 +312,10 @@ on all four measurements, and faster than `sonic` on the small payload in both
 directions. That is odjson's core contribution and it needs no interfaces.
 
 **`-methods` on `encoding/json` and `encoding/json/v2`: 5 of 8 wins, and the
-three losses are structural.** All of these numbers come from `bench/ab`, which
-measures the generated codec, the reflection baseline and the interface floor
-in a single process — comparing them across processes moves the small
-differences by more than their size.
+three losses are structural.** The `encoding/json` and `encoding/json/v2` rows
+above come from `bench/ab`, which measures the generated codec, the reflection
+baseline and the interface floor in a single process — comparing them across
+processes moves the small differences by more than their size.
 
 For a value-driven `MarshalerTo`, `gen = floor + odjson's own encode`, so the
 room left for odjson is `plain - floor`:
@@ -326,8 +326,11 @@ room left for odjson is `plain - floor`:
 | `encoding/json/v2` Marshal `twitter` | 359 µs | 388 µs | 29 µs | 108 µs | 8.8 GB/s |
 | `encoding/json/v2` Marshal `small` | 802 ns | 1.02 µs | 217 ns | 303 ns | — |
 
-All three remaining losses are marshal rows, and the two `twitter` ones are
-settled by the last column: sonic's AVX2 and JIT compiled encoder writes this
+All three remaining losses are marshal rows, and no `MarshalerTo` can turn
+them into 1.3× wins: a marshaler that costs nothing still measures 365 µs on
+`twitter` and 808 ns on `small` under `json/v2`, and reflection divided by 1.3
+is 307 µs and 794 ns. The two `twitter` ones are also settled by the last
+column: sonic's AVX2 and JIT compiled encoder writes this
 document at 2.2–2.7 GB/s, so a budget of 3.9 or 8.8 GB/s is not a tuning
 target, it is outside what any Go encoder does. A token-driven `MarshalerTo`
 would not pay the reformat at all, but it pays per member instead, and at this
@@ -353,9 +356,10 @@ guard on that equivalence.
 implemented on top of `encoding/json/v2`, so it picks up the generated
 `MarshalJSONTo` / `UnmarshalJSONFrom` — and with those tuned for the streaming
 contract (see below) an unchanged `json.Marshal` / `json.Unmarshal` call site is
-**1.08×–1.17× faster** on three of the four measurements, and within 3% on the
-fourth. Under `encoding/json/v2` itself the picture is parity on small
-documents and 8–16% behind on the 616 KiB one.
+**1.06×–1.45× faster** on three of the four measurements, and 10% behind on the
+fourth. Under `encoding/json/v2` itself decoding is **1.36× faster** on the
+small document and 1.03× on the 616 KiB one, and encoding is 8–15% behind on
+both.
 
 **It still does not pay off on sonic or go-json.** Those call `MarshalJSON`,
 get a `[]byte` back, and re-validate it; their own encoders are reflection-free
@@ -387,7 +391,7 @@ came out of that, all measured:
 | `MarshalJSONTo` writes in a **stream mode**: no HTML escaping, no UTF-8 validation | `jsontext` does both while reformatting; doing them twice was ~3% of the encode |
 | the scratch buffer is a **pooled `*Buffer`**, not a `sync.Pool` of `[]byte` | `Put`ting a slice boxes its header — one allocation per call, 500 of them per encode of a 500-element slice |
 | the escape scan is **word-at-a-time** (SWAR over eight bytes) | 14% of the encode was a byte-at-a-time table loop; this cut ~6% off the large payload |
-| `UnmarshalJSONFrom` **drives the decoder token by token** instead of `ReadValue` + reparse | the document was being parsed twice; now it is parsed once, and strings skip odjson's UTF-8 pass because `jsontext` has already made it |
+| `UnmarshalJSONFrom` **drives the decoder token by token** on large documents instead of `ReadValue` + reparse | the document was being parsed twice; now it is parsed once, and strings skip odjson's UTF-8 pass because `jsontext` has already made it |
 
 Together those took `encoding/json` + `-methods` from 1.17–1.20× *slower* to
 1.08–1.17× *faster*, and `json/v2` from 1.38–1.48× slower to parity on small
@@ -413,6 +417,48 @@ is 255 KiB over 7463 members, or **34 bytes per member**, near the dense end.
 Interpolating puts a token-driven encoder at about 1.13× reflection there,
 which is where the value-driven form already is. Neither shape wins this
 payload, so the simpler one was kept.
+
+### What the decode side pays, and what was removed
+
+The decoder has a tax of its own. Every object member name that goes through
+`jsontext.Decoder`'s public API — `ReadToken`, `ReadValue`, `SkipValue`, or
+the names inside a value read whole — is inserted into a per-object namespace
+so that duplicates can be rejected, and that namespace is a linear scan over
+the names already seen, so an object with *k* members costs *k²/2* string
+comparisons. `json/v2`'s own struct decoder switches it off
+(`Tokens.Last.DisableNamespace()`) and tracks the fields it knows in a bitset;
+that call sits behind `export`, and the linker refuses a `go:linkname` to
+`encoding/json/internal.AllowInternalUse`. On `twitter`, whose `User` objects
+carry about forty members each, `objectNamespace.insert` is **19% of the
+generated decoder's profile** and 6% of reflection's. Together with the
+whitespace scan (10%) and the UTF-8 re-validation of non-ASCII strings (8%),
+65% of the generated decode happens inside `ReadValue`, and none of that is
+reachable from outside the package.
+
+What was left to odjson was measured and cut, all through `bench/ab`:
+
+| change | why it helps |
+| --- | --- |
+| **small values are read whole** (`odjsonrt.WholeValue`): when the unread buffer is at most 4 KiB and ends in a closing bracket, one `ReadValue` hands the bytes to a byte oriented decoder that trusts jsontext's validation and follows json/v2's semantics (`odjsonParseV2`) | a call per member costs more than a second scan of a few hundred bytes: `small` went from 1.72 µs to 1.40 µs. On `twitter` the same trade loses (1.19 ms against 1.07 ms), because the second scan walks 350 KiB of indentation and every unknown member again, so large values stay token driven |
+| **scalar containers are read whole** even inside a token driven object | `[1,2,3]` is one `ReadValue` and a scan, not seven decoder calls |
+| the next kind is read from **`UnreadBuffer`** (`odjsonrt.NextKind`) instead of `PeekKind` | `PeekKind` is a full state machine step whose checks the following `ReadValue` repeats; a peek at the buffer costs a few ns and falls back to `PeekKind` only when a streaming decoder has run dry |
+| a **string cache** shared by the whole decode, as `json/v2`'s reflection decoder has | a name or value that recurs is allocated once: 13 → 6 allocations on `small`, 4551 → 2977 on `twitter` |
+| scalars are parsed **straight from the `ReadValue` bytes**: integers in one pass over the digits, strings with a single `IndexByte` for the escape check | jsontext has already established the grammar, so re-scanning it was pure overhead |
+
+Those took `json/v2` + `-methods` from parity to **1.36× faster** on the small
+decode and to 1.03× on `twitter`, and `encoding/json` + `-methods` from 1.19×
+to **1.45×** on the small decode. The ceiling on `twitter` is set by the 65%
+above: with odjson's own share at zero, the row would read about 1.35×, and
+with its share halved again, which is what remains realistic, about 1.1×.
+
+The whole-value path is the reason a struct with `-methods` carries two
+decoders besides the `encoding/json` one: `odjsonParseFrom`, which drives the
+decoder, and `odjsonParseV2`, which parses bytes under json/v2's rules. Which
+one runs is decided at runtime, per value, by the buffer test above. A
+streaming decoder over an `io.Reader` starts with a 64 byte buffer that rarely
+ends in a bracket, so it is driven token by token and keeps its memory bounded;
+when a chunk does end in a bracket, `ReadValue` fetches the rest of that value,
+which is correct, only buffered rather than streamed.
 
 ### `-methods` follows each library's semantics
 
