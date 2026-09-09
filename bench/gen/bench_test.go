@@ -179,37 +179,54 @@ func TestGeneratedMatchesReflection(t *testing.T) {
 				t.Fatalf("fixture is not valid JSON: %v", err)
 			}
 
-			// The premise of -methods=true: every host library honours
-			// MarshalJSON, so all four must hand back exactly the bytes the
-			// generated encoder produced.
+			// The premise of -methods: every host library honours the
+			// generated codec. sonic and go-json call MarshalJSON, so their
+			// bytes must equal the direct encoder's exactly. encoding/json
+			// and encoding/json/v2 are both json/v2 on this toolchain and
+			// call MarshalJSONTo, which deliberately follows json/v2's own
+			// semantics (nil slices encode as [], not null), so for those the
+			// check is that the value survives a round trip through the
+			// generated pair.
 			for _, c := range codecs {
-				if c.name == "odjson-direct" {
+				switch c.name {
+				case "odjson-direct":
 					continue
-				}
-				viaHost, err := c.marshal(p.decoded)
-				if err != nil {
-					t.Fatalf("%s marshal: %v", c.name, err)
-				}
-				if c.name == "json-v2" {
-					// encoding/json/v2 re-canonicalises the value handed to
-					// jsontext.Encoder.WriteValue: it does not escape HTML by
-					// default, so odjson's \u003c sequences come back as
-					// literal characters. Compare meaning, not bytes.
-					var a, b any
-					if err := jsonv1.Unmarshal(direct, &a); err != nil {
-						t.Fatalf("odjson output: %v", err)
+				case "encoding-json", "json-v2":
+					viaHost, err := c.marshal(p.decoded)
+					if err != nil {
+						t.Fatalf("%s marshal: %v", c.name, err)
 					}
-					if err := jsonv1.Unmarshal(viaHost, &b); err != nil {
-						t.Fatalf("json-v2 output: %v", err)
+					again := p.newValue()
+					if err := c.unmarshal(viaHost, again); err != nil {
+						t.Fatalf("%s re-decode: %v", c.name, err)
 					}
-					if !reflect.DeepEqual(a, b) {
-						t.Error("json-v2 did not route through the generated codec")
+					stable, err := c.marshal(again)
+					if err != nil {
+						t.Fatalf("%s re-encode: %v", c.name, err)
 					}
-					continue
-				}
-				if !bytes.Equal(direct, viaHost) {
-					t.Errorf("%s did not route through the generated codec (%d bytes vs %d)",
-						c.name, len(viaHost), len(direct))
+					// Compare as values, not bytes: json/v2 writes object
+					// members in map iteration order, so neither its own
+					// output nor odjson's ModeStream output is byte stable
+					// for a document containing maps.
+					var a, b2 any
+					if err := jsonv1.Unmarshal(viaHost, &a); err != nil {
+						t.Fatalf("%s output: %v", c.name, err)
+					}
+					if err := jsonv1.Unmarshal(stable, &b2); err != nil {
+						t.Fatalf("%s output: %v", c.name, err)
+					}
+					if !reflect.DeepEqual(a, b2) {
+						t.Errorf("%s is not stable across the generated pair", c.name)
+					}
+				default:
+					viaHost, err := c.marshal(p.decoded)
+					if err != nil {
+						t.Fatalf("%s marshal: %v", c.name, err)
+					}
+					if !bytes.Equal(direct, viaHost) {
+						t.Errorf("%s did not route through the generated codec (%d bytes vs %d)",
+							c.name, len(viaHost), len(direct))
+					}
 				}
 			}
 

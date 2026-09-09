@@ -9,14 +9,14 @@ import (
 )
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Deep) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Deep) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"deep_only\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.DeepOnly), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.DeepOnly), m)
 	dst = append(dst, ",\"shared\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Shared), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Shared), m)
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -50,7 +50,6 @@ func (v *Deep) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "deep_only":
@@ -59,10 +58,11 @@ func (v *Deep) odjsonParse(data []byte, p int) (int, error) {
 			idx = 1
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "deep_only"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "deep_only"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "shared"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "shared"):
 				idx = 1
 			}
 		}
@@ -92,6 +92,7 @@ func (v *Deep) odjsonParse(data []byte, p int) (int, error) {
 				v.Shared = x6
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -114,7 +115,7 @@ func (v *Deep) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendDeep appends the JSON encoding of v to dst.
 func AppendDeep(dst []byte, v *Deep) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeDeep sizes the buffer MarshalDeep allocates.
@@ -122,7 +123,7 @@ var odjsonSizeDeep odjsonrt.SizeHint
 
 // MarshalDeep returns the JSON encoding of v.
 func MarshalDeep(v *Deep) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeDeep.New())
+	buf, err := v.odjsonAppend(odjsonSizeDeep.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -140,14 +141,14 @@ func UnmarshalDeep(data []byte, v *Deep) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Mid) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Mid) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"deep_only\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Deep.DeepOnly), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Deep.DeepOnly), m)
 	dst = append(dst, ",\"shared\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Shared), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Shared), m)
 	dst = append(dst, ",\"mid_only\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.MidOnly))
 	if len(dst) == start {
@@ -183,7 +184,6 @@ func (v *Mid) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "deep_only":
@@ -194,12 +194,13 @@ func (v *Mid) odjsonParse(data []byte, p int) (int, error) {
 			idx = 2
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "deep_only"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "deep_only"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "shared"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "shared"):
 				idx = 1
-			case odjsonrt.EqualFold(key, "mid_only"):
+			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "mid_only"):
 				idx = 2
 			}
 		}
@@ -241,6 +242,7 @@ func (v *Mid) odjsonParse(data []byte, p int) (int, error) {
 				v.MidOnly = int(x15)
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -263,7 +265,7 @@ func (v *Mid) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendMid appends the JSON encoding of v to dst.
 func AppendMid(dst []byte, v *Mid) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeMid sizes the buffer MarshalMid allocates.
@@ -271,7 +273,7 @@ var odjsonSizeMid odjsonrt.SizeHint
 
 // MarshalMid returns the JSON encoding of v.
 func MarshalMid(v *Mid) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeMid.New())
+	buf, err := v.odjsonAppend(odjsonSizeMid.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -289,14 +291,14 @@ func UnmarshalMid(data []byte, v *Mid) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *LeftConflict) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *LeftConflict) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"Clash\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Clash), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Clash), m)
 	dst = append(dst, ",\"left\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Left), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Left), m)
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -330,7 +332,6 @@ func (v *LeftConflict) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "Clash":
@@ -339,10 +340,11 @@ func (v *LeftConflict) odjsonParse(data []byte, p int) (int, error) {
 			idx = 1
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "Clash"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "Clash"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "left"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "left"):
 				idx = 1
 			}
 		}
@@ -372,6 +374,7 @@ func (v *LeftConflict) odjsonParse(data []byte, p int) (int, error) {
 				v.Left = x21
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -394,7 +397,7 @@ func (v *LeftConflict) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendLeftConflict appends the JSON encoding of v to dst.
 func AppendLeftConflict(dst []byte, v *LeftConflict) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeLeftConflict sizes the buffer MarshalLeftConflict allocates.
@@ -402,7 +405,7 @@ var odjsonSizeLeftConflict odjsonrt.SizeHint
 
 // MarshalLeftConflict returns the JSON encoding of v.
 func MarshalLeftConflict(v *LeftConflict) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeLeftConflict.New())
+	buf, err := v.odjsonAppend(odjsonSizeLeftConflict.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -420,14 +423,14 @@ func UnmarshalLeftConflict(data []byte, v *LeftConflict) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *RightConflict) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *RightConflict) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"Clash\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Clash), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Clash), m)
 	dst = append(dst, ",\"right\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Right), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Right), m)
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -461,7 +464,6 @@ func (v *RightConflict) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "Clash":
@@ -470,10 +472,11 @@ func (v *RightConflict) odjsonParse(data []byte, p int) (int, error) {
 			idx = 1
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "Clash"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "Clash"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "right"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "right"):
 				idx = 1
 			}
 		}
@@ -503,6 +506,7 @@ func (v *RightConflict) odjsonParse(data []byte, p int) (int, error) {
 				v.Right = x27
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -525,7 +529,7 @@ func (v *RightConflict) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendRightConflict appends the JSON encoding of v to dst.
 func AppendRightConflict(dst []byte, v *RightConflict) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeRightConflict sizes the buffer MarshalRightConflict allocates.
@@ -533,7 +537,7 @@ var odjsonSizeRightConflict odjsonrt.SizeHint
 
 // MarshalRightConflict returns the JSON encoding of v.
 func MarshalRightConflict(v *RightConflict) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeRightConflict.New())
+	buf, err := v.odjsonAppend(odjsonSizeRightConflict.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -551,12 +555,12 @@ func UnmarshalRightConflict(data []byte, v *RightConflict) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *UntaggedSide) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *UntaggedSide) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"Winner\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Winner), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Winner), m)
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -590,15 +594,15 @@ func (v *UntaggedSide) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "Winner":
 			idx = 0
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "Winner"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "Winner"):
 				idx = 0
 			}
 		}
@@ -616,6 +620,7 @@ func (v *UntaggedSide) odjsonParse(data []byte, p int) (int, error) {
 				v.Winner = x30
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -638,7 +643,7 @@ func (v *UntaggedSide) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendUntaggedSide appends the JSON encoding of v to dst.
 func AppendUntaggedSide(dst []byte, v *UntaggedSide) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeUntaggedSide sizes the buffer MarshalUntaggedSide allocates.
@@ -646,7 +651,7 @@ var odjsonSizeUntaggedSide odjsonrt.SizeHint
 
 // MarshalUntaggedSide returns the JSON encoding of v.
 func MarshalUntaggedSide(v *UntaggedSide) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeUntaggedSide.New())
+	buf, err := v.odjsonAppend(odjsonSizeUntaggedSide.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -664,12 +669,12 @@ func UnmarshalUntaggedSide(data []byte, v *UntaggedSide) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *TaggedSide) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *TaggedSide) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"Winner\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Winner), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Winner), m)
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -703,15 +708,15 @@ func (v *TaggedSide) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "Winner":
 			idx = 0
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "Winner"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "Winner"):
 				idx = 0
 			}
 		}
@@ -729,6 +734,7 @@ func (v *TaggedSide) odjsonParse(data []byte, p int) (int, error) {
 				v.Winner = x33
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -751,7 +757,7 @@ func (v *TaggedSide) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendTaggedSide appends the JSON encoding of v to dst.
 func AppendTaggedSide(dst []byte, v *TaggedSide) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeTaggedSide sizes the buffer MarshalTaggedSide allocates.
@@ -759,7 +765,7 @@ var odjsonSizeTaggedSide odjsonrt.SizeHint
 
 // MarshalTaggedSide returns the JSON encoding of v.
 func MarshalTaggedSide(v *TaggedSide) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeTaggedSide.New())
+	buf, err := v.odjsonAppend(odjsonSizeTaggedSide.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -777,7 +783,7 @@ func UnmarshalTaggedSide(data []byte, v *TaggedSide) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *PtrPart) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *PtrPart) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
@@ -816,15 +822,15 @@ func (v *PtrPart) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "ptr_only":
 			idx = 0
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "ptr_only"):
+			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "ptr_only"):
 				idx = 0
 			}
 		}
@@ -842,6 +848,7 @@ func (v *PtrPart) odjsonParse(data []byte, p int) (int, error) {
 				v.PtrOnly = int(x36)
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -864,7 +871,7 @@ func (v *PtrPart) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendPtrPart appends the JSON encoding of v to dst.
 func AppendPtrPart(dst []byte, v *PtrPart) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizePtrPart sizes the buffer MarshalPtrPart allocates.
@@ -872,7 +879,7 @@ var odjsonSizePtrPart odjsonrt.SizeHint
 
 // MarshalPtrPart returns the JSON encoding of v.
 func MarshalPtrPart(v *PtrPart) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizePtrPart.New())
+	buf, err := v.odjsonAppend(odjsonSizePtrPart.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -890,7 +897,7 @@ func UnmarshalPtrPart(data []byte, v *PtrPart) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Named) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Named) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
@@ -929,15 +936,15 @@ func (v *Named) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "value":
 			idx = 0
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "value"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "value"):
 				idx = 0
 			}
 		}
@@ -955,6 +962,7 @@ func (v *Named) odjsonParse(data []byte, p int) (int, error) {
 				v.Value = int(x39)
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -977,7 +985,7 @@ func (v *Named) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendNamed appends the JSON encoding of v to dst.
 func AppendNamed(dst []byte, v *Named) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeNamed sizes the buffer MarshalNamed allocates.
@@ -985,7 +993,7 @@ var odjsonSizeNamed odjsonrt.SizeHint
 
 // MarshalNamed returns the JSON encoding of v.
 func MarshalNamed(v *Named) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeNamed.New())
+	buf, err := v.odjsonAppend(odjsonSizeNamed.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -1003,35 +1011,35 @@ func UnmarshalNamed(data []byte, v *Named) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Promoted) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Promoted) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"deep_only\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Mid.Deep.DeepOnly), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Mid.Deep.DeepOnly), m)
 	dst = append(dst, ",\"shared\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Mid.Shared), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Mid.Shared), m)
 	dst = append(dst, ",\"mid_only\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Mid.MidOnly))
 	dst = append(dst, ",\"left\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.LeftConflict.Left), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.LeftConflict.Left), m)
 	dst = append(dst, ",\"right\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.RightConflict.Right), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.RightConflict.Right), m)
 	dst = append(dst, ",\"Winner\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.TaggedSide.Winner), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.TaggedSide.Winner), m)
 	if v.PtrPart != nil {
 		dst = append(dst, ",\"ptr_only\":"...)
 		dst = odjsonrt.AppendInt(dst, int64(v.PtrPart.PtrOnly))
 	}
 	dst = append(dst, ",\"Label\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Label), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Label), m)
 	dst = append(dst, ",\"named\":"...)
-	dst, err = v.Named.odjsonAppend(dst)
+	dst, err = v.Named.odjsonAppend(dst, m)
 	if err != nil {
 		return nil, err
 	}
 	dst = append(dst, ",\"own\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Own), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Own), m)
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -1065,7 +1073,6 @@ func (v *Promoted) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "deep_only":
@@ -1090,26 +1097,27 @@ func (v *Promoted) odjsonParse(data []byte, p int) (int, error) {
 			idx = 9
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "deep_only"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "deep_only"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "shared"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "shared"):
 				idx = 1
-			case odjsonrt.EqualFold(key, "mid_only"):
+			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "mid_only"):
 				idx = 2
-			case odjsonrt.EqualFold(key, "left"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "left"):
 				idx = 3
-			case odjsonrt.EqualFold(key, "right"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "right"):
 				idx = 4
-			case odjsonrt.EqualFold(key, "Winner"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "Winner"):
 				idx = 5
-			case odjsonrt.EqualFold(key, "ptr_only"):
+			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "ptr_only"):
 				idx = 6
-			case odjsonrt.EqualFold(key, "Label"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "Label"):
 				idx = 7
-			case odjsonrt.EqualFold(key, "named"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "named"):
 				idx = 8
-			case odjsonrt.EqualFold(key, "own"):
+			case (len(key) == 3 || fold) && odjsonrt.EqualFold(key, "own"):
 				idx = 9
 			}
 		}
@@ -1214,28 +1222,24 @@ func (v *Promoted) odjsonParse(data []byte, p int) (int, error) {
 				v.Label = Label(x63)
 			}
 		case 8:
+			p, err = v.Named.odjsonParse(data, p)
+			if err != nil {
+				return p, err
+			}
+		case 9:
 			p = odjsonrt.SkipSpace(data, p)
 			if np64, ok65 := odjsonrt.ParseNull(data, p); ok65 {
 				p = np64
 			} else {
-				p, err = v.Named.odjsonParse(data, p)
+				var x66 string
+				x66, p, err = odjsonrt.ParseString(data, p)
 				if err != nil {
 					return p, err
 				}
-			}
-		case 9:
-			p = odjsonrt.SkipSpace(data, p)
-			if np66, ok67 := odjsonrt.ParseNull(data, p); ok67 {
-				p = np66
-			} else {
-				var x68 string
-				x68, p, err = odjsonrt.ParseString(data, p)
-				if err != nil {
-					return p, err
-				}
-				v.Own = x68
+				v.Own = x66
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -1258,7 +1262,7 @@ func (v *Promoted) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendPromoted appends the JSON encoding of v to dst.
 func AppendPromoted(dst []byte, v *Promoted) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizePromoted sizes the buffer MarshalPromoted allocates.
@@ -1266,7 +1270,7 @@ var odjsonSizePromoted odjsonrt.SizeHint
 
 // MarshalPromoted returns the JSON encoding of v.
 func MarshalPromoted(v *Promoted) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizePromoted.New())
+	buf, err := v.odjsonAppend(odjsonSizePromoted.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -1284,12 +1288,12 @@ func UnmarshalPromoted(data []byte, v *Promoted) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *ShallowWins) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *ShallowWins) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"deep_only\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Deep.DeepOnly), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Deep.DeepOnly), m)
 	dst = append(dst, ",\"shared\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Shared))
 	if len(dst) == start {
@@ -1325,7 +1329,6 @@ func (v *ShallowWins) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "deep_only":
@@ -1334,39 +1337,41 @@ func (v *ShallowWins) odjsonParse(data []byte, p int) (int, error) {
 			idx = 1
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "deep_only"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "deep_only"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "shared"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "shared"):
 				idx = 1
 			}
 		}
 		switch idx {
 		case 0:
 			p = odjsonrt.SkipSpace(data, p)
-			if np69, ok70 := odjsonrt.ParseNull(data, p); ok70 {
-				p = np69
+			if np67, ok68 := odjsonrt.ParseNull(data, p); ok68 {
+				p = np67
 			} else {
-				var x71 string
-				x71, p, err = odjsonrt.ParseString(data, p)
+				var x69 string
+				x69, p, err = odjsonrt.ParseString(data, p)
 				if err != nil {
 					return p, err
 				}
-				v.Deep.DeepOnly = x71
+				v.Deep.DeepOnly = x69
 			}
 		case 1:
 			p = odjsonrt.SkipSpace(data, p)
-			if np72, ok73 := odjsonrt.ParseNull(data, p); ok73 {
-				p = np72
+			if np70, ok71 := odjsonrt.ParseNull(data, p); ok71 {
+				p = np70
 			} else {
-				var x74 int64
-				x74, p, err = odjsonrt.ParseInt(data, p, 64)
+				var x72 int64
+				x72, p, err = odjsonrt.ParseInt(data, p, 64)
 				if err != nil {
 					return p, err
 				}
-				v.Shared = int(x74)
+				v.Shared = int(x72)
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -1389,7 +1394,7 @@ func (v *ShallowWins) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendShallowWins appends the JSON encoding of v to dst.
 func AppendShallowWins(dst []byte, v *ShallowWins) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeShallowWins sizes the buffer MarshalShallowWins allocates.
@@ -1397,7 +1402,7 @@ var odjsonSizeShallowWins odjsonrt.SizeHint
 
 // MarshalShallowWins returns the JSON encoding of v.
 func MarshalShallowWins(v *ShallowWins) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeShallowWins.New())
+	buf, err := v.odjsonAppend(odjsonSizeShallowWins.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}

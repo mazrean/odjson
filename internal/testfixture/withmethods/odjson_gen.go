@@ -5,20 +5,21 @@
 package withmethods
 
 import (
+	"bytes"
 	"encoding/json/jsontext"
 	"github.com/mazrean/odjson/odjsonrt"
 )
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Address) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Address) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"street\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Street), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Street), m)
 	if len(v.City) != 0 {
 		dst = append(dst, ",\"city\":"...)
-		dst = odjsonrt.AppendString(dst, string(v.City), true)
+		dst = odjsonrt.AppendStringMode(dst, string(v.City), m)
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
@@ -53,7 +54,6 @@ func (v *Address) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "street":
@@ -62,10 +62,11 @@ func (v *Address) odjsonParse(data []byte, p int) (int, error) {
 			idx = 1
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "street"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "street"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "city"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "city"):
 				idx = 1
 			}
 		}
@@ -95,6 +96,7 @@ func (v *Address) odjsonParse(data []byte, p int) (int, error) {
 				v.City = x6
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -115,9 +117,96 @@ func (v *Address) odjsonParse(data []byte, p int) (int, error) {
 	}
 }
 
+// odjsonParseFrom decodes the next value in dec into v,
+// driving the decoder token by token so the document is
+// parsed once rather than twice.
+func (v *Address) odjsonParseFrom(dec *jsontext.Decoder) error {
+	var err error
+	_ = err
+	switch k := dec.PeekKind(); k {
+	case 'n':
+		_, err = dec.ReadToken()
+		return err
+	case '{':
+	default:
+		return odjsonrt.ErrKind(byte(k), "Address")
+	}
+	if _, err = dec.ReadToken(); err != nil {
+		return err
+	}
+	for dec.PeekKind() != '}' {
+		var key jsontext.Value
+		key, err = dec.ReadValue()
+		if err != nil {
+			return err
+		}
+		idx := -1
+		switch string(key) {
+		case "\"street\"":
+			idx = 0
+		case "\"city\"":
+			idx = 1
+		}
+		if idx < 0 && bytes.IndexByte(key, '\\') >= 0 {
+			if name, ok := odjsonrt.UnquoteName(key); ok {
+				switch string(name) {
+				case "street":
+					idx = 0
+				case "city":
+					idx = 1
+				}
+			}
+		}
+		switch idx {
+		case 0:
+			var val7 jsontext.Value
+			val7, err = dec.ReadValue()
+			if err != nil {
+				return err
+			}
+			vp8 := 0
+			if np9, ok10 := odjsonrt.ParseNull(val7, vp8); ok10 {
+				vp8 = np9
+			} else {
+				var x11 string
+				x11, vp8, err = odjsonrt.ParseStringTrusted(val7, vp8)
+				if err != nil {
+					return err
+				}
+				v.Street = x11
+			}
+			_ = vp8
+		case 1:
+			var val12 jsontext.Value
+			val12, err = dec.ReadValue()
+			if err != nil {
+				return err
+			}
+			vp13 := 0
+			if np14, ok15 := odjsonrt.ParseNull(val12, vp13); ok15 {
+				vp13 = np14
+			} else {
+				var x16 string
+				x16, vp13, err = odjsonrt.ParseStringTrusted(val12, vp13)
+				if err != nil {
+					return err
+				}
+				v.City = x16
+			}
+			_ = vp13
+		default:
+			if _, err = dec.ReadValue(); err != nil {
+				return err
+			}
+		}
+	}
+	_, err = dec.ReadToken()
+	return err
+}
+
 // AppendAddress appends the JSON encoding of v to dst.
 func AppendAddress(dst []byte, v *Address) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeAddress sizes the buffer MarshalAddress allocates.
@@ -125,7 +214,7 @@ var odjsonSizeAddress odjsonrt.SizeHint
 
 // MarshalAddress returns the JSON encoding of v.
 func MarshalAddress(v *Address) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeAddress.New())
+	buf, err := v.odjsonAppend(odjsonSizeAddress.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -154,32 +243,32 @@ func (v *Address) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Address) MarshalJSONTo(enc *jsontext.Encoder) error {
-	buf, err := v.odjsonAppend(odjsonrt.AcquireBuffer())
-	if err != nil {
-		odjsonrt.ReleaseBuffer(buf)
-		return err
+	// WriteValue copies what it is given, so the scratch buffer can go
+	// straight back to the pool. ModeStream leaves the HTML escaping and
+	// the UTF-8 validation to the encoder, which performs both while
+	// reformatting the value either way.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	if buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeStream); err == nil {
+		odjsonSizeAddress.Record(buf.B)
+		err = enc.WriteValue(buf.B)
 	}
-	err = enc.WriteValue(buf)
-	odjsonrt.ReleaseBuffer(buf)
+	odjsonrt.PutBuffer(buf)
 	return err
 }
 
 // UnmarshalJSONFrom implements encoding/json/v2.UnmarshalerFrom.
 func (v *Address) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	val, err := dec.ReadValue()
-	if err != nil {
-		return err
-	}
-	return UnmarshalAddress(val, v)
+	return v.odjsonParseFrom(dec)
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Person) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Person) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"name\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Name), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Name), m)
 	dst = append(dst, ",\"age\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Age))
 	if v.Email != nil {
@@ -187,26 +276,26 @@ func (v *Person) odjsonAppend(dst []byte) ([]byte, error) {
 		if v.Email == nil {
 			dst = append(dst, 'n', 'u', 'l', 'l')
 		} else {
-			dst = odjsonrt.AppendString(dst, string((*v.Email)), true)
+			dst = odjsonrt.AppendStringMode(dst, string((*v.Email)), m)
 		}
 	}
 	if len(v.Tags) != 0 {
 		dst = append(dst, ",\"tags\":"...)
 		if v.Tags == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = odjsonrt.AppendNilSlice(dst, m)
 		} else {
 			dst = append(dst, '[')
-			for i7 := range v.Tags {
-				if i7 > 0 {
+			for i17 := range v.Tags {
+				if i17 > 0 {
 					dst = append(dst, ',')
 				}
-				dst = odjsonrt.AppendString(dst, string(v.Tags[i7]), true)
+				dst = odjsonrt.AppendStringMode(dst, string(v.Tags[i17]), m)
 			}
 			dst = append(dst, ']')
 		}
 	}
 	dst = append(dst, ",\"address\":"...)
-	dst, err = v.Address.odjsonAppend(dst)
+	dst, err = v.Address.odjsonAppend(dst, m)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +332,6 @@ func (v *Person) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "name":
@@ -258,94 +346,98 @@ func (v *Person) odjsonParse(data []byte, p int) (int, error) {
 			idx = 4
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "name"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "name"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "age"):
+			case (len(key) == 3 || fold) && odjsonrt.EqualFold(key, "age"):
 				idx = 1
-			case odjsonrt.EqualFold(key, "email"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "email"):
 				idx = 2
-			case odjsonrt.EqualFold(key, "tags"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "tags"):
 				idx = 3
-			case odjsonrt.EqualFold(key, "address"):
+			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "address"):
 				idx = 4
 			}
 		}
 		switch idx {
 		case 0:
 			p = odjsonrt.SkipSpace(data, p)
-			if np8, ok9 := odjsonrt.ParseNull(data, p); ok9 {
-				p = np8
+			if np18, ok19 := odjsonrt.ParseNull(data, p); ok19 {
+				p = np18
 			} else {
-				var x10 string
-				x10, p, err = odjsonrt.ParseString(data, p)
+				var x20 string
+				x20, p, err = odjsonrt.ParseString(data, p)
 				if err != nil {
 					return p, err
 				}
-				v.Name = x10
+				v.Name = x20
 			}
 		case 1:
 			p = odjsonrt.SkipSpace(data, p)
-			if np11, ok12 := odjsonrt.ParseNull(data, p); ok12 {
-				p = np11
+			if np21, ok22 := odjsonrt.ParseNull(data, p); ok22 {
+				p = np21
 			} else {
-				var x13 int64
-				x13, p, err = odjsonrt.ParseInt(data, p, 64)
+				var x23 int64
+				x23, p, err = odjsonrt.ParseInt(data, p, 64)
 				if err != nil {
 					return p, err
 				}
-				v.Age = int(x13)
+				v.Age = int(x23)
 			}
 		case 2:
 			p = odjsonrt.SkipSpace(data, p)
-			if np14, ok15 := odjsonrt.ParseNull(data, p); ok15 {
+			if np24, ok25 := odjsonrt.ParseNull(data, p); ok25 {
 				v.Email = nil
-				p = np14
+				p = np24
 			} else {
 				if v.Email == nil {
 					v.Email = new(string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if np16, ok17 := odjsonrt.ParseNull(data, p); ok17 {
-					p = np16
+				if np26, ok27 := odjsonrt.ParseNull(data, p); ok27 {
+					p = np26
 				} else {
-					var x18 string
-					x18, p, err = odjsonrt.ParseString(data, p)
+					var x28 string
+					x28, p, err = odjsonrt.ParseString(data, p)
 					if err != nil {
 						return p, err
 					}
-					(*v.Email) = x18
+					(*v.Email) = x28
 				}
 			}
 		case 3:
 			p = odjsonrt.SkipSpace(data, p)
-			if np19, ok20 := odjsonrt.ParseNull(data, p); ok20 {
-				p = np19
+			if np29, ok30 := odjsonrt.ParseNull(data, p); ok30 {
+				p = np29
 				v.Tags = nil
 			} else {
 				if p >= len(data) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]string")
 				}
 				p++
-				s21 := v.Tags[:0]
+				s31 := v.Tags[:0]
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == ']' {
 					p++
 				} else {
+					if cap(s31) == 0 {
+						s31 = make([]string, 0, 4)
+					}
 					for {
-						var e22 string
+						var e32 string
 						p = odjsonrt.SkipSpace(data, p)
-						if np23, ok24 := odjsonrt.ParseNull(data, p); ok24 {
-							p = np23
+						if np33, ok34 := odjsonrt.ParseNull(data, p); ok34 {
+							p = np33
 						} else {
-							var x25 string
-							x25, p, err = odjsonrt.ParseString(data, p)
+							var x35 string
+							x35, p, err = odjsonrt.ParseString(data, p)
 							if err != nil {
 								return p, err
 							}
-							e22 = x25
+							e32 = x35
 						}
-						s21 = append(s21, e22)
+						s31 = append(s31, e32)
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -361,22 +453,18 @@ func (v *Person) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
 				}
-				if s21 == nil {
-					s21 = []string{}
+				if s31 == nil {
+					s31 = []string{}
 				}
-				v.Tags = s21
+				v.Tags = s31
 			}
 		case 4:
-			p = odjsonrt.SkipSpace(data, p)
-			if np26, ok27 := odjsonrt.ParseNull(data, p); ok27 {
-				p = np26
-			} else {
-				p, err = v.Address.odjsonParse(data, p)
-				if err != nil {
-					return p, err
-				}
+			p, err = v.Address.odjsonParse(data, p)
+			if err != nil {
+				return p, err
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -397,9 +485,186 @@ func (v *Person) odjsonParse(data []byte, p int) (int, error) {
 	}
 }
 
+// odjsonParseFrom decodes the next value in dec into v,
+// driving the decoder token by token so the document is
+// parsed once rather than twice.
+func (v *Person) odjsonParseFrom(dec *jsontext.Decoder) error {
+	var err error
+	_ = err
+	switch k := dec.PeekKind(); k {
+	case 'n':
+		_, err = dec.ReadToken()
+		return err
+	case '{':
+	default:
+		return odjsonrt.ErrKind(byte(k), "Person")
+	}
+	if _, err = dec.ReadToken(); err != nil {
+		return err
+	}
+	for dec.PeekKind() != '}' {
+		var key jsontext.Value
+		key, err = dec.ReadValue()
+		if err != nil {
+			return err
+		}
+		idx := -1
+		switch string(key) {
+		case "\"name\"":
+			idx = 0
+		case "\"age\"":
+			idx = 1
+		case "\"email\"":
+			idx = 2
+		case "\"tags\"":
+			idx = 3
+		case "\"address\"":
+			idx = 4
+		}
+		if idx < 0 && bytes.IndexByte(key, '\\') >= 0 {
+			if name, ok := odjsonrt.UnquoteName(key); ok {
+				switch string(name) {
+				case "name":
+					idx = 0
+				case "age":
+					idx = 1
+				case "email":
+					idx = 2
+				case "tags":
+					idx = 3
+				case "address":
+					idx = 4
+				}
+			}
+		}
+		switch idx {
+		case 0:
+			var val36 jsontext.Value
+			val36, err = dec.ReadValue()
+			if err != nil {
+				return err
+			}
+			vp37 := 0
+			if np38, ok39 := odjsonrt.ParseNull(val36, vp37); ok39 {
+				vp37 = np38
+			} else {
+				var x40 string
+				x40, vp37, err = odjsonrt.ParseStringTrusted(val36, vp37)
+				if err != nil {
+					return err
+				}
+				v.Name = x40
+			}
+			_ = vp37
+		case 1:
+			var val41 jsontext.Value
+			val41, err = dec.ReadValue()
+			if err != nil {
+				return err
+			}
+			vp42 := 0
+			if np43, ok44 := odjsonrt.ParseNull(val41, vp42); ok44 {
+				vp42 = np43
+			} else {
+				var x45 int64
+				x45, vp42, err = odjsonrt.ParseInt(val41, vp42, 64)
+				if err != nil {
+					return err
+				}
+				v.Age = int(x45)
+			}
+			_ = vp42
+		case 2:
+			if dec.PeekKind() == 'n' {
+				if _, err = dec.ReadToken(); err != nil {
+					return err
+				}
+				v.Email = nil
+			} else {
+				if v.Email == nil {
+					v.Email = new(string)
+				}
+				var val46 jsontext.Value
+				val46, err = dec.ReadValue()
+				if err != nil {
+					return err
+				}
+				vp47 := 0
+				if np48, ok49 := odjsonrt.ParseNull(val46, vp47); ok49 {
+					vp47 = np48
+				} else {
+					var x50 string
+					x50, vp47, err = odjsonrt.ParseStringTrusted(val46, vp47)
+					if err != nil {
+						return err
+					}
+					(*v.Email) = x50
+				}
+				_ = vp47
+			}
+		case 3:
+			switch k := dec.PeekKind(); k {
+			case 'n':
+				if _, err = dec.ReadToken(); err != nil {
+					return err
+				}
+				v.Tags = nil
+			case '[':
+				if _, err = dec.ReadToken(); err != nil {
+					return err
+				}
+				s51 := v.Tags[:0]
+				if dec.PeekKind() != ']' && cap(s51) == 0 {
+					s51 = make([]string, 0, 4)
+				}
+				for dec.PeekKind() != ']' {
+					var e52 string
+					var val53 jsontext.Value
+					val53, err = dec.ReadValue()
+					if err != nil {
+						return err
+					}
+					vp54 := 0
+					if np55, ok56 := odjsonrt.ParseNull(val53, vp54); ok56 {
+						vp54 = np55
+					} else {
+						var x57 string
+						x57, vp54, err = odjsonrt.ParseStringTrusted(val53, vp54)
+						if err != nil {
+							return err
+						}
+						e52 = x57
+					}
+					_ = vp54
+					s51 = append(s51, e52)
+				}
+				if _, err = dec.ReadToken(); err != nil {
+					return err
+				}
+				if s51 == nil {
+					s51 = []string{}
+				}
+				v.Tags = s51
+			default:
+				return odjsonrt.ErrKind(byte(k), "[]string")
+			}
+		case 4:
+			if err = v.Address.odjsonParseFrom(dec); err != nil {
+				return err
+			}
+		default:
+			if _, err = dec.ReadValue(); err != nil {
+				return err
+			}
+		}
+	}
+	_, err = dec.ReadToken()
+	return err
+}
+
 // AppendPerson appends the JSON encoding of v to dst.
 func AppendPerson(dst []byte, v *Person) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizePerson sizes the buffer MarshalPerson allocates.
@@ -407,7 +672,7 @@ var odjsonSizePerson odjsonrt.SizeHint
 
 // MarshalPerson returns the JSON encoding of v.
 func MarshalPerson(v *Person) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizePerson.New())
+	buf, err := v.odjsonAppend(odjsonSizePerson.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -436,21 +701,21 @@ func (v *Person) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Person) MarshalJSONTo(enc *jsontext.Encoder) error {
-	buf, err := v.odjsonAppend(odjsonrt.AcquireBuffer())
-	if err != nil {
-		odjsonrt.ReleaseBuffer(buf)
-		return err
+	// WriteValue copies what it is given, so the scratch buffer can go
+	// straight back to the pool. ModeStream leaves the HTML escaping and
+	// the UTF-8 validation to the encoder, which performs both while
+	// reformatting the value either way.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	if buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeStream); err == nil {
+		odjsonSizePerson.Record(buf.B)
+		err = enc.WriteValue(buf.B)
 	}
-	err = enc.WriteValue(buf)
-	odjsonrt.ReleaseBuffer(buf)
+	odjsonrt.PutBuffer(buf)
 	return err
 }
 
 // UnmarshalJSONFrom implements encoding/json/v2.UnmarshalerFrom.
 func (v *Person) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	val, err := dec.ReadValue()
-	if err != nil {
-		return err
-	}
-	return UnmarshalPerson(val, v)
+	return v.odjsonParseFrom(dec)
 }

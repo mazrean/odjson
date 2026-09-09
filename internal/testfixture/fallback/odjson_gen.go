@@ -9,12 +9,12 @@ import (
 )
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Fallbacks) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Fallbacks) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"generic\":"...)
-	dst, err = odjsonrt.AppendAny(dst, v.Generic, true)
+	dst, err = odjsonrt.AppendAnyMode(dst, v.Generic, m)
 	if err != nil {
 		return nil, err
 	}
@@ -22,23 +22,23 @@ func (v *Fallbacks) odjsonAppend(dst []byte) ([]byte, error) {
 	if v.GenericPtr == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
-		dst, err = odjsonrt.AppendAny(dst, (*v.GenericPtr), true)
+		dst, err = odjsonrt.AppendAnyMode(dst, (*v.GenericPtr), m)
 		if err != nil {
 			return nil, err
 		}
 	}
 	dst = append(dst, ",\"anon\":"...)
-	dst, err = odjsonrt.AppendAny(dst, v.Anon, true)
+	dst, err = odjsonrt.AppendAnyMode(dst, v.Anon, m)
 	if err != nil {
 		return nil, err
 	}
 	dst = append(dst, ",\"int_map\":"...)
-	dst, err = odjsonrt.AppendAny(dst, v.IntMap, true)
+	dst, err = odjsonrt.AppendAnyMode(dst, v.IntMap, m)
 	if err != nil {
 		return nil, err
 	}
 	dst = append(dst, ",\"custom\":"...)
-	dst, err = odjsonrt.AppendMarshaler(dst, v.Custom, true)
+	dst, err = odjsonrt.AppendMarshaler(dst, v.Custom, m.EscapeHTML())
 	if err != nil {
 		return nil, err
 	}
@@ -46,13 +46,13 @@ func (v *Fallbacks) odjsonAppend(dst []byte) ([]byte, error) {
 	if v.CustomPtr == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
-		dst, err = odjsonrt.AppendMarshaler(dst, (*v.CustomPtr), true)
+		dst, err = odjsonrt.AppendMarshaler(dst, (*v.CustomPtr), m.EscapeHTML())
 		if err != nil {
 			return nil, err
 		}
 	}
 	dst = append(dst, ",\"text\":"...)
-	dst, err = odjsonrt.AppendTextMarshaler(dst, v.Text, true)
+	dst, err = odjsonrt.AppendTextMarshaler(dst, v.Text, m.EscapeHTML())
 	if err != nil {
 		return nil, err
 	}
@@ -60,13 +60,13 @@ func (v *Fallbacks) odjsonAppend(dst []byte) ([]byte, error) {
 	if v.TextPtr == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
-		dst, err = odjsonrt.AppendTextMarshaler(dst, (*v.TextPtr), true)
+		dst, err = odjsonrt.AppendTextMarshaler(dst, (*v.TextPtr), m.EscapeHTML())
 		if err != nil {
 			return nil, err
 		}
 	}
 	dst = append(dst, ",\"plain\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Plain), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Plain), m)
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -100,7 +100,6 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "generic":
@@ -123,24 +122,25 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 			idx = 8
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "generic"):
+			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "generic"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "generic_ptr"):
+			case (len(key) == 11 || fold) && odjsonrt.EqualFold(key, "generic_ptr"):
 				idx = 1
-			case odjsonrt.EqualFold(key, "anon"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "anon"):
 				idx = 2
-			case odjsonrt.EqualFold(key, "int_map"):
+			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "int_map"):
 				idx = 3
-			case odjsonrt.EqualFold(key, "custom"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "custom"):
 				idx = 4
-			case odjsonrt.EqualFold(key, "custom_ptr"):
+			case (len(key) == 10 || fold) && odjsonrt.EqualFold(key, "custom_ptr"):
 				idx = 5
-			case odjsonrt.EqualFold(key, "text"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "text"):
 				idx = 6
-			case odjsonrt.EqualFold(key, "text_ptr"):
+			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "text_ptr"):
 				idx = 7
-			case odjsonrt.EqualFold(key, "plain"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "plain"):
 				idx = 8
 			}
 		}
@@ -255,6 +255,7 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 				v.Plain = x21
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -277,7 +278,7 @@ func (v *Fallbacks) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendFallbacks appends the JSON encoding of v to dst.
 func AppendFallbacks(dst []byte, v *Fallbacks) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeFallbacks sizes the buffer MarshalFallbacks allocates.
@@ -285,7 +286,7 @@ var odjsonSizeFallbacks odjsonrt.SizeHint
 
 // MarshalFallbacks returns the JSON encoding of v.
 func MarshalFallbacks(v *Fallbacks) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeFallbacks.New())
+	buf, err := v.odjsonAppend(odjsonSizeFallbacks.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}

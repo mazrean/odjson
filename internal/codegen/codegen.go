@@ -42,11 +42,29 @@ type generator struct {
 	n    int
 }
 
-// ctx names the variables a decoding fragment reads from.
+// ctx names the variables a decoding fragment reads from, and how it reports
+// failure.
 type ctx struct {
 	data string
 	pos  string
 	ret  string
+	// single makes the fragment return only an error, which is what the
+	// jsontext driven decoders need.
+	single bool
+	// trusted tells the fragment that the bytes came from a
+	// jsontext.Decoder, which has already validated their UTF-8.
+	trusted bool
+	// trimmed says the position is already at the first byte of the value,
+	// so the fragment's leading whitespace skip can be dropped.
+	trimmed bool
+}
+
+// fail renders the statement returning expr as the fragment's error.
+func (c ctx) fail(expr string) string {
+	if c.single {
+		return "return " + expr
+	}
+	return "return " + c.ret + ", " + expr
 }
 
 // Generate renders the complete generated file for pkg.
@@ -129,10 +147,10 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 	g.pf("")
 	if s.Local {
 		g.pf("// odjsonAppend appends the JSON encoding of v to dst.")
-		g.pf("func (v *%s) odjsonAppend(dst []byte) ([]byte, error) {", s.Expr)
+		g.pf("func (v *%s) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {", s.Expr)
 	} else {
 		g.pf("// %sAppend appends the JSON encoding of v to dst.", s.Helper)
-		g.pf("func %sAppend(dst []byte, v *%s) ([]byte, error) {", s.Helper, s.Expr)
+		g.pf("func %sAppend(dst []byte, v *%s, m odjsonrt.StringMode) ([]byte, error) {", s.Helper, s.Expr)
 	}
 	g.encodeStruct(s)
 	g.pf("}")
@@ -150,6 +168,24 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 	g.decodeStruct(s)
 	g.pf("}")
 
+	if g.opts.Methods && g.opts.JSONV2 {
+		g.pkg.Imports.Add(analyzer.JSONTextPath, "jsontext")
+		g.pf("")
+		if s.Local {
+			g.pf("// odjsonParseFrom decodes the next value in dec into v,")
+			g.pf("// driving the decoder token by token so the document is")
+			g.pf("// parsed once rather than twice.")
+			g.pf("func (v *%s) odjsonParseFrom(dec *jsontext.Decoder) error {", s.Expr)
+		} else {
+			g.pf("// %sParseFrom decodes the next value in dec into v,", s.Helper)
+			g.pf("// driving the decoder token by token so the document is")
+			g.pf("// parsed once rather than twice.")
+			g.pf("func %sParseFrom(dec *jsontext.Decoder, v *%s) error {", s.Helper, s.Expr)
+		}
+		g.decodeStructFrom(s)
+		g.pf("}")
+	}
+
 	if !s.Local {
 		return
 	}
@@ -158,7 +194,7 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 	g.pf("")
 	g.pf("// Append%s appends the JSON encoding of v to dst.", name)
 	g.pf("func Append%s(dst []byte, v *%s) ([]byte, error) {", name, s.Expr)
-	g.pf("\treturn v.odjsonAppend(dst)")
+	g.pf("\treturn v.odjsonAppend(dst, %s)", g.v1Mode())
 	g.pf("}")
 
 	g.pf("")
@@ -167,7 +203,7 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 	g.pf("")
 	g.pf("// Marshal%s returns the JSON encoding of v.", name)
 	g.pf("func Marshal%s(v *%s) ([]byte, error) {", name, s.Expr)
-	g.pf("\tbuf, err := v.odjsonAppend(odjsonSize%s.New())", name)
+	g.pf("\tbuf, err := v.odjsonAppend(odjsonSize%s.New(), %s)", name, g.v1Mode())
 	g.pf("\tif err != nil {")
 	g.pf("\t\treturn nil, err")
 	g.pf("\t}")
@@ -209,24 +245,24 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 	g.pf("")
 	g.pf("// MarshalJSONTo implements encoding/json/v2.MarshalerTo.")
 	g.pf("func (v %s) MarshalJSONTo(enc *jsontext.Encoder) error {", s.Expr)
-	g.pf("\tbuf, err := v.odjsonAppend(odjsonrt.AcquireBuffer())")
-	g.pf("\tif err != nil {")
-	g.pf("\t\todjsonrt.ReleaseBuffer(buf)")
-	g.pf("\t\treturn err")
+	g.pf("\t// WriteValue copies what it is given, so the scratch buffer can go")
+	g.pf("\t// straight back to the pool. ModeStream leaves the HTML escaping and")
+	g.pf("\t// the UTF-8 validation to the encoder, which performs both while")
+	g.pf("\t// reformatting the value either way.")
+	g.pf("\tbuf := odjsonrt.GetBuffer()")
+	g.pf("\tvar err error")
+	g.pf("\tif buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeStream); err == nil {")
+	g.pf("\t\todjsonSize%s.Record(buf.B)", name)
+	g.pf("\t\terr = enc.WriteValue(buf.B)")
 	g.pf("\t}")
-	g.pf("\terr = enc.WriteValue(buf)")
-	g.pf("\todjsonrt.ReleaseBuffer(buf)")
+	g.pf("\todjsonrt.PutBuffer(buf)")
 	g.pf("\treturn err")
 	g.pf("}")
 
 	g.pf("")
 	g.pf("// UnmarshalJSONFrom implements encoding/json/v2.UnmarshalerFrom.")
 	g.pf("func (v *%s) UnmarshalJSONFrom(dec *jsontext.Decoder) error {", s.Expr)
-	g.pf("\tval, err := dec.ReadValue()")
-	g.pf("\tif err != nil {")
-	g.pf("\t\treturn err")
-	g.pf("\t}")
-	g.pf("\treturn Unmarshal%s(val, v)", name)
+	g.pf("\treturn v.odjsonParseFrom(dec)")
 	g.pf("}")
 }
 

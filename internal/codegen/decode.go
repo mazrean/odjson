@@ -9,7 +9,7 @@ import (
 
 func (g *generator) decErr(c ctx, n int) {
 	g.pf("%sif err != nil {", ind(n))
-	g.pf("%sreturn %s, err", ind(n+1), c.ret)
+	g.pf("%s%s", ind(n+1), c.fail("err"))
 	g.pf("%s}", ind(n))
 }
 
@@ -36,7 +36,6 @@ func (g *generator) decodeStruct(s *analyzer.StructInfo) {
 	g.pf("\t\tif err != nil {")
 	g.pf("\t\t\treturn p, err")
 	g.pf("\t\t}")
-	g.pf("\t\tp = odjsonrt.SkipSpace(data, p)")
 	g.pf("\t\tidx := -1")
 	if len(s.Fields) > 0 {
 		g.pf("\t\tswitch string(key) {")
@@ -46,10 +45,16 @@ func (g *generator) decodeStruct(s *analyzer.StructInfo) {
 		}
 		g.pf("\t\t}")
 		if g.opts.CaseInsensitive {
+			// An unmatched name is compared case-insensitively against every
+			// field. Guarding each comparison by length keeps that from being
+			// a call per field: only a non-ASCII name can fold to a name of a
+			// different byte length.
 			g.pf("\t\tif idx < 0 {")
+			g.pf("\t\t\tfold := !odjsonrt.ASCII(key)")
 			g.pf("\t\t\tswitch {")
 			for i, f := range s.Fields {
-				g.pf("\t\t\tcase odjsonrt.EqualFold(key, %s):", strconv.Quote(f.JSONName))
+				g.pf("\t\t\tcase (len(key) == %d || fold) && odjsonrt.EqualFold(key, %s):",
+					len(f.JSONName), strconv.Quote(f.JSONName))
 				g.pf("\t\t\t\tidx = %d", i)
 			}
 			g.pf("\t\t\t}")
@@ -67,6 +72,7 @@ func (g *generator) decodeStruct(s *analyzer.StructInfo) {
 		}
 	}
 	g.pf("\t\tdefault:")
+	g.pf("\t\t\tp = odjsonrt.SkipSpace(data, p)")
 	g.pf("\t\t\tp, err = odjsonrt.SkipValue(data, p)")
 	g.pf("\t\t\tif err != nil {")
 	g.pf("\t\t\t\treturn p, err")
@@ -129,7 +135,7 @@ func (g *generator) decodeQuoted(t *analyzer.Type, target string, c ctx, n int) 
 	sub := ctx{data: inner, pos: sp, ret: c.ret}
 	g.decode(t, target, sub, n+1)
 	g.pf("%sif err = odjsonrt.EndOfDocument(%s, %s); err != nil {", ind(n+1), inner, sp)
-	g.pf("%sreturn %s, err", ind(n+2), c.ret)
+	g.pf("%s%s", ind(n+2), c.fail("err"))
 	g.pf("%s}", ind(n+1))
 	g.pf("%s}", ind(n))
 }
@@ -150,18 +156,39 @@ func nullZero(t *analyzer.Type) bool {
 
 // decode writes the statements parsing one JSON value into target.
 func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
+	// lead emits the fragment's leading whitespace skip, unless the caller has
+	// already positioned the offset on the value. Only the first call in a
+	// fragment can be elided; everything nested has to look for itself.
+	lead := func() {
+		if c.trimmed {
+			c.trimmed = false
+			return
+		}
+		g.pf("%s%s = odjsonrt.SkipSpace(%s, %s)", ind(n), c.pos, c.data, c.pos)
+	}
 	switch t.Kind {
 	case analyzer.KindRawMessage:
 		raw := g.tmp("raw")
-		g.pf("%s%s = odjsonrt.SkipSpace(%s, %s)", ind(n), c.pos, c.data, c.pos)
+		lead()
 		g.pf("%svar %s []byte", ind(n), raw)
 		g.pf("%s%s, %s, err = odjsonrt.ParseRaw(%s, %s)", ind(n), raw, c.pos, c.data, c.pos)
 		g.decErr(c, n)
 		g.pf("%s%s = append(%s[:0], %s...)", ind(n), target, target, raw)
 		return
+	case analyzer.KindStruct:
+		// The struct's own decoder skips leading whitespace and handles a
+		// null itself, so wrapping the call in another of each is wasted
+		// work on every nested object.
+		if t.Struct.Local {
+			g.pf("%s%s, err = %s.odjsonParse(%s, %s)", ind(n), c.pos, target, c.data, c.pos)
+		} else {
+			g.pf("%s%s, err = %sParse(%s, %s, %s)", ind(n), c.pos, t.Struct.Helper, c.data, addr(target), c.pos)
+		}
+		g.decErr(c, n)
+		return
 	case analyzer.KindPointer:
 		np, ok := g.tmp("np"), g.tmp("ok")
-		g.pf("%s%s = odjsonrt.SkipSpace(%s, %s)", ind(n), c.pos, c.data, c.pos)
+		lead()
 		g.pf("%sif %s, %s := odjsonrt.ParseNull(%s, %s); %s {", ind(n), np, ok, c.data, c.pos, ok)
 		g.pf("%s%s = nil", ind(n+1), target)
 		g.pf("%s%s = %s", ind(n+1), c.pos, np)
@@ -185,7 +212,7 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 			// the value alone. json.Unmarshaler, in contrast, does receive
 			// the literal null, so only this branch skips it.
 			np, ok := g.tmp("np"), g.tmp("ok")
-			g.pf("%s%s = odjsonrt.SkipSpace(%s, %s)", ind(n), c.pos, c.data, c.pos)
+			lead()
 			g.pf("%sif %s, %s := odjsonrt.ParseNull(%s, %s); %s {", ind(n), np, ok, c.data, c.pos, ok)
 			g.pf("%s%s = %s", ind(n+1), c.pos, np)
 			g.pf("%s} else {", ind(n))
@@ -196,8 +223,7 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 		}
 	}
 
-	g.pf("%s%s = odjsonrt.SkipSpace(%s, %s)", ind(n), c.pos, c.data, c.pos)
-	body := n
+	lead()
 	np, ok := g.tmp("np"), g.tmp("ok")
 	g.pf("%sif %s, %s := odjsonrt.ParseNull(%s, %s); %s {", ind(n), np, ok, c.data, c.pos, ok)
 	g.pf("%s%s = %s", ind(n+1), c.pos, np)
@@ -205,7 +231,7 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 		g.pf("%s%s = nil", ind(n+1), target)
 	}
 	g.pf("%s} else {", ind(n))
-	body = n + 1
+	body := n + 1
 
 	switch t.Kind {
 	case analyzer.KindBool:
@@ -217,7 +243,11 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 	case analyzer.KindFloat:
 		g.parseInto(c, body, target, t.Expr, "float64", fmt.Sprintf("odjsonrt.ParseFloat(%%s, %%s, %d)", t.Bits))
 	case analyzer.KindString:
-		g.parseInto(c, body, target, t.Expr, "string", "odjsonrt.ParseString(%s, %s)")
+		call := "odjsonrt.ParseString(%s, %s)"
+		if c.trusted {
+			call = "odjsonrt.ParseStringTrusted(%s, %s)"
+		}
+		g.parseInto(c, body, target, t.Expr, "string", call)
 	case analyzer.KindNumber:
 		g.parseInto(c, body, target, t.Expr, "string", "odjsonrt.ParseNumberString(%s, %s)")
 	case analyzer.KindBytes:
@@ -228,13 +258,6 @@ func (g *generator) decode(t *analyzer.Type, target string, c ctx, n int) {
 		g.decodeArray(t, target, c, body)
 	case analyzer.KindMap:
 		g.decodeMap(t, target, c, body)
-	case analyzer.KindStruct:
-		if t.Struct.Local {
-			g.pf("%s%s, err = %s.odjsonParse(%s, %s)", ind(body), c.pos, target, c.data, c.pos)
-		} else {
-			g.pf("%s%s, err = %sParse(%s, %s, %s)", ind(body), c.pos, t.Struct.Helper, c.data, addr(target), c.pos)
-		}
-		g.decErr(c, body)
 	default:
 		if t.EmptyInterface {
 			// ParseAny builds map[string]any / []any trees directly; the
@@ -268,7 +291,7 @@ func (g *generator) parseInto(c ctx, n int, target, expr, native, call string) {
 
 func (g *generator) expectByte(c ctx, n int, b byte, what string) {
 	g.pf("%sif %s >= len(%s) || %s[%s] != '%c' {", ind(n), c.pos, c.data, c.data, c.pos, b)
-	g.pf("%sreturn %s, odjsonrt.ErrType(%s, %s, %s)", ind(n+1), c.ret, c.data, c.pos, strconv.Quote(what))
+	g.pf("%s%s", ind(n+1), c.fail(fmt.Sprintf("odjsonrt.ErrType(%s, %s, %s)", c.data, c.pos, strconv.Quote(what))))
 	g.pf("%s}", ind(n))
 	g.pf("%s%s++", ind(n), c.pos)
 }
@@ -278,7 +301,7 @@ func (g *generator) expectByte(c ctx, n int, b byte, what string) {
 func (g *generator) separator(c ctx, n int, closing byte, what string) {
 	g.pf("%s%s = odjsonrt.SkipSpace(%s, %s)", ind(n), c.pos, c.data, c.pos)
 	g.pf("%sif %s >= len(%s) {", ind(n), c.pos, c.data)
-	g.pf("%sreturn %s, odjsonrt.ErrSyntax(%s, %s, \"unexpected end of JSON input\")", ind(n+1), c.ret, c.data, c.pos)
+	g.pf("%s%s", ind(n+1), c.fail(fmt.Sprintf("odjsonrt.ErrSyntax(%s, %s, \"unexpected end of JSON input\")", c.data, c.pos)))
 	g.pf("%s}", ind(n))
 	g.pf("%sif %s[%s] == ',' {", ind(n), c.data, c.pos)
 	g.pf("%s%s++", ind(n+1), c.pos)
@@ -288,7 +311,7 @@ func (g *generator) separator(c ctx, n int, closing byte, what string) {
 	g.pf("%s%s++", ind(n+1), c.pos)
 	g.pf("%sbreak", ind(n+1))
 	g.pf("%s}", ind(n))
-	g.pf("%sreturn %s, odjsonrt.ErrSyntax(%s, %s, %s)", ind(n), c.ret, c.data, c.pos, strconv.Quote(what))
+	g.pf("%s%s", ind(n), c.fail(fmt.Sprintf("odjsonrt.ErrSyntax(%s, %s, %s)", c.data, c.pos, strconv.Quote(what))))
 }
 
 func (g *generator) decodeSlice(t *analyzer.Type, target string, c ctx, n int) {
@@ -299,6 +322,12 @@ func (g *generator) decodeSlice(t *analyzer.Type, target string, c ctx, n int) {
 	g.pf("%sif %s < len(%s) && %s[%s] == ']' {", ind(n), c.pos, c.data, c.data, c.pos)
 	g.pf("%s%s++", ind(n+1), c.pos)
 	g.pf("%s} else {", ind(n))
+	// Growing from nothing costs an allocation and a copy per doubling, so
+	// start with room for a few elements — but only once the array is known
+	// to be non-empty, since empty arrays are common and must stay free.
+	g.pf("%sif cap(%s) == 0 {", ind(n+1), s)
+	g.pf("%s%s = make(%s, 0, 4)", ind(n+2), s, t.Expr)
+	g.pf("%s}", ind(n+1))
 	g.pf("%sfor {", ind(n+1))
 	g.pf("%svar %s %s", ind(n+2), e, t.Elem.Expr)
 	g.decode(t.Elem, e, c, n+2)

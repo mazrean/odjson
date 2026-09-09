@@ -12,7 +12,7 @@ import (
 )
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Inner) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
@@ -20,7 +20,7 @@ func (v *Inner) odjsonAppend(dst []byte) ([]byte, error) {
 	dst = odjsonrt.AppendInt(dst, int64(v.ID))
 	if len(v.Note) != 0 {
 		dst = append(dst, ",\"note\":"...)
-		dst = odjsonrt.AppendString(dst, string(v.Note), true)
+		dst = odjsonrt.AppendStringMode(dst, string(v.Note), m)
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
@@ -55,7 +55,6 @@ func (v *Inner) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "id":
@@ -64,10 +63,11 @@ func (v *Inner) odjsonParse(data []byte, p int) (int, error) {
 			idx = 1
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "id"):
+			case (len(key) == 2 || fold) && odjsonrt.EqualFold(key, "id"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "note"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "note"):
 				idx = 1
 			}
 		}
@@ -97,6 +97,7 @@ func (v *Inner) odjsonParse(data []byte, p int) (int, error) {
 				v.Note = x6
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -119,7 +120,7 @@ func (v *Inner) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendInner appends the JSON encoding of v to dst.
 func AppendInner(dst []byte, v *Inner) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeInner sizes the buffer MarshalInner allocates.
@@ -127,7 +128,7 @@ var odjsonSizeInner odjsonrt.SizeHint
 
 // MarshalInner returns the JSON encoding of v.
 func MarshalInner(v *Inner) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeInner.New())
+	buf, err := v.odjsonAppend(odjsonSizeInner.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +146,7 @@ func UnmarshalInner(data []byte, v *Inner) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Base) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Base) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
@@ -153,7 +154,7 @@ func (v *Base) odjsonAppend(dst []byte) ([]byte, error) {
 	dst = odjsonrt.AppendInt(dst, int64(v.BaseID))
 	if len(v.BaseName) != 0 {
 		dst = append(dst, ",\"base_name\":"...)
-		dst = odjsonrt.AppendString(dst, string(v.BaseName), true)
+		dst = odjsonrt.AppendStringMode(dst, string(v.BaseName), m)
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
@@ -188,7 +189,6 @@ func (v *Base) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "base_id":
@@ -197,10 +197,11 @@ func (v *Base) odjsonParse(data []byte, p int) (int, error) {
 			idx = 1
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "base_id"):
+			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "base_id"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "base_name"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "base_name"):
 				idx = 1
 			}
 		}
@@ -230,6 +231,7 @@ func (v *Base) odjsonParse(data []byte, p int) (int, error) {
 				v.BaseName = x12
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -252,7 +254,7 @@ func (v *Base) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendBase appends the JSON encoding of v to dst.
 func AppendBase(dst []byte, v *Base) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeBase sizes the buffer MarshalBase allocates.
@@ -260,7 +262,7 @@ var odjsonSizeBase odjsonrt.SizeHint
 
 // MarshalBase returns the JSON encoding of v.
 func MarshalBase(v *Base) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeBase.New())
+	buf, err := v.odjsonAppend(odjsonSizeBase.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -278,12 +280,12 @@ func UnmarshalBase(data []byte, v *Base) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *PtrBase) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *PtrBase) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"ptr_field\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.PtrField), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.PtrField), m)
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
 	} else {
@@ -317,15 +319,15 @@ func (v *PtrBase) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "ptr_field":
 			idx = 0
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "ptr_field"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "ptr_field"):
 				idx = 0
 			}
 		}
@@ -343,6 +345,7 @@ func (v *PtrBase) odjsonParse(data []byte, p int) (int, error) {
 				v.PtrField = x15
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -365,7 +368,7 @@ func (v *PtrBase) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendPtrBase appends the JSON encoding of v to dst.
 func AppendPtrBase(dst []byte, v *PtrBase) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizePtrBase sizes the buffer MarshalPtrBase allocates.
@@ -373,7 +376,7 @@ var odjsonSizePtrBase odjsonrt.SizeHint
 
 // MarshalPtrBase returns the JSON encoding of v.
 func MarshalPtrBase(v *PtrBase) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizePtrBase.New())
+	buf, err := v.odjsonAppend(odjsonSizePtrBase.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +394,7 @@ func UnmarshalPtrBase(data []byte, v *PtrBase) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Scalars) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Scalars) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
@@ -399,11 +402,11 @@ func (v *Scalars) odjsonAppend(dst []byte) ([]byte, error) {
 	dst = odjsonrt.AppendInt(dst, int64(v.Base.BaseID))
 	if len(v.Base.BaseName) != 0 {
 		dst = append(dst, ",\"base_name\":"...)
-		dst = odjsonrt.AppendString(dst, string(v.Base.BaseName), true)
+		dst = odjsonrt.AppendStringMode(dst, string(v.Base.BaseName), m)
 	}
 	if v.PtrBase != nil {
 		dst = append(dst, ",\"ptr_field\":"...)
-		dst = odjsonrt.AppendString(dst, string(v.PtrBase.PtrField), true)
+		dst = odjsonrt.AppendStringMode(dst, string(v.PtrBase.PtrField), m)
 	}
 	dst = append(dst, ",\"bool\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.Bool))
@@ -438,9 +441,9 @@ func (v *Scalars) odjsonAppend(dst []byte) ([]byte, error) {
 		return nil, err
 	}
 	dst = append(dst, ",\"string\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.String), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.String), m)
 	dst = append(dst, ",\"named\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Named), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Named), m)
 	dst = append(dst, ",\"named_level\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.NamedLevel))
 	dst = append(dst, ",\"qint\":"...)
@@ -452,7 +455,7 @@ func (v *Scalars) odjsonAppend(dst []byte) ([]byte, error) {
 	dst = odjsonrt.AppendBool(dst, bool(v.QuotedBool))
 	dst = append(dst, '"')
 	dst = append(dst, ",\"qstring\":"...)
-	dst = odjsonrt.AppendStringQuoted(dst, string(v.QuotedString), true)
+	dst = odjsonrt.AppendStringQuotedMode(dst, string(v.QuotedString), m)
 	dst = append(dst, ",\"qfloat\":"...)
 	dst = append(dst, '"')
 	dst, err = odjsonrt.AppendFloat(dst, float64(v.QuotedFloat), 64)
@@ -469,14 +472,14 @@ func (v *Scalars) odjsonAppend(dst []byte) ([]byte, error) {
 		dst = append(dst, '"')
 	}
 	dst = append(dst, ",\"renamed\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Renamed), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Renamed), m)
 	dst = append(dst, ",\"Untagged\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Untagged), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Untagged), m)
 	if len(v.OmitEmptyString) != 0 {
 		dst = append(dst, ",\"oe_string\":"...)
-		dst = odjsonrt.AppendString(dst, string(v.OmitEmptyString), true)
+		dst = odjsonrt.AppendStringMode(dst, string(v.OmitEmptyString), m)
 	}
-	if v.OmitEmptyInt != 0 {
+	if m == odjsonrt.ModeStream || v.OmitEmptyInt != 0 {
 		dst = append(dst, ",\"oe_int\":"...)
 		dst = odjsonrt.AppendInt(dst, int64(v.OmitEmptyInt))
 	}
@@ -485,13 +488,13 @@ func (v *Scalars) odjsonAppend(dst []byte) ([]byte, error) {
 		if v.OmitEmptyPtr == nil {
 			dst = append(dst, 'n', 'u', 'l', 'l')
 		} else {
-			dst = odjsonrt.AppendString(dst, string((*v.OmitEmptyPtr)), true)
+			dst = odjsonrt.AppendStringMode(dst, string((*v.OmitEmptyPtr)), m)
 		}
 	}
 	if len(v.OmitEmptySlice) != 0 {
 		dst = append(dst, ",\"oe_slice\":"...)
 		if v.OmitEmptySlice == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = odjsonrt.AppendNilSlice(dst, m)
 		} else {
 			dst = append(dst, '[')
 			for i16 := range v.OmitEmptySlice {
@@ -505,21 +508,21 @@ func (v *Scalars) odjsonAppend(dst []byte) ([]byte, error) {
 	}
 	if !v.OmitZeroTime.IsZero() {
 		dst = append(dst, ",\"oz_time\":"...)
-		dst, err = odjsonrt.AppendMarshaler(dst, v.OmitZeroTime, true)
+		dst, err = odjsonrt.AppendMarshaler(dst, v.OmitZeroTime, m.EscapeHTML())
 		if err != nil {
 			return nil, err
 		}
 	}
 	if v.OmitZeroInner != (Inner{}) {
 		dst = append(dst, ",\"oz_inner\":"...)
-		dst, err = v.OmitZeroInner.odjsonAppend(dst)
+		dst, err = v.OmitZeroInner.odjsonAppend(dst, m)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if v.OmitZeroString != "" {
 		dst = append(dst, ",\"oz_string\":"...)
-		dst = odjsonrt.AppendString(dst, string(v.OmitZeroString), true)
+		dst = odjsonrt.AppendStringMode(dst, string(v.OmitZeroString), m)
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
@@ -554,7 +557,6 @@ func (v *Scalars) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "base_id":
@@ -625,72 +627,73 @@ func (v *Scalars) odjsonParse(data []byte, p int) (int, error) {
 			idx = 32
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "base_id"):
+			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "base_id"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "base_name"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "base_name"):
 				idx = 1
-			case odjsonrt.EqualFold(key, "ptr_field"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "ptr_field"):
 				idx = 2
-			case odjsonrt.EqualFold(key, "bool"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "bool"):
 				idx = 3
-			case odjsonrt.EqualFold(key, "int"):
+			case (len(key) == 3 || fold) && odjsonrt.EqualFold(key, "int"):
 				idx = 4
-			case odjsonrt.EqualFold(key, "int8"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "int8"):
 				idx = 5
-			case odjsonrt.EqualFold(key, "int16"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "int16"):
 				idx = 6
-			case odjsonrt.EqualFold(key, "int32"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "int32"):
 				idx = 7
-			case odjsonrt.EqualFold(key, "int64"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "int64"):
 				idx = 8
-			case odjsonrt.EqualFold(key, "uint"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "uint"):
 				idx = 9
-			case odjsonrt.EqualFold(key, "uint8"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "uint8"):
 				idx = 10
-			case odjsonrt.EqualFold(key, "uint16"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "uint16"):
 				idx = 11
-			case odjsonrt.EqualFold(key, "uint32"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "uint32"):
 				idx = 12
-			case odjsonrt.EqualFold(key, "uint64"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "uint64"):
 				idx = 13
-			case odjsonrt.EqualFold(key, "float32"):
+			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "float32"):
 				idx = 14
-			case odjsonrt.EqualFold(key, "float64"):
+			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "float64"):
 				idx = 15
-			case odjsonrt.EqualFold(key, "string"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "string"):
 				idx = 16
-			case odjsonrt.EqualFold(key, "named"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "named"):
 				idx = 17
-			case odjsonrt.EqualFold(key, "named_level"):
+			case (len(key) == 11 || fold) && odjsonrt.EqualFold(key, "named_level"):
 				idx = 18
-			case odjsonrt.EqualFold(key, "qint"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "qint"):
 				idx = 19
-			case odjsonrt.EqualFold(key, "qbool"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "qbool"):
 				idx = 20
-			case odjsonrt.EqualFold(key, "qstring"):
+			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "qstring"):
 				idx = 21
-			case odjsonrt.EqualFold(key, "qfloat"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "qfloat"):
 				idx = 22
-			case odjsonrt.EqualFold(key, "qptr"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "qptr"):
 				idx = 23
-			case odjsonrt.EqualFold(key, "renamed"):
+			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "renamed"):
 				idx = 24
-			case odjsonrt.EqualFold(key, "Untagged"):
+			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "Untagged"):
 				idx = 25
-			case odjsonrt.EqualFold(key, "oe_string"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "oe_string"):
 				idx = 26
-			case odjsonrt.EqualFold(key, "oe_int"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "oe_int"):
 				idx = 27
-			case odjsonrt.EqualFold(key, "oe_ptr"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "oe_ptr"):
 				idx = 28
-			case odjsonrt.EqualFold(key, "oe_slice"):
+			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "oe_slice"):
 				idx = 29
-			case odjsonrt.EqualFold(key, "oz_time"):
+			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "oz_time"):
 				idx = 30
-			case odjsonrt.EqualFold(key, "oz_inner"):
+			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "oz_inner"):
 				idx = 31
-			case odjsonrt.EqualFold(key, "oz_string"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "oz_string"):
 				idx = 32
 			}
 		}
@@ -1149,6 +1152,9 @@ func (v *Scalars) odjsonParse(data []byte, p int) (int, error) {
 				if p < len(data) && data[p] == ']' {
 					p++
 				} else {
+					if cap(s130) == 0 {
+						s130 = make([]int, 0, 4)
+					}
 					for {
 						var e131 int
 						p = odjsonrt.SkipSpace(data, p)
@@ -1189,28 +1195,24 @@ func (v *Scalars) odjsonParse(data []byte, p int) (int, error) {
 				return p, err
 			}
 		case 31:
+			p, err = v.OmitZeroInner.odjsonParse(data, p)
+			if err != nil {
+				return p, err
+			}
+		case 32:
 			p = odjsonrt.SkipSpace(data, p)
 			if np135, ok136 := odjsonrt.ParseNull(data, p); ok136 {
 				p = np135
 			} else {
-				p, err = v.OmitZeroInner.odjsonParse(data, p)
+				var x137 string
+				x137, p, err = odjsonrt.ParseString(data, p)
 				if err != nil {
 					return p, err
 				}
-			}
-		case 32:
-			p = odjsonrt.SkipSpace(data, p)
-			if np137, ok138 := odjsonrt.ParseNull(data, p); ok138 {
-				p = np137
-			} else {
-				var x139 string
-				x139, p, err = odjsonrt.ParseString(data, p)
-				if err != nil {
-					return p, err
-				}
-				v.OmitZeroString = x139
+				v.OmitZeroString = x137
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -1233,7 +1235,7 @@ func (v *Scalars) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendScalars appends the JSON encoding of v to dst.
 func AppendScalars(dst []byte, v *Scalars) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeScalars sizes the buffer MarshalScalars allocates.
@@ -1241,7 +1243,7 @@ var odjsonSizeScalars odjsonrt.SizeHint
 
 // MarshalScalars returns the JSON encoding of v.
 func MarshalScalars(v *Scalars) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeScalars.New())
+	buf, err := v.odjsonAppend(odjsonSizeScalars.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -1259,68 +1261,76 @@ func UnmarshalScalars(data []byte, v *Scalars) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Composites) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"bytes\":"...)
-	dst = odjsonrt.AppendBase64(dst, []byte(v.Bytes))
+	if v.Bytes == nil {
+		dst = odjsonrt.AppendNilBytes(dst, m)
+	} else {
+		dst = odjsonrt.AppendBase64(dst, []byte(v.Bytes))
+	}
 	dst = append(dst, ",\"named_flags\":"...)
-	dst = odjsonrt.AppendBase64(dst, []byte(v.NamedFlag))
+	if v.NamedFlag == nil {
+		dst = odjsonrt.AppendNilBytes(dst, m)
+	} else {
+		dst = odjsonrt.AppendBase64(dst, []byte(v.NamedFlag))
+	}
 	dst = append(dst, ",\"byte_array\":"...)
 	dst = append(dst, '[')
-	for i140 := 0; i140 < 4; i140++ {
-		if i140 > 0 {
+	for i138 := 0; i138 < 4; i138++ {
+		if i138 > 0 {
 			dst = append(dst, ',')
 		}
-		dst = odjsonrt.AppendUint(dst, uint64(v.ByteArray[i140]))
+		dst = odjsonrt.AppendUint(dst, uint64(v.ByteArray[i138]))
 	}
 	dst = append(dst, ']')
 	dst = append(dst, ",\"int_array\":"...)
 	dst = append(dst, '[')
-	for i141 := 0; i141 < 3; i141++ {
-		if i141 > 0 {
+	for i139 := 0; i139 < 3; i139++ {
+		if i139 > 0 {
 			dst = append(dst, ',')
 		}
-		dst = odjsonrt.AppendInt(dst, int64(v.IntArray[i141]))
+		dst = odjsonrt.AppendInt(dst, int64(v.IntArray[i139]))
 	}
 	dst = append(dst, ']')
 	dst = append(dst, ",\"ints\":"...)
 	if v.Ints == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = odjsonrt.AppendNilSlice(dst, m)
 	} else {
 		dst = append(dst, '[')
-		for i142 := range v.Ints {
-			if i142 > 0 {
+		for i140 := range v.Ints {
+			if i140 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = odjsonrt.AppendInt(dst, int64(v.Ints[i142]))
+			dst = odjsonrt.AppendInt(dst, int64(v.Ints[i140]))
 		}
 		dst = append(dst, ']')
 	}
 	dst = append(dst, ",\"strings\":"...)
 	if v.Strings == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = odjsonrt.AppendNilSlice(dst, m)
 	} else {
 		dst = append(dst, '[')
-		for i143 := range v.Strings {
-			if i143 > 0 {
+		for i141 := range v.Strings {
+			if i141 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = odjsonrt.AppendString(dst, string(v.Strings[i143]), true)
+			dst = odjsonrt.AppendStringMode(dst, string(v.Strings[i141]), m)
 		}
 		dst = append(dst, ']')
 	}
 	dst = append(dst, ",\"inners\":"...)
 	if v.Inners == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = odjsonrt.AppendNilSlice(dst, m)
 	} else {
 		dst = append(dst, '[')
-		for i144 := range v.Inners {
-			if i144 > 0 {
+		for i142 := range v.Inners {
+			if i142 > 0 {
 				dst = append(dst, ',')
 			}
-			dst, err = v.Inners[i144].odjsonAppend(dst)
+			dst, err = v.Inners[i142].odjsonAppend(dst, m)
 			if err != nil {
 				return nil, err
 			}
@@ -1329,17 +1339,17 @@ func (v *Composites) odjsonAppend(dst []byte) ([]byte, error) {
 	}
 	dst = append(dst, ",\"inner_ptrs\":"...)
 	if v.InnerPtrs == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = odjsonrt.AppendNilSlice(dst, m)
 	} else {
 		dst = append(dst, '[')
-		for i145 := range v.InnerPtrs {
-			if i145 > 0 {
+		for i143 := range v.InnerPtrs {
+			if i143 > 0 {
 				dst = append(dst, ',')
 			}
-			if v.InnerPtrs[i145] == nil {
+			if v.InnerPtrs[i143] == nil {
 				dst = append(dst, 'n', 'u', 'l', 'l')
 			} else {
-				dst, err = (*v.InnerPtrs[i145]).odjsonAppend(dst)
+				dst, err = (*v.InnerPtrs[i143]).odjsonAppend(dst, m)
 				if err != nil {
 					return nil, err
 				}
@@ -1349,22 +1359,22 @@ func (v *Composites) odjsonAppend(dst []byte) ([]byte, error) {
 	}
 	dst = append(dst, ",\"nested\":"...)
 	if v.Nested == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = odjsonrt.AppendNilSlice(dst, m)
 	} else {
 		dst = append(dst, '[')
-		for i146 := range v.Nested {
-			if i146 > 0 {
+		for i144 := range v.Nested {
+			if i144 > 0 {
 				dst = append(dst, ',')
 			}
-			if v.Nested[i146] == nil {
-				dst = append(dst, 'n', 'u', 'l', 'l')
+			if v.Nested[i144] == nil {
+				dst = odjsonrt.AppendNilSlice(dst, m)
 			} else {
 				dst = append(dst, '[')
-				for i147 := range v.Nested[i146] {
-					if i147 > 0 {
+				for i145 := range v.Nested[i144] {
+					if i145 > 0 {
 						dst = append(dst, ',')
 					}
-					dst = odjsonrt.AppendInt(dst, int64(v.Nested[i146][i147]))
+					dst = odjsonrt.AppendInt(dst, int64(v.Nested[i144][i145]))
 				}
 				dst = append(dst, ']')
 			}
@@ -1373,43 +1383,43 @@ func (v *Composites) odjsonAppend(dst []byte) ([]byte, error) {
 	}
 	dst = append(dst, ",\"string_map\":"...)
 	if v.StringMap == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = odjsonrt.AppendNilMap(dst, m)
 	} else {
-		keys148 := make([]string, 0, len(v.StringMap))
-		for k149 := range v.StringMap {
-			keys148 = append(keys148, string(k149))
+		keys146 := make([]string, 0, len(v.StringMap))
+		for k147 := range v.StringMap {
+			keys146 = append(keys146, string(k147))
 		}
-		slices.Sort(keys148)
+		slices.Sort(keys146)
 		dst = append(dst, '{')
-		for i150, k149 := range keys148 {
-			if i150 > 0 {
+		for i148, k147 := range keys146 {
+			if i148 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = odjsonrt.AppendString(dst, k149, true)
+			dst = odjsonrt.AppendStringMode(dst, k147, m)
 			dst = append(dst, ':')
-			mv151 := v.StringMap[k149]
-			dst = odjsonrt.AppendString(dst, string(mv151), true)
+			mv149 := v.StringMap[k147]
+			dst = odjsonrt.AppendStringMode(dst, string(mv149), m)
 		}
 		dst = append(dst, '}')
 	}
 	dst = append(dst, ",\"inner_map\":"...)
 	if v.InnerMap == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = odjsonrt.AppendNilMap(dst, m)
 	} else {
-		keys152 := make([]string, 0, len(v.InnerMap))
-		for k153 := range v.InnerMap {
-			keys152 = append(keys152, string(k153))
+		keys150 := make([]string, 0, len(v.InnerMap))
+		for k151 := range v.InnerMap {
+			keys150 = append(keys150, string(k151))
 		}
-		slices.Sort(keys152)
+		slices.Sort(keys150)
 		dst = append(dst, '{')
-		for i154, k153 := range keys152 {
-			if i154 > 0 {
+		for i152, k151 := range keys150 {
+			if i152 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = odjsonrt.AppendString(dst, k153, true)
+			dst = odjsonrt.AppendStringMode(dst, k151, m)
 			dst = append(dst, ':')
-			mv155 := v.InnerMap[k153]
-			dst, err = mv155.odjsonAppend(dst)
+			mv153 := v.InnerMap[k151]
+			dst, err = mv153.odjsonAppend(dst, m)
 			if err != nil {
 				return nil, err
 			}
@@ -1418,48 +1428,48 @@ func (v *Composites) odjsonAppend(dst []byte) ([]byte, error) {
 	}
 	dst = append(dst, ",\"named_map\":"...)
 	if v.NamedMap == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = odjsonrt.AppendNilMap(dst, m)
 	} else {
-		keys156 := make([]string, 0, len(v.NamedMap))
-		for k157 := range v.NamedMap {
-			keys156 = append(keys156, string(k157))
+		keys154 := make([]string, 0, len(v.NamedMap))
+		for k155 := range v.NamedMap {
+			keys154 = append(keys154, string(k155))
 		}
-		slices.Sort(keys156)
+		slices.Sort(keys154)
 		dst = append(dst, '{')
-		for i158, k157 := range keys156 {
-			if i158 > 0 {
+		for i156, k155 := range keys154 {
+			if i156 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = odjsonrt.AppendString(dst, k157, true)
+			dst = odjsonrt.AppendStringMode(dst, k155, m)
 			dst = append(dst, ':')
-			mv159 := v.NamedMap[k157]
-			dst = odjsonrt.AppendInt(dst, int64(mv159))
+			mv157 := v.NamedMap[k155]
+			dst = odjsonrt.AppendInt(dst, int64(mv157))
 		}
 		dst = append(dst, '}')
 	}
 	dst = append(dst, ",\"color_map\":"...)
 	if v.ColorMap == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = odjsonrt.AppendNilMap(dst, m)
 	} else {
-		keys160 := make([]string, 0, len(v.ColorMap))
-		for k161 := range v.ColorMap {
-			keys160 = append(keys160, string(k161))
+		keys158 := make([]string, 0, len(v.ColorMap))
+		for k159 := range v.ColorMap {
+			keys158 = append(keys158, string(k159))
 		}
-		slices.Sort(keys160)
+		slices.Sort(keys158)
 		dst = append(dst, '{')
-		for i162, k161 := range keys160 {
-			if i162 > 0 {
+		for i160, k159 := range keys158 {
+			if i160 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = odjsonrt.AppendString(dst, k161, true)
+			dst = odjsonrt.AppendStringMode(dst, k159, m)
 			dst = append(dst, ':')
-			mv163 := v.ColorMap[Color(k161)]
-			dst = odjsonrt.AppendInt(dst, int64(mv163))
+			mv161 := v.ColorMap[Color(k159)]
+			dst = odjsonrt.AppendInt(dst, int64(mv161))
 		}
 		dst = append(dst, '}')
 	}
 	dst = append(dst, ",\"inner\":"...)
-	dst, err = v.Inner.odjsonAppend(dst)
+	dst, err = v.Inner.odjsonAppend(dst, m)
 	if err != nil {
 		return nil, err
 	}
@@ -1467,7 +1477,7 @@ func (v *Composites) odjsonAppend(dst []byte) ([]byte, error) {
 	if v.InnerPtr == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
-		dst, err = (*v.InnerPtr).odjsonAppend(dst)
+		dst, err = (*v.InnerPtr).odjsonAppend(dst, m)
 		if err != nil {
 			return nil, err
 		}
@@ -1479,7 +1489,7 @@ func (v *Composites) odjsonAppend(dst []byte) ([]byte, error) {
 		if (*v.DeepPtr) == nil {
 			dst = append(dst, 'n', 'u', 'l', 'l')
 		} else {
-			dst, err = (*(*v.DeepPtr)).odjsonAppend(dst)
+			dst, err = (*(*v.DeepPtr)).odjsonAppend(dst, m)
 			if err != nil {
 				return nil, err
 			}
@@ -1489,24 +1499,24 @@ func (v *Composites) odjsonAppend(dst []byte) ([]byte, error) {
 	if v.Any == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
-		dst, err = odjsonrt.AppendAny(dst, v.Any, true)
+		dst, err = odjsonrt.AppendAnyMode(dst, v.Any, m)
 		if err != nil {
 			return nil, err
 		}
 	}
 	dst = append(dst, ",\"anys\":"...)
 	if v.Anys == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = odjsonrt.AppendNilSlice(dst, m)
 	} else {
 		dst = append(dst, '[')
-		for i164 := range v.Anys {
-			if i164 > 0 {
+		for i162 := range v.Anys {
+			if i162 > 0 {
 				dst = append(dst, ',')
 			}
-			if v.Anys[i164] == nil {
+			if v.Anys[i162] == nil {
 				dst = append(dst, 'n', 'u', 'l', 'l')
 			} else {
-				dst, err = odjsonrt.AppendAny(dst, v.Anys[i164], true)
+				dst, err = odjsonrt.AppendAnyMode(dst, v.Anys[i162], m)
 				if err != nil {
 					return nil, err
 				}
@@ -1515,7 +1525,7 @@ func (v *Composites) odjsonAppend(dst []byte) ([]byte, error) {
 		dst = append(dst, ']')
 	}
 	dst = append(dst, ",\"raw\":"...)
-	dst, err = odjsonrt.AppendMarshaler(dst, v.Raw, true)
+	dst, err = odjsonrt.AppendMarshaler(dst, v.Raw, m.EscapeHTML())
 	if err != nil {
 		return nil, err
 	}
@@ -1525,7 +1535,7 @@ func (v *Composites) odjsonAppend(dst []byte) ([]byte, error) {
 		return nil, err
 	}
 	dst = append(dst, ",\"time\":"...)
-	dst, err = odjsonrt.AppendMarshaler(dst, v.Time, true)
+	dst, err = odjsonrt.AppendMarshaler(dst, v.Time, m.EscapeHTML())
 	if err != nil {
 		return nil, err
 	}
@@ -1533,7 +1543,7 @@ func (v *Composites) odjsonAppend(dst []byte) ([]byte, error) {
 	if v.TimePtr == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
-		dst, err = odjsonrt.AppendMarshaler(dst, (*v.TimePtr), true)
+		dst, err = odjsonrt.AppendMarshaler(dst, (*v.TimePtr), m.EscapeHTML())
 		if err != nil {
 			return nil, err
 		}
@@ -1573,7 +1583,6 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "bytes":
@@ -1624,108 +1633,109 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 			idx = 22
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "bytes"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "bytes"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "named_flags"):
+			case (len(key) == 11 || fold) && odjsonrt.EqualFold(key, "named_flags"):
 				idx = 1
-			case odjsonrt.EqualFold(key, "byte_array"):
+			case (len(key) == 10 || fold) && odjsonrt.EqualFold(key, "byte_array"):
 				idx = 2
-			case odjsonrt.EqualFold(key, "int_array"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "int_array"):
 				idx = 3
-			case odjsonrt.EqualFold(key, "ints"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "ints"):
 				idx = 4
-			case odjsonrt.EqualFold(key, "strings"):
+			case (len(key) == 7 || fold) && odjsonrt.EqualFold(key, "strings"):
 				idx = 5
-			case odjsonrt.EqualFold(key, "inners"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "inners"):
 				idx = 6
-			case odjsonrt.EqualFold(key, "inner_ptrs"):
+			case (len(key) == 10 || fold) && odjsonrt.EqualFold(key, "inner_ptrs"):
 				idx = 7
-			case odjsonrt.EqualFold(key, "nested"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "nested"):
 				idx = 8
-			case odjsonrt.EqualFold(key, "string_map"):
+			case (len(key) == 10 || fold) && odjsonrt.EqualFold(key, "string_map"):
 				idx = 9
-			case odjsonrt.EqualFold(key, "inner_map"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "inner_map"):
 				idx = 10
-			case odjsonrt.EqualFold(key, "named_map"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "named_map"):
 				idx = 11
-			case odjsonrt.EqualFold(key, "color_map"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "color_map"):
 				idx = 12
-			case odjsonrt.EqualFold(key, "inner"):
+			case (len(key) == 5 || fold) && odjsonrt.EqualFold(key, "inner"):
 				idx = 13
-			case odjsonrt.EqualFold(key, "inner_ptr"):
+			case (len(key) == 9 || fold) && odjsonrt.EqualFold(key, "inner_ptr"):
 				idx = 14
-			case odjsonrt.EqualFold(key, "deep_ptr"):
+			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "deep_ptr"):
 				idx = 15
-			case odjsonrt.EqualFold(key, "any"):
+			case (len(key) == 3 || fold) && odjsonrt.EqualFold(key, "any"):
 				idx = 16
-			case odjsonrt.EqualFold(key, "anys"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "anys"):
 				idx = 17
-			case odjsonrt.EqualFold(key, "raw"):
+			case (len(key) == 3 || fold) && odjsonrt.EqualFold(key, "raw"):
 				idx = 18
-			case odjsonrt.EqualFold(key, "number"):
+			case (len(key) == 6 || fold) && odjsonrt.EqualFold(key, "number"):
 				idx = 19
-			case odjsonrt.EqualFold(key, "time"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "time"):
 				idx = 20
-			case odjsonrt.EqualFold(key, "time_ptr"):
+			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "time_ptr"):
 				idx = 21
-			case odjsonrt.EqualFold(key, "dur"):
+			case (len(key) == 3 || fold) && odjsonrt.EqualFold(key, "dur"):
 				idx = 22
 			}
 		}
 		switch idx {
 		case 0:
 			p = odjsonrt.SkipSpace(data, p)
-			if np165, ok166 := odjsonrt.ParseNull(data, p); ok166 {
-				p = np165
+			if np163, ok164 := odjsonrt.ParseNull(data, p); ok164 {
+				p = np163
 				v.Bytes = nil
 			} else {
-				var x167 []byte
-				x167, p, err = odjsonrt.ParseBase64(data, p)
+				var x165 []byte
+				x165, p, err = odjsonrt.ParseBase64(data, p)
 				if err != nil {
 					return p, err
 				}
-				v.Bytes = x167
+				v.Bytes = x165
 			}
 		case 1:
 			p = odjsonrt.SkipSpace(data, p)
-			if np168, ok169 := odjsonrt.ParseNull(data, p); ok169 {
-				p = np168
+			if np166, ok167 := odjsonrt.ParseNull(data, p); ok167 {
+				p = np166
 				v.NamedFlag = nil
 			} else {
-				var x170 []byte
-				x170, p, err = odjsonrt.ParseBase64(data, p)
+				var x168 []byte
+				x168, p, err = odjsonrt.ParseBase64(data, p)
 				if err != nil {
 					return p, err
 				}
-				v.NamedFlag = Flags(x170)
+				v.NamedFlag = Flags(x168)
 			}
 		case 2:
 			p = odjsonrt.SkipSpace(data, p)
-			if np171, ok172 := odjsonrt.ParseNull(data, p); ok172 {
-				p = np171
+			if np169, ok170 := odjsonrt.ParseNull(data, p); ok170 {
+				p = np169
 			} else {
 				if p >= len(data) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[4]byte")
 				}
 				p++
-				i173 := 0
+				i171 := 0
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == ']' {
 					p++
 				} else {
 					for {
-						if i173 < 4 {
+						if i171 < 4 {
 							p = odjsonrt.SkipSpace(data, p)
-							if np175, ok176 := odjsonrt.ParseNull(data, p); ok176 {
-								p = np175
+							if np173, ok174 := odjsonrt.ParseNull(data, p); ok174 {
+								p = np173
 							} else {
-								var x177 uint64
-								x177, p, err = odjsonrt.ParseUint(data, p, 8)
+								var x175 uint64
+								x175, p, err = odjsonrt.ParseUint(data, p, 8)
 								if err != nil {
 									return p, err
 								}
-								v.ByteArray[i173] = byte(x177)
+								v.ByteArray[i171] = byte(x175)
 							}
 						} else {
 							p = odjsonrt.SkipSpace(data, p)
@@ -1734,7 +1744,7 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 								return p, err
 							}
 						}
-						i173++
+						i171++
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -1750,37 +1760,37 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
 				}
-				for ; i173 < 4; i173++ {
-					var z174 byte
-					v.ByteArray[i173] = z174
+				for ; i171 < 4; i171++ {
+					var z172 byte
+					v.ByteArray[i171] = z172
 				}
 			}
 		case 3:
 			p = odjsonrt.SkipSpace(data, p)
-			if np178, ok179 := odjsonrt.ParseNull(data, p); ok179 {
-				p = np178
+			if np176, ok177 := odjsonrt.ParseNull(data, p); ok177 {
+				p = np176
 			} else {
 				if p >= len(data) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[3]int")
 				}
 				p++
-				i180 := 0
+				i178 := 0
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == ']' {
 					p++
 				} else {
 					for {
-						if i180 < 3 {
+						if i178 < 3 {
 							p = odjsonrt.SkipSpace(data, p)
-							if np182, ok183 := odjsonrt.ParseNull(data, p); ok183 {
-								p = np182
+							if np180, ok181 := odjsonrt.ParseNull(data, p); ok181 {
+								p = np180
 							} else {
-								var x184 int64
-								x184, p, err = odjsonrt.ParseInt(data, p, 64)
+								var x182 int64
+								x182, p, err = odjsonrt.ParseInt(data, p, 64)
 								if err != nil {
 									return p, err
 								}
-								v.IntArray[i180] = int(x184)
+								v.IntArray[i178] = int(x182)
 							}
 						} else {
 							p = odjsonrt.SkipSpace(data, p)
@@ -1789,7 +1799,7 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 								return p, err
 							}
 						}
-						i180++
+						i178++
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -1805,40 +1815,43 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
 				}
-				for ; i180 < 3; i180++ {
-					var z181 int
-					v.IntArray[i180] = z181
+				for ; i178 < 3; i178++ {
+					var z179 int
+					v.IntArray[i178] = z179
 				}
 			}
 		case 4:
 			p = odjsonrt.SkipSpace(data, p)
-			if np185, ok186 := odjsonrt.ParseNull(data, p); ok186 {
-				p = np185
+			if np183, ok184 := odjsonrt.ParseNull(data, p); ok184 {
+				p = np183
 				v.Ints = nil
 			} else {
 				if p >= len(data) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]int")
 				}
 				p++
-				s187 := v.Ints[:0]
+				s185 := v.Ints[:0]
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == ']' {
 					p++
 				} else {
+					if cap(s185) == 0 {
+						s185 = make([]int, 0, 4)
+					}
 					for {
-						var e188 int
+						var e186 int
 						p = odjsonrt.SkipSpace(data, p)
-						if np189, ok190 := odjsonrt.ParseNull(data, p); ok190 {
-							p = np189
+						if np187, ok188 := odjsonrt.ParseNull(data, p); ok188 {
+							p = np187
 						} else {
-							var x191 int64
-							x191, p, err = odjsonrt.ParseInt(data, p, 64)
+							var x189 int64
+							x189, p, err = odjsonrt.ParseInt(data, p, 64)
 							if err != nil {
 								return p, err
 							}
-							e188 = int(x191)
+							e186 = int(x189)
 						}
-						s187 = append(s187, e188)
+						s185 = append(s185, e186)
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -1854,40 +1867,43 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
 				}
-				if s187 == nil {
-					s187 = []int{}
+				if s185 == nil {
+					s185 = []int{}
 				}
-				v.Ints = s187
+				v.Ints = s185
 			}
 		case 5:
 			p = odjsonrt.SkipSpace(data, p)
-			if np192, ok193 := odjsonrt.ParseNull(data, p); ok193 {
-				p = np192
+			if np190, ok191 := odjsonrt.ParseNull(data, p); ok191 {
+				p = np190
 				v.Strings = nil
 			} else {
 				if p >= len(data) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "Tags")
 				}
 				p++
-				s194 := v.Strings[:0]
+				s192 := v.Strings[:0]
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == ']' {
 					p++
 				} else {
+					if cap(s192) == 0 {
+						s192 = make(Tags, 0, 4)
+					}
 					for {
-						var e195 string
+						var e193 string
 						p = odjsonrt.SkipSpace(data, p)
-						if np196, ok197 := odjsonrt.ParseNull(data, p); ok197 {
-							p = np196
+						if np194, ok195 := odjsonrt.ParseNull(data, p); ok195 {
+							p = np194
 						} else {
-							var x198 string
-							x198, p, err = odjsonrt.ParseString(data, p)
+							var x196 string
+							x196, p, err = odjsonrt.ParseString(data, p)
 							if err != nil {
 								return p, err
 							}
-							e195 = x198
+							e193 = x196
 						}
-						s194 = append(s194, e195)
+						s192 = append(s192, e193)
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -1903,38 +1919,36 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
 				}
-				if s194 == nil {
-					s194 = Tags{}
+				if s192 == nil {
+					s192 = Tags{}
 				}
-				v.Strings = s194
+				v.Strings = s192
 			}
 		case 6:
 			p = odjsonrt.SkipSpace(data, p)
-			if np199, ok200 := odjsonrt.ParseNull(data, p); ok200 {
-				p = np199
+			if np197, ok198 := odjsonrt.ParseNull(data, p); ok198 {
+				p = np197
 				v.Inners = nil
 			} else {
 				if p >= len(data) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Inner")
 				}
 				p++
-				s201 := v.Inners[:0]
+				s199 := v.Inners[:0]
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == ']' {
 					p++
 				} else {
+					if cap(s199) == 0 {
+						s199 = make([]Inner, 0, 4)
+					}
 					for {
-						var e202 Inner
-						p = odjsonrt.SkipSpace(data, p)
-						if np203, ok204 := odjsonrt.ParseNull(data, p); ok204 {
-							p = np203
-						} else {
-							p, err = e202.odjsonParse(data, p)
-							if err != nil {
-								return p, err
-							}
+						var e200 Inner
+						p, err = e200.odjsonParse(data, p)
+						if err != nil {
+							return p, err
 						}
-						s201 = append(s201, e202)
+						s199 = append(s199, e200)
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -1950,47 +1964,45 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
 				}
-				if s201 == nil {
-					s201 = []Inner{}
+				if s199 == nil {
+					s199 = []Inner{}
 				}
-				v.Inners = s201
+				v.Inners = s199
 			}
 		case 7:
 			p = odjsonrt.SkipSpace(data, p)
-			if np205, ok206 := odjsonrt.ParseNull(data, p); ok206 {
-				p = np205
+			if np201, ok202 := odjsonrt.ParseNull(data, p); ok202 {
+				p = np201
 				v.InnerPtrs = nil
 			} else {
 				if p >= len(data) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]*Inner")
 				}
 				p++
-				s207 := v.InnerPtrs[:0]
+				s203 := v.InnerPtrs[:0]
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == ']' {
 					p++
 				} else {
+					if cap(s203) == 0 {
+						s203 = make([]*Inner, 0, 4)
+					}
 					for {
-						var e208 *Inner
+						var e204 *Inner
 						p = odjsonrt.SkipSpace(data, p)
-						if np209, ok210 := odjsonrt.ParseNull(data, p); ok210 {
-							e208 = nil
-							p = np209
+						if np205, ok206 := odjsonrt.ParseNull(data, p); ok206 {
+							e204 = nil
+							p = np205
 						} else {
-							if e208 == nil {
-								e208 = new(Inner)
+							if e204 == nil {
+								e204 = new(Inner)
 							}
-							p = odjsonrt.SkipSpace(data, p)
-							if np211, ok212 := odjsonrt.ParseNull(data, p); ok212 {
-								p = np211
-							} else {
-								p, err = (*e208).odjsonParse(data, p)
-								if err != nil {
-									return p, err
-								}
+							p, err = (*e204).odjsonParse(data, p)
+							if err != nil {
+								return p, err
 							}
 						}
-						s207 = append(s207, e208)
+						s203 = append(s203, e204)
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -2006,56 +2018,62 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
 				}
-				if s207 == nil {
-					s207 = []*Inner{}
+				if s203 == nil {
+					s203 = []*Inner{}
 				}
-				v.InnerPtrs = s207
+				v.InnerPtrs = s203
 			}
 		case 8:
 			p = odjsonrt.SkipSpace(data, p)
-			if np213, ok214 := odjsonrt.ParseNull(data, p); ok214 {
-				p = np213
+			if np207, ok208 := odjsonrt.ParseNull(data, p); ok208 {
+				p = np207
 				v.Nested = nil
 			} else {
 				if p >= len(data) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[][]int")
 				}
 				p++
-				s215 := v.Nested[:0]
+				s209 := v.Nested[:0]
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == ']' {
 					p++
 				} else {
+					if cap(s209) == 0 {
+						s209 = make([][]int, 0, 4)
+					}
 					for {
-						var e216 []int
+						var e210 []int
 						p = odjsonrt.SkipSpace(data, p)
-						if np217, ok218 := odjsonrt.ParseNull(data, p); ok218 {
-							p = np217
-							e216 = nil
+						if np211, ok212 := odjsonrt.ParseNull(data, p); ok212 {
+							p = np211
+							e210 = nil
 						} else {
 							if p >= len(data) || data[p] != '[' {
 								return p, odjsonrt.ErrType(data, p, "[]int")
 							}
 							p++
-							s219 := e216[:0]
+							s213 := e210[:0]
 							p = odjsonrt.SkipSpace(data, p)
 							if p < len(data) && data[p] == ']' {
 								p++
 							} else {
+								if cap(s213) == 0 {
+									s213 = make([]int, 0, 4)
+								}
 								for {
-									var e220 int
+									var e214 int
 									p = odjsonrt.SkipSpace(data, p)
-									if np221, ok222 := odjsonrt.ParseNull(data, p); ok222 {
-										p = np221
+									if np215, ok216 := odjsonrt.ParseNull(data, p); ok216 {
+										p = np215
 									} else {
-										var x223 int64
-										x223, p, err = odjsonrt.ParseInt(data, p, 64)
+										var x217 int64
+										x217, p, err = odjsonrt.ParseInt(data, p, 64)
 										if err != nil {
 											return p, err
 										}
-										e220 = int(x223)
+										e214 = int(x217)
 									}
-									s219 = append(s219, e220)
+									s213 = append(s213, e214)
 									p = odjsonrt.SkipSpace(data, p)
 									if p >= len(data) {
 										return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -2071,12 +2089,12 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 									return p, odjsonrt.ErrSyntax(data, p, "after array element")
 								}
 							}
-							if s219 == nil {
-								s219 = []int{}
+							if s213 == nil {
+								s213 = []int{}
 							}
-							e216 = s219
+							e210 = s213
 						}
-						s215 = append(s215, e216)
+						s209 = append(s209, e210)
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -2092,49 +2110,49 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
 				}
-				if s215 == nil {
-					s215 = [][]int{}
+				if s209 == nil {
+					s209 = [][]int{}
 				}
-				v.Nested = s215
+				v.Nested = s209
 			}
 		case 9:
 			p = odjsonrt.SkipSpace(data, p)
-			if np224, ok225 := odjsonrt.ParseNull(data, p); ok225 {
-				p = np224
+			if np218, ok219 := odjsonrt.ParseNull(data, p); ok219 {
+				p = np218
 				v.StringMap = nil
 			} else {
 				if p >= len(data) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
-				m226 := v.StringMap
-				if m226 == nil {
-					m226 = make(map[string]string)
+				m220 := v.StringMap
+				if m220 == nil {
+					m220 = make(map[string]string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == '}' {
 					p++
 				} else {
 					for {
-						var k227 []byte
+						var k221 []byte
 						p = odjsonrt.SkipSpace(data, p)
-						k227, _, p, err = odjsonrt.ParseKey(data, p)
+						k221, _, p, err = odjsonrt.ParseKey(data, p)
 						if err != nil {
 							return p, err
 						}
-						var mv228 string
+						var mv222 string
 						p = odjsonrt.SkipSpace(data, p)
-						if np229, ok230 := odjsonrt.ParseNull(data, p); ok230 {
-							p = np229
+						if np223, ok224 := odjsonrt.ParseNull(data, p); ok224 {
+							p = np223
 						} else {
-							var x231 string
-							x231, p, err = odjsonrt.ParseString(data, p)
+							var x225 string
+							x225, p, err = odjsonrt.ParseString(data, p)
 							if err != nil {
 								return p, err
 							}
-							mv228 = x231
+							mv222 = x225
 						}
-						m226[string(k227)] = mv228
+						m220[string(k221)] = mv222
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -2150,44 +2168,39 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
 					}
 				}
-				v.StringMap = m226
+				v.StringMap = m220
 			}
 		case 10:
 			p = odjsonrt.SkipSpace(data, p)
-			if np232, ok233 := odjsonrt.ParseNull(data, p); ok233 {
-				p = np232
+			if np226, ok227 := odjsonrt.ParseNull(data, p); ok227 {
+				p = np226
 				v.InnerMap = nil
 			} else {
 				if p >= len(data) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]Inner")
 				}
 				p++
-				m234 := v.InnerMap
-				if m234 == nil {
-					m234 = make(map[string]Inner)
+				m228 := v.InnerMap
+				if m228 == nil {
+					m228 = make(map[string]Inner)
 				}
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == '}' {
 					p++
 				} else {
 					for {
-						var k235 []byte
+						var k229 []byte
 						p = odjsonrt.SkipSpace(data, p)
-						k235, _, p, err = odjsonrt.ParseKey(data, p)
+						k229, _, p, err = odjsonrt.ParseKey(data, p)
 						if err != nil {
 							return p, err
 						}
-						var mv236 Inner
-						p = odjsonrt.SkipSpace(data, p)
-						if np237, ok238 := odjsonrt.ParseNull(data, p); ok238 {
-							p = np237
-						} else {
-							p, err = mv236.odjsonParse(data, p)
-							if err != nil {
-								return p, err
-							}
+						var mv230 Inner
+						p, err = mv230.odjsonParse(data, p)
+						if err != nil {
+							return p, err
 						}
-						m234[string(k235)] = mv236
+						m228[string(k229)] = mv230
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -2203,21 +2216,76 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
 					}
 				}
-				v.InnerMap = m234
+				v.InnerMap = m228
 			}
 		case 11:
 			p = odjsonrt.SkipSpace(data, p)
-			if np239, ok240 := odjsonrt.ParseNull(data, p); ok240 {
-				p = np239
+			if np231, ok232 := odjsonrt.ParseNull(data, p); ok232 {
+				p = np231
 				v.NamedMap = nil
 			} else {
 				if p >= len(data) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "Meta")
 				}
 				p++
-				m241 := v.NamedMap
+				m233 := v.NamedMap
+				if m233 == nil {
+					m233 = make(Meta)
+				}
+				p = odjsonrt.SkipSpace(data, p)
+				if p < len(data) && data[p] == '}' {
+					p++
+				} else {
+					for {
+						var k234 []byte
+						p = odjsonrt.SkipSpace(data, p)
+						k234, _, p, err = odjsonrt.ParseKey(data, p)
+						if err != nil {
+							return p, err
+						}
+						var mv235 int
+						p = odjsonrt.SkipSpace(data, p)
+						if np236, ok237 := odjsonrt.ParseNull(data, p); ok237 {
+							p = np236
+						} else {
+							var x238 int64
+							x238, p, err = odjsonrt.ParseInt(data, p, 64)
+							if err != nil {
+								return p, err
+							}
+							mv235 = int(x238)
+						}
+						m233[string(k234)] = mv235
+						p = odjsonrt.SkipSpace(data, p)
+						if p >= len(data) {
+							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
+						}
+						if data[p] == ',' {
+							p++
+							continue
+						}
+						if data[p] == '}' {
+							p++
+							break
+						}
+						return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
+					}
+				}
+				v.NamedMap = m233
+			}
+		case 12:
+			p = odjsonrt.SkipSpace(data, p)
+			if np239, ok240 := odjsonrt.ParseNull(data, p); ok240 {
+				p = np239
+				v.ColorMap = nil
+			} else {
+				if p >= len(data) || data[p] != '{' {
+					return p, odjsonrt.ErrType(data, p, "map[Color]int")
+				}
+				p++
+				m241 := v.ColorMap
 				if m241 == nil {
-					m241 = make(Meta)
+					m241 = make(map[Color]int)
 				}
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == '}' {
@@ -2242,7 +2310,7 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 							}
 							mv243 = int(x246)
 						}
-						m241[string(k242)] = mv243
+						m241[Color(string(k242))] = mv243
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -2258,163 +2326,96 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
 					}
 				}
-				v.NamedMap = m241
-			}
-		case 12:
-			p = odjsonrt.SkipSpace(data, p)
-			if np247, ok248 := odjsonrt.ParseNull(data, p); ok248 {
-				p = np247
-				v.ColorMap = nil
-			} else {
-				if p >= len(data) || data[p] != '{' {
-					return p, odjsonrt.ErrType(data, p, "map[Color]int")
-				}
-				p++
-				m249 := v.ColorMap
-				if m249 == nil {
-					m249 = make(map[Color]int)
-				}
-				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
-					p++
-				} else {
-					for {
-						var k250 []byte
-						p = odjsonrt.SkipSpace(data, p)
-						k250, _, p, err = odjsonrt.ParseKey(data, p)
-						if err != nil {
-							return p, err
-						}
-						var mv251 int
-						p = odjsonrt.SkipSpace(data, p)
-						if np252, ok253 := odjsonrt.ParseNull(data, p); ok253 {
-							p = np252
-						} else {
-							var x254 int64
-							x254, p, err = odjsonrt.ParseInt(data, p, 64)
-							if err != nil {
-								return p, err
-							}
-							mv251 = int(x254)
-						}
-						m249[Color(string(k250))] = mv251
-						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
-							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
-						}
-						if data[p] == ',' {
-							p++
-							continue
-						}
-						if data[p] == '}' {
-							p++
-							break
-						}
-						return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
-					}
-				}
-				v.ColorMap = m249
+				v.ColorMap = m241
 			}
 		case 13:
-			p = odjsonrt.SkipSpace(data, p)
-			if np255, ok256 := odjsonrt.ParseNull(data, p); ok256 {
-				p = np255
-			} else {
-				p, err = v.Inner.odjsonParse(data, p)
-				if err != nil {
-					return p, err
-				}
+			p, err = v.Inner.odjsonParse(data, p)
+			if err != nil {
+				return p, err
 			}
 		case 14:
 			p = odjsonrt.SkipSpace(data, p)
-			if np257, ok258 := odjsonrt.ParseNull(data, p); ok258 {
+			if np247, ok248 := odjsonrt.ParseNull(data, p); ok248 {
 				v.InnerPtr = nil
-				p = np257
+				p = np247
 			} else {
 				if v.InnerPtr == nil {
 					v.InnerPtr = new(Inner)
 				}
-				p = odjsonrt.SkipSpace(data, p)
-				if np259, ok260 := odjsonrt.ParseNull(data, p); ok260 {
-					p = np259
-				} else {
-					p, err = (*v.InnerPtr).odjsonParse(data, p)
-					if err != nil {
-						return p, err
-					}
+				p, err = (*v.InnerPtr).odjsonParse(data, p)
+				if err != nil {
+					return p, err
 				}
 			}
 		case 15:
 			p = odjsonrt.SkipSpace(data, p)
-			if np261, ok262 := odjsonrt.ParseNull(data, p); ok262 {
+			if np249, ok250 := odjsonrt.ParseNull(data, p); ok250 {
 				v.DeepPtr = nil
-				p = np261
+				p = np249
 			} else {
 				if v.DeepPtr == nil {
 					v.DeepPtr = new(*Inner)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if np263, ok264 := odjsonrt.ParseNull(data, p); ok264 {
+				if np251, ok252 := odjsonrt.ParseNull(data, p); ok252 {
 					(*v.DeepPtr) = nil
-					p = np263
+					p = np251
 				} else {
 					if (*v.DeepPtr) == nil {
 						(*v.DeepPtr) = new(Inner)
 					}
-					p = odjsonrt.SkipSpace(data, p)
-					if np265, ok266 := odjsonrt.ParseNull(data, p); ok266 {
-						p = np265
-					} else {
-						p, err = (*(*v.DeepPtr)).odjsonParse(data, p)
-						if err != nil {
-							return p, err
-						}
+					p, err = (*(*v.DeepPtr)).odjsonParse(data, p)
+					if err != nil {
+						return p, err
 					}
 				}
 			}
 		case 16:
 			p = odjsonrt.SkipSpace(data, p)
-			if np267, ok268 := odjsonrt.ParseNull(data, p); ok268 {
-				p = np267
+			if np253, ok254 := odjsonrt.ParseNull(data, p); ok254 {
+				p = np253
 				v.Any = nil
 			} else {
-				var a269 any
-				a269, p, err = odjsonrt.ParseAny(data, p)
+				var a255 any
+				a255, p, err = odjsonrt.ParseAny(data, p)
 				if err != nil {
 					return p, err
 				}
-				v.Any = a269
+				v.Any = a255
 			}
 		case 17:
 			p = odjsonrt.SkipSpace(data, p)
-			if np270, ok271 := odjsonrt.ParseNull(data, p); ok271 {
-				p = np270
+			if np256, ok257 := odjsonrt.ParseNull(data, p); ok257 {
+				p = np256
 				v.Anys = nil
 			} else {
 				if p >= len(data) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]any")
 				}
 				p++
-				s272 := v.Anys[:0]
+				s258 := v.Anys[:0]
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == ']' {
 					p++
 				} else {
+					if cap(s258) == 0 {
+						s258 = make([]any, 0, 4)
+					}
 					for {
-						var e273 any
+						var e259 any
 						p = odjsonrt.SkipSpace(data, p)
-						if np274, ok275 := odjsonrt.ParseNull(data, p); ok275 {
-							p = np274
-							e273 = nil
+						if np260, ok261 := odjsonrt.ParseNull(data, p); ok261 {
+							p = np260
+							e259 = nil
 						} else {
-							var a276 any
-							a276, p, err = odjsonrt.ParseAny(data, p)
+							var a262 any
+							a262, p, err = odjsonrt.ParseAny(data, p)
 							if err != nil {
 								return p, err
 							}
-							e273 = a276
+							e259 = a262
 						}
-						s272 = append(s272, e273)
+						s258 = append(s258, e259)
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -2430,10 +2431,10 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
 				}
-				if s272 == nil {
-					s272 = []any{}
+				if s258 == nil {
+					s258 = []any{}
 				}
-				v.Anys = s272
+				v.Anys = s258
 			}
 		case 18:
 			p, err = odjsonrt.ParseUnmarshaler(data, p, &v.Raw)
@@ -2442,15 +2443,15 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 			}
 		case 19:
 			p = odjsonrt.SkipSpace(data, p)
-			if np277, ok278 := odjsonrt.ParseNull(data, p); ok278 {
-				p = np277
+			if np263, ok264 := odjsonrt.ParseNull(data, p); ok264 {
+				p = np263
 			} else {
-				var x279 string
-				x279, p, err = odjsonrt.ParseNumberString(data, p)
+				var x265 string
+				x265, p, err = odjsonrt.ParseNumberString(data, p)
 				if err != nil {
 					return p, err
 				}
-				v.Number = json.Number(x279)
+				v.Number = json.Number(x265)
 			}
 		case 20:
 			p, err = odjsonrt.ParseUnmarshaler(data, p, &v.Time)
@@ -2459,9 +2460,9 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 			}
 		case 21:
 			p = odjsonrt.SkipSpace(data, p)
-			if np280, ok281 := odjsonrt.ParseNull(data, p); ok281 {
+			if np266, ok267 := odjsonrt.ParseNull(data, p); ok267 {
 				v.TimePtr = nil
-				p = np280
+				p = np266
 			} else {
 				if v.TimePtr == nil {
 					v.TimePtr = new(time.Time)
@@ -2473,17 +2474,18 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 			}
 		case 22:
 			p = odjsonrt.SkipSpace(data, p)
-			if np282, ok283 := odjsonrt.ParseNull(data, p); ok283 {
-				p = np282
+			if np268, ok269 := odjsonrt.ParseNull(data, p); ok269 {
+				p = np268
 			} else {
-				var x284 int64
-				x284, p, err = odjsonrt.ParseInt(data, p, 64)
+				var x270 int64
+				x270, p, err = odjsonrt.ParseInt(data, p, 64)
 				if err != nil {
 					return p, err
 				}
-				v.Dur = time.Duration(x284)
+				v.Dur = time.Duration(x270)
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -2506,7 +2508,7 @@ func (v *Composites) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendComposites appends the JSON encoding of v to dst.
 func AppendComposites(dst []byte, v *Composites) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeComposites sizes the buffer MarshalComposites allocates.
@@ -2514,7 +2516,7 @@ var odjsonSizeComposites odjsonrt.SizeHint
 
 // MarshalComposites returns the JSON encoding of v.
 func MarshalComposites(v *Composites) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeComposites.New())
+	buf, err := v.odjsonAppend(odjsonSizeComposites.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -2532,26 +2534,26 @@ func UnmarshalComposites(data []byte, v *Composites) error {
 }
 
 // odjsonAppend appends the JSON encoding of v to dst.
-func (v *Recursive) odjsonAppend(dst []byte) ([]byte, error) {
+func (v *Recursive) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
 	dst = append(dst, ",\"name\":"...)
-	dst = odjsonrt.AppendString(dst, string(v.Name), true)
+	dst = odjsonrt.AppendStringMode(dst, string(v.Name), m)
 	if len(v.Children) != 0 {
 		dst = append(dst, ",\"children\":"...)
 		if v.Children == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = odjsonrt.AppendNilSlice(dst, m)
 		} else {
 			dst = append(dst, '[')
-			for i285 := range v.Children {
-				if i285 > 0 {
+			for i271 := range v.Children {
+				if i271 > 0 {
 					dst = append(dst, ',')
 				}
-				if v.Children[i285] == nil {
+				if v.Children[i271] == nil {
 					dst = append(dst, 'n', 'u', 'l', 'l')
 				} else {
-					dst, err = (*v.Children[i285]).odjsonAppend(dst)
+					dst, err = (*v.Children[i271]).odjsonAppend(dst, m)
 					if err != nil {
 						return nil, err
 					}
@@ -2593,7 +2595,6 @@ func (v *Recursive) odjsonParse(data []byte, p int) (int, error) {
 		if err != nil {
 			return p, err
 		}
-		p = odjsonrt.SkipSpace(data, p)
 		idx := -1
 		switch string(key) {
 		case "name":
@@ -2602,62 +2603,61 @@ func (v *Recursive) odjsonParse(data []byte, p int) (int, error) {
 			idx = 1
 		}
 		if idx < 0 {
+			fold := !odjsonrt.ASCII(key)
 			switch {
-			case odjsonrt.EqualFold(key, "name"):
+			case (len(key) == 4 || fold) && odjsonrt.EqualFold(key, "name"):
 				idx = 0
-			case odjsonrt.EqualFold(key, "children"):
+			case (len(key) == 8 || fold) && odjsonrt.EqualFold(key, "children"):
 				idx = 1
 			}
 		}
 		switch idx {
 		case 0:
 			p = odjsonrt.SkipSpace(data, p)
-			if np286, ok287 := odjsonrt.ParseNull(data, p); ok287 {
-				p = np286
+			if np272, ok273 := odjsonrt.ParseNull(data, p); ok273 {
+				p = np272
 			} else {
-				var x288 string
-				x288, p, err = odjsonrt.ParseString(data, p)
+				var x274 string
+				x274, p, err = odjsonrt.ParseString(data, p)
 				if err != nil {
 					return p, err
 				}
-				v.Name = x288
+				v.Name = x274
 			}
 		case 1:
 			p = odjsonrt.SkipSpace(data, p)
-			if np289, ok290 := odjsonrt.ParseNull(data, p); ok290 {
-				p = np289
+			if np275, ok276 := odjsonrt.ParseNull(data, p); ok276 {
+				p = np275
 				v.Children = nil
 			} else {
 				if p >= len(data) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]*Recursive")
 				}
 				p++
-				s291 := v.Children[:0]
+				s277 := v.Children[:0]
 				p = odjsonrt.SkipSpace(data, p)
 				if p < len(data) && data[p] == ']' {
 					p++
 				} else {
+					if cap(s277) == 0 {
+						s277 = make([]*Recursive, 0, 4)
+					}
 					for {
-						var e292 *Recursive
+						var e278 *Recursive
 						p = odjsonrt.SkipSpace(data, p)
-						if np293, ok294 := odjsonrt.ParseNull(data, p); ok294 {
-							e292 = nil
-							p = np293
+						if np279, ok280 := odjsonrt.ParseNull(data, p); ok280 {
+							e278 = nil
+							p = np279
 						} else {
-							if e292 == nil {
-								e292 = new(Recursive)
+							if e278 == nil {
+								e278 = new(Recursive)
 							}
-							p = odjsonrt.SkipSpace(data, p)
-							if np295, ok296 := odjsonrt.ParseNull(data, p); ok296 {
-								p = np295
-							} else {
-								p, err = (*e292).odjsonParse(data, p)
-								if err != nil {
-									return p, err
-								}
+							p, err = (*e278).odjsonParse(data, p)
+							if err != nil {
+								return p, err
 							}
 						}
-						s291 = append(s291, e292)
+						s277 = append(s277, e278)
 						p = odjsonrt.SkipSpace(data, p)
 						if p >= len(data) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
@@ -2673,12 +2673,13 @@ func (v *Recursive) odjsonParse(data []byte, p int) (int, error) {
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
 				}
-				if s291 == nil {
-					s291 = []*Recursive{}
+				if s277 == nil {
+					s277 = []*Recursive{}
 				}
-				v.Children = s291
+				v.Children = s277
 			}
 		default:
+			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValue(data, p)
 			if err != nil {
 				return p, err
@@ -2701,7 +2702,7 @@ func (v *Recursive) odjsonParse(data []byte, p int) (int, error) {
 
 // AppendRecursive appends the JSON encoding of v to dst.
 func AppendRecursive(dst []byte, v *Recursive) ([]byte, error) {
-	return v.odjsonAppend(dst)
+	return v.odjsonAppend(dst, odjsonrt.ModeHTML)
 }
 
 // odjsonSizeRecursive sizes the buffer MarshalRecursive allocates.
@@ -2709,7 +2710,7 @@ var odjsonSizeRecursive odjsonrt.SizeHint
 
 // MarshalRecursive returns the JSON encoding of v.
 func MarshalRecursive(v *Recursive) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeRecursive.New())
+	buf, err := v.odjsonAppend(odjsonSizeRecursive.New(), odjsonrt.ModeHTML)
 	if err != nil {
 		return nil, err
 	}

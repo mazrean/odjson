@@ -24,11 +24,20 @@ func jsonString(s string, escapeHTML bool) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func (g *generator) htmlLit() string {
+// mode is the identifier of the StringMode parameter threaded through the
+// generated encoders.
+const mode = "m"
+
+// htmlLit renders the escapeHTML argument for the runtime helpers that still
+// take a bool.
+func (g *generator) htmlLit() string { return mode + ".EscapeHTML()" }
+
+// v1Mode is the StringMode the encoding/json entry points use.
+func (g *generator) v1Mode() string {
 	if g.opts.EscapeHTML {
-		return "true"
+		return "odjsonrt.ModeHTML"
 	}
-	return "false"
+	return "odjsonrt.ModePlain"
 }
 
 func (g *generator) encodeStruct(s *analyzer.StructInfo) {
@@ -47,6 +56,12 @@ func (g *generator) encodeStruct(s *analyzer.StructInfo) {
 		}
 		if f.OmitEmpty {
 			if c := g.nonEmptyExpr(f.Type, selector(f)); c != "true" {
+				// encoding/json omits a zero number or a false bool;
+				// encoding/json/v2 only omits values that encode as "",
+				// [], {} or null, so under ModeStream they stay.
+				if alwaysKeptByV2(f.Type) {
+					c = "(" + mode + " == odjsonrt.ModeStream || " + c + ")"
+				}
 				conds = append(conds, c)
 			}
 		}
@@ -84,7 +99,7 @@ func (g *generator) encodeQuoted(t *analyzer.Type, src string, addressable bool,
 		g.encodeQuoted(t.Elem, "(*"+src+")", true, n+1)
 		g.pf("%s}", ind(n))
 	case analyzer.KindString:
-		g.pf("%sdst = odjsonrt.AppendStringQuoted(dst, string(%s), %s)", ind(n), src, g.htmlLit())
+		g.pf("%sdst = odjsonrt.AppendStringQuotedMode(dst, string(%s), %s)", ind(n), src, mode)
 	default:
 		g.pf("%sdst = append(dst, '\"')", ind(n))
 		g.encode(t, src, addressable, n)
@@ -148,13 +163,17 @@ func (g *generator) encode(t *analyzer.Type, src string, addressable bool, n int
 		g.pf("%sdst, err = odjsonrt.AppendFloat(dst, float64(%s), %d)", ind(n), src, t.Bits)
 		g.encErr(n)
 	case analyzer.KindString:
-		g.pf("%sdst = odjsonrt.AppendString(dst, string(%s), %s)", ind(n), src, g.htmlLit())
+		g.pf("%sdst = odjsonrt.AppendStringMode(dst, string(%s), %s)", ind(n), src, mode)
 	case analyzer.KindBytes:
-		g.pf("%sdst = odjsonrt.AppendBase64(dst, []byte(%s))", ind(n), src)
+		g.pf("%sif %s == nil {", ind(n), src)
+		g.pf("%sdst = odjsonrt.AppendNilBytes(dst, %s)", ind(n+1), mode)
+		g.pf("%s} else {", ind(n))
+		g.pf("%sdst = odjsonrt.AppendBase64(dst, []byte(%s))", ind(n+1), src)
+		g.pf("%s}", ind(n))
 	case analyzer.KindSlice:
 		i := g.tmp("i")
 		g.pf("%sif %s == nil {", ind(n), src)
-		g.pf("%sdst = append(dst, 'n', 'u', 'l', 'l')", ind(n+1))
+		g.pf("%sdst = odjsonrt.AppendNilSlice(dst, %s)", ind(n+1), mode)
 		g.pf("%s} else {", ind(n))
 		g.pf("%sdst = append(dst, '[')", ind(n+1))
 		g.pf("%sfor %s := range %s {", ind(n+1), i, src)
@@ -179,7 +198,7 @@ func (g *generator) encode(t *analyzer.Type, src string, addressable bool, n int
 		g.pkg.Imports.Add("slices", "slices")
 		keys, k, i, mv := g.tmp("keys"), g.tmp("k"), g.tmp("i"), g.tmp("mv")
 		g.pf("%sif %s == nil {", ind(n), src)
-		g.pf("%sdst = append(dst, 'n', 'u', 'l', 'l')", ind(n+1))
+		g.pf("%sdst = odjsonrt.AppendNilMap(dst, %s)", ind(n+1), mode)
 		g.pf("%s} else {", ind(n))
 		g.pf("%s%s := make([]string, 0, len(%s))", ind(n+1), keys, src)
 		g.pf("%sfor %s := range %s {", ind(n+1), k, src)
@@ -191,7 +210,7 @@ func (g *generator) encode(t *analyzer.Type, src string, addressable bool, n int
 		g.pf("%sif %s > 0 {", ind(n+2), i)
 		g.pf("%sdst = append(dst, ',')", ind(n+3))
 		g.pf("%s}", ind(n+2))
-		g.pf("%sdst = odjsonrt.AppendString(dst, %s, %s)", ind(n+2), k, g.htmlLit())
+		g.pf("%sdst = odjsonrt.AppendStringMode(dst, %s, %s)", ind(n+2), k, mode)
 		g.pf("%sdst = append(dst, ':')", ind(n+2))
 		g.pf("%s%s := %s[%s]", ind(n+2), mv, src, convert(t.Key.Expr, k))
 		g.encode(t.Elem, mv, true, n+2)
@@ -205,9 +224,9 @@ func (g *generator) encode(t *analyzer.Type, src string, addressable bool, n int
 			src = tv
 		}
 		if t.Struct.Local {
-			g.pf("%sdst, err = %s.odjsonAppend(dst)", ind(n), src)
+			g.pf("%sdst, err = %s.odjsonAppend(dst, %s)", ind(n), src, mode)
 		} else {
-			g.pf("%sdst, err = %sAppend(dst, %s)", ind(n), t.Struct.Helper, addr(src))
+			g.pf("%sdst, err = %sAppend(dst, %s, %s)", ind(n), t.Struct.Helper, addr(src), mode)
 		}
 		g.encErr(n)
 	default:
@@ -218,12 +237,12 @@ func (g *generator) encode(t *analyzer.Type, src string, addressable bool, n int
 			g.pf("%sif %s == nil {", ind(n), src)
 			g.pf("%sdst = append(dst, 'n', 'u', 'l', 'l')", ind(n+1))
 			g.pf("%s} else {", ind(n))
-			g.pf("%sdst, err = odjsonrt.AppendAny(dst, %s, %s)", ind(n+1), src, g.htmlLit())
+			g.pf("%sdst, err = odjsonrt.AppendAnyMode(dst, %s, %s)", ind(n+1), src, mode)
 			g.encErr(n + 1)
 			g.pf("%s}", ind(n))
 			return
 		}
-		g.pf("%sdst, err = odjsonrt.AppendAny(dst, %s, %s)", ind(n), src, g.htmlLit())
+		g.pf("%sdst, err = odjsonrt.AppendAnyMode(dst, %s, %s)", ind(n), src, mode)
 		g.encErr(n)
 	}
 }
@@ -262,6 +281,17 @@ func (g *generator) nonEmptyExpr(t *analyzer.Type, src string) string {
 		return "true"
 	default:
 		return "true"
+	}
+}
+
+// alwaysKeptByV2 reports whether encoding/json/v2 keeps a field that
+// encoding/json would drop under omitempty.
+func alwaysKeptByV2(t *analyzer.Type) bool {
+	switch t.Kind {
+	case analyzer.KindBool, analyzer.KindInt, analyzer.KindUint, analyzer.KindFloat:
+		return true
+	default:
+		return false
 	}
 }
 
