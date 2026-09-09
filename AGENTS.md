@@ -113,7 +113,9 @@ Within the root module:
   project.
 - `internal/` — generator implementation, not part of the public API:
   `analyzer` (go/packages loading and encoding/json's field promotion rules),
-  `codegen` (source rendering), `generate` (the driver), and `testfixture`,
+  `codegen` (builds the file as a `go/ast` tree and prints it; `emit.go`
+  explains how statements get the positions that drive the printer's
+  layout), `generate` (the driver), and `testfixture`,
   whose sub-packages each pin one area against `encoding/json`: the root
   package covers every scalar and composite field shape, `embed` covers field
   promotion and conflict resolution, `fallback` covers what the generator hands
