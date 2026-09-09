@@ -1,9 +1,30 @@
 package proto
 
-import "github.com/mazrean/odjson/odjsonrt"
+import (
+	"bytes"
+
+	"github.com/mazrean/odjson/odjsonrt"
+)
+
+// trusted selects the string parser. jsontext validates the UTF-8 of every
+// value it hands to UnmarshalJSONFrom, so a decoder reached that way can skip
+// odjsonrt.ParseString's own utf8.Valid pass over every non-ASCII string.
+type trusted bool
+
+func (t trusted) str(data []byte, p int) (string, int, error) {
+	if !t {
+		return odjsonrt.ParseString(data, p)
+	}
+	if p < len(data) && data[p] == '"' {
+		if q := bytes.IndexAny(data[p+1:], "\\\""); q >= 0 && data[p+1+q] == '"' {
+			return string(data[p+1 : p+1+q]), p + q + 2, nil
+		}
+	}
+	return odjsonrt.ParseString(data, p)
+}
 
 // parseAuthor is the shape of odjson's generated struct decoder.
-func parseAuthor(data []byte, v *Author, p int) (int, error) {
+func parseAuthor(data []byte, v *Author, p int, tr trusted) (int, error) {
 	var err error
 	p = odjsonrt.SkipSpace(data, p)
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
@@ -26,7 +47,7 @@ func parseAuthor(data []byte, v *Author, p int) (int, error) {
 		p = odjsonrt.SkipSpace(data, p)
 		switch string(key) {
 		case "name":
-			v.Name, p, err = odjsonrt.ParseString(data, p)
+			v.Name, p, err = tr.str(data, p)
 		case "age":
 			var n int64
 			n, p, err = odjsonrt.ParseInt(data, p, 64)
@@ -54,7 +75,7 @@ func parseAuthor(data []byte, v *Author, p int) (int, error) {
 	}
 }
 
-func parseBook(data []byte, v *TokBook, p int) (int, error) {
+func parseBook(data []byte, v *TokBook, p int, tr trusted) (int, error) {
 	var err error
 	p = odjsonrt.SkipSpace(data, p)
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
@@ -83,10 +104,10 @@ func parseBook(data []byte, v *TokBook, p int) (int, error) {
 		case "ids":
 			v.BookIds, p, err = parseIntsBytes(data, p, v.BookIds)
 		case "title":
-			v.Title, p, err = odjsonrt.ParseString(data, p)
+			v.Title, p, err = tr.str(data, p)
 		case "titles":
 			p, err = parseSlice(data, p, &v.Titles, func(d []byte, q int) (string, int, error) {
-				return odjsonrt.ParseString(d, q)
+				return tr.str(d, q)
 			})
 		case "price":
 			v.Price, p, err = odjsonrt.ParseFloat(data, p, 64)
@@ -99,11 +120,11 @@ func parseBook(data []byte, v *TokBook, p int) (int, error) {
 		case "hots":
 			p, err = parseSlice(data, p, &v.Hots, odjsonrt.ParseBool)
 		case "author":
-			p, err = parseAuthor(data, &v.Author, p)
+			p, err = parseAuthor(data, &v.Author, p, tr)
 		case "authors":
 			p, err = parseSlice(data, p, &v.Authors, func(d []byte, q int) (Author, int, error) {
 				var a Author
-				n, err := parseAuthor(d, &a, q)
+				n, err := parseAuthor(d, &a, q, tr)
 				return a, n, err
 			})
 		case "weights":

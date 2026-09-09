@@ -107,15 +107,15 @@ func appendInts(dst []byte, s []int) []byte {
 }
 
 // MarshalJSONTo builds the whole value first, then writes it in one call.
+// The scratch space comes from the encoder itself: AvailableBuffer is sized to
+// the largest value written so far and is reused, so this allocates nothing,
+// unlike a sync.Pool whose Put boxes the slice header on every call.
 func (v BlobBook) MarshalJSONTo(enc *jsontext.Encoder) error {
-	buf, err := appendBook(odjsonrt.AcquireBuffer(), &v)
+	buf, err := appendBook(enc.AvailableBuffer(), &v)
 	if err != nil {
-		odjsonrt.ReleaseBuffer(buf)
 		return err
 	}
-	err = enc.WriteValue(buf)
-	odjsonrt.ReleaseBuffer(buf)
-	return err
+	return enc.WriteValue(buf)
 }
 
 // UnmarshalJSONFrom reads the whole value, then parses it with odjson's byte
@@ -125,6 +125,6 @@ func (v *BlobBook) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if err != nil {
 		return err
 	}
-	_, err = parseBook(val, (*TokBook)(v), 0)
+	_, err = parseBook(val, (*TokBook)(v), 0, false)
 	return err
 }

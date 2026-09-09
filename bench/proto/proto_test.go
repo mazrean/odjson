@@ -27,7 +27,7 @@ func TestVariantsAgree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, v := range map[string]any{"blob": BlobBook(b), "token": TokBook(b)} {
+	for name, v := range map[string]any{"blob": BlobBook(b), "token": TokBook(b), "fast": FastBook(b)} {
 		got, err := jsonv2.Marshal(v)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
@@ -67,6 +67,30 @@ func stringy(tb testing.TB) Book {
 	return v
 }
 
+// dense returns a value whose bytes are dominated by many small members, the
+// shape where the per-member cost of jsontext's public API matters most: 500
+// copies of the small fixture, about 11k object members in 180 KiB.
+func dense[T ~struct {
+	BookId  int       `json:"id"`
+	BookIds []int     `json:"ids"`
+	Title   string    `json:"title"`
+	Titles  []string  `json:"titles"`
+	Price   float64   `json:"price"`
+	Prices  []float64 `json:"prices"`
+	Hot     bool      `json:"hot"`
+	Hots    []bool    `json:"hots"`
+	Author  Author    `json:"author"`
+	Authors []Author  `json:"authors"`
+	Weights []int     `json:"weights"`
+}](tb testing.TB, one T) []T {
+	tb.Helper()
+	s := make([]T, 500)
+	for i := range s {
+		s[i] = one
+	}
+	return s
+}
+
 func BenchmarkProtoMarshal(b *testing.B) {
 	v := decoded(b)
 	big := stringy(b)
@@ -77,9 +101,15 @@ func BenchmarkProtoMarshal(b *testing.B) {
 		{"small/reflection", v},
 		{"small/blob-WriteValue", BlobBook(v)},
 		{"small/token-WriteToken", TokBook(v)},
+		{"small/fast-WriteValue", FastBook(v)},
 		{"stringy/reflection", big},
 		{"stringy/blob-WriteValue", BlobBook(big)},
 		{"stringy/token-WriteToken", TokBook(big)},
+		{"stringy/fast-WriteValue", FastBook(big)},
+		{"dense/reflection", dense(b, v)},
+		{"dense/blob-WriteValue", dense(b, BlobBook(v))},
+		{"dense/token-WriteToken", dense(b, TokBook(v))},
+		{"dense/fast-WriteValue", dense(b, FastBook(v))},
 	}
 	for _, c := range cases {
 		b.Run(c.name, func(b *testing.B) {
@@ -103,12 +133,17 @@ func BenchmarkProtoUnmarshal(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	densePayload, err := jsonv2.Marshal(dense(b, decoded(b)))
+	if err != nil {
+		b.Fatal(err)
+	}
 	inputs := []struct {
 		name string
 		data []byte
 	}{
 		{"small", payload},
 		{"stringy", bigPayload},
+		{"dense", densePayload},
 	}
 	cases := []struct {
 		name  string
@@ -117,8 +152,22 @@ func BenchmarkProtoUnmarshal(b *testing.B) {
 		{"reflection", func() any { return new(Book) }},
 		{"blob-ReadValue", func() any { return new(BlobBook) }},
 		{"token-ReadToken", func() any { return new(TokBook) }},
+		{"fast-trusted", func() any { return new(FastBook) }},
+	}
+	denseCases := []struct {
+		name  string
+		fresh func() any
+	}{
+		{"reflection", func() any { return new([]Book) }},
+		{"blob-ReadValue", func() any { return new([]BlobBook) }},
+		{"token-ReadToken", func() any { return new([]TokBook) }},
+		{"fast-trusted", func() any { return new([]FastBook) }},
 	}
 	for _, in := range inputs {
+		cases := cases
+		if in.name == "dense" {
+			cases = denseCases
+		}
 		for _, c := range cases {
 			b.Run(in.name+"/"+c.name, func(b *testing.B) {
 				if err := jsonv2.Unmarshal(in.data, c.fresh()); err != nil {
