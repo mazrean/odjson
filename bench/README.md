@@ -131,6 +131,10 @@ versus reflection; use `gen` and `plain` for the absolute numbers.
 cd bench && go test -bench . -count 5 ./ab/
 ```
 
+`ab` covers all four host libraries; the sonic and go-json rows are what settle
+whether `-methods` wins their small unmarshal (it does, narrowly) and loses
+everything else on them (it does, by the floor).
+
 ## `floor`
 
 `bench/floor` answers a different question: not "how fast is the generated
@@ -138,9 +142,11 @@ codec" but "what does the host library charge for using a codec at all". Its
 marshaler returns an already encoded document and its unmarshaler discards its
 input, so the numbers are a lower bound for any implementation of
 `json.Marshaler` / `json.Unmarshaler`. For sonic and go-json that bound is
-already above what those libraries cost without the interface, which is why
-`-methods` cannot win on them at any speed. Keep this package: it is the
-evidence for that claim.
+already at or above what those libraries cost to encode without the interface,
+which is why `-methods` cannot win their marshal rows at any speed, and it is
+more than half of what they cost to decode `twitter`, which is why the large
+unmarshal rows are out of reach for a pure Go decoder. Keep this package: it is
+the evidence for both claims.
 
 ## `proto`
 

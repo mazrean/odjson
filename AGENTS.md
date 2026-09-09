@@ -25,16 +25,30 @@ user already has, and makes it faster. It does not replace them.
 
 **Where the win actually is** (measured, see `bench/`): the direct functions,
 always. `-methods` is a second win on the two standard libraries — it makes
-`encoding/json/v2` 1.4-2.7x *faster* on all four measurements and
-`encoding/json` 1.06-1.39x faster on three of four — but it cannot win on
-sonic or go-json, and `bench/floor` proves why rather than asserting it: with
-a `MarshalJSON` that costs nothing, sonic still spends 107us on the twitter
-payload against 102us for its own reflection path, and go-json 347us against
-239us. The interface floor is above the target, so no generated code can
-close it. Do not re-open that question without re-running `bench/floor`. It
-stays **off by default** for that reason: the recommendation is not uniform
-across libraries, so the user has to make it. Keep the benchmark section of
-`README.md` honest about this, and re-measure before changing the default.
+`encoding/json/v2` 1.5-3.1x *faster* on all four measurements and
+`encoding/json` 1.12-1.6x faster on three of four. On sonic and go-json it
+wins only the small unmarshal rows (1.08x and 1.02x in `bench/ab`), and
+`bench/floor` proves why the rest cannot be won rather than asserting it: with
+a `MarshalJSON` that costs nothing, sonic still spends 105us on the twitter
+payload against 111us for its own path, and go-json 338us against 239us,
+because sonic validates and go-json compacts whatever a marshaler returns.
+On the decode side the floor is the skip-and-validate pass they make before
+calling `UnmarshalJSON`: 284us and 470us on twitter, against their own 491us
+and 655us, so the generated decoder would have to run 2.5x faster than sonic's
+JIT to break even there. Do not re-open either question without re-running
+`bench/floor` and `bench/ab`. `-methods` stays **off by default** for that
+reason: the recommendation is not uniform across libraries, so the user has
+to make it. Keep the benchmark section of `README.md` honest about this, and
+re-measure before changing the default.
+
+The byte oriented decoder (`odjsonParse`, behind `UnmarshalT`, `UnmarshalJSON`,
+the direct path and the whole-value path) matches known member names against
+the document's raw bytes, quotes included, before scanning anything, and
+decodes bools, integers and simple floats inline; the general runtime parsers
+are the fallback and the only thing that produces an error. Anything added to
+that decoder has to keep the parity fixtures green, and any new fast path must
+decline rather than guess: `internal/testfixture`'s scalar cases cover the
+spellings the raw match cannot see.
 
 The json/v2 numbers rest on `odjsonrt/direct.go`, **the direct path**: for a
 top-level value under a plain `json.Marshal` / `json.Unmarshal` the generated
