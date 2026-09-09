@@ -68,10 +68,17 @@ Generation strategy:
   the struct's fields, with no reflection and no intermediate map. With
   `-methods` each struct gets two more decoders for `UnmarshalJSONFrom`:
   `odjsonParseFrom` drives the `jsontext.Decoder` member by member, and
-  `odjsonParseV2` parses bytes the decoder has already validated, under
-  json/v2's semantics (null zeroes, arrays are strict, names are case
-  sensitive). `odjsonrt.WholeValue` picks between them per value at runtime:
-  small values are read whole, large ones are driven token by token.
+  `odjsonParseV2` parses a byte slice under json/v2's semantics (null
+  zeroes, arrays are strict, names are case sensitive). Its `strict`
+  argument says whether those bytes still need json/v2's checks: `true` on
+  the direct path, where nothing has looked at them, `false` when they came
+  out of the decoder, which has already applied whatever options the caller
+  passed. Never check again in the second case; that refuses what
+  `AllowDuplicateNames` or `AllowInvalidUTF8` (and so every `encoding/json`
+  call) explicitly allowed, and `TestLenientOptionsReachTheFallback` in
+  `internal/testfixture/v2parity` guards it. `odjsonrt.WholeValue` picks
+  between the two decoders per value at runtime: small values are read
+  whole, large ones are driven token by token.
 
 ## Repository layout
 

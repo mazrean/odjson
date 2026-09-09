@@ -45,10 +45,12 @@ every major library honours:
 | [`github.com/goccy/go-json`](https://github.com/goccy/go-json)     | `json.Marshaler` / `json.Unmarshaler` |
 
 Then an unchanged `json.Marshal(v)` — whichever `json` that is — dispatches into
-the generated code. That is convenient, but it is **not** the fast path: the
-interface contract makes the host library re-scan and copy what the generated
-codec produces. `-methods` is off by default for that reason; the
-[benchmarks](#benchmarks) show the cost.
+the generated code. That is convenient, but on sonic and go-json it is **not**
+the fast path: their interface contract makes them re-scan and copy what the
+generated codec produces. `encoding/json` gains a little and `encoding/json/v2`
+gains a lot, through the [direct path](#the-direct-path). `-methods` is off by
+default because that recommendation is not uniform; the
+[benchmarks](#benchmarks) show each case.
 
 ## Install
 
