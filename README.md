@@ -315,7 +315,9 @@ speed:
 > margin over the standard library narrows sharply, to the point where the
 > encode side is no longer a win at all. Plan a version bump around a Go
 > upgrade, or build with `-tags odjson_safe` if you would rather never depend on
-> it. The measurements for both paths are in
+> it. A nightly workflow watches for the release and, once the layout still
+> checks out on it, opens the pull request that adds it — so the wait is a
+> review and a tag, not a discovery. The measurements for both paths are in
 > [docs/internals.md](./docs/internals.md#the-direct-path).
 
 ## How it works

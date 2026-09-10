@@ -1,0 +1,321 @@
+name: Go minor watch
+
+# Watches for a new Go minor release and, when one is out, proves odjsonrt's
+# direct path still holds on it before proposing the one-line widening of its
+# version gate (`verifiedGoMinors` in odjsonrt/direct.go).
+#
+# Why it exists: the direct path reaches jsontext's unexported fields through
+# reflect-computed offsets and unsafe, so it is gated to the Go minors it was
+# verified against, and AGENTS.md's rule is "never widen the gate blind". This
+# workflow is the non-blind path — it widens the gate in its own checkout, runs
+# the suite on the new toolchain, and opens the PR only if that comes back
+# green; a failure becomes an issue instead. It does not replace the human
+# read of jsontext's source that the PR body links to: a green suite says the
+# layout still matches, not that the reasoning behind it survived.
+#
+# What it needs from the repository:
+#   - The GitHub App behind the `Release` environment (APP_ID / APP_PRIVATE_KEY)
+#     must hold `contents: write`, `pull requests: write` and `issues: write`
+#     here. The default GITHUB_TOKEN would do all three, but a pull request it
+#     opens triggers no `pull_request` workflows, so the PR would land with no
+#     checks at all.
+#   - Scheduled runs fire only from the default branch, and GitHub suspends
+#     them after 60 days without repository activity.
+
+on:
+  schedule:
+    # Daily, off the hour: scheduled runs are queued rather than guaranteed,
+    # and the top of the hour is the most contended slot.
+    - cron: "37 2 * * *"
+  workflow_dispatch:
+    inputs:
+      go_version:
+        description: "Go version to verify, e.g. 1.28.0 (default: the newest stable release)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # One at a time: a manual run and the nightly one would otherwise race for
+  # the same branch.
+  group: ${{ github.workflow }}
+
+jobs:
+  verify:
+    name: Verify the direct path on the newest Go
+    runs-on: ubuntu-latest
+    # Borrowed from the release job, which is where the App's credentials are
+    # stored. Nothing is deployed here.
+    environment: Release
+    defaults:
+      run:
+        shell: bash
+    env:
+      # The whole point is to test the toolchain setup-go installed, so the
+      # `go` line in go.mod must never quietly pull a different one.
+      GOTOOLCHAIN: local
+    steps:
+      - name: generate a token
+        id: token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      # The token has to exist before the checkout: it is what the later
+      # `git push` authenticates with, and what makes the pull request come
+      # from the App instead of from a token whose PRs run no checks.
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ steps.token.outputs.token }}
+
+      - name: pick the version to verify
+        id: pick
+        env:
+          REQUESTED: ${{ inputs.go_version }}
+        run: |
+          set -euo pipefail
+          if [ -n "$REQUESTED" ]; then
+            full="${REQUESTED#go}"
+          else
+            # ?mode=json, without include=all, is the two supported stable
+            # series. Sorting on the parsed numbers rather than trusting the
+            # order keeps a reshuffle upstream from picking the older one.
+            full=$(curl -fsSL 'https://go.dev/dl/?mode=json' |
+              jq -r '[.[] | select(.stable) | .version | ltrimstr("go")]
+                     | sort_by(split(".") | map(tonumber? // 0)) | last')
+          fi
+          minor="go$(cut -d. -f1,2 <<<"$full")"
+          {
+            echo "full=$full"
+            echo "minor=$minor"
+            echo "branch=chore/direct-$minor"
+          } >> "$GITHUB_OUTPUT"
+          echo "candidate: Go $full (minor $minor)"
+
+      - name: is there anything to do?
+        id: state
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          MINOR: ${{ steps.pick.outputs.minor }}
+          BRANCH: ${{ steps.pick.outputs.branch }}
+        run: |
+          set -euo pipefail
+          if ! line=$(grep -E '^var verifiedGoMinors = \[\]string\{' odjsonrt/direct.go); then
+            echo "::error::odjsonrt/direct.go no longer declares verifiedGoMinors on one line; this workflow's rewrite is stale"
+            exit 1
+          fi
+          verified=$(grep -oE 'go1\.[0-9]+' <<<"$line" | tr '\n' ' ')
+          prev=$(printf '%s\n' $verified | sort -t. -k2,2n | tail -1)
+          echo "the gate currently accepts: $verified"
+
+          skip=""
+          case " $verified " in
+            *" $MINOR "*) skip="$MINOR is already in the gate" ;;
+          esac
+          # A closed-and-unmerged PR is a decision; reopening it every night
+          # would be noise. So is re-filing an issue this workflow already
+          # filed. Both are listed and filtered rather than searched, because
+          # the search index lags behind a freshly created item.
+          if [ -z "$skip" ] &&
+             [ "$(gh pr list --head "$BRANCH" --state all --json number --jq 'length')" != 0 ]; then
+            skip="a pull request for $BRANCH already exists"
+          fi
+          if [ -z "$skip" ] &&
+             [ "$(gh issue list --state all --limit 200 --json title \
+                    --jq "[.[] | select((.title | contains(\"$MINOR\")) and (.title | contains(\"direct path\")))] | length")" != 0 ]; then
+            skip="an issue about the $MINOR gate already exists"
+          fi
+
+          if [ -n "$skip" ]; then
+            echo "::notice::nothing to do — $skip"
+            echo "Nothing to do: $skip." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          {
+            echo "skip=$skip"
+            echo "prev=$prev"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@v6
+        if: steps.state.outputs.skip == ''
+        with:
+          go-version: ${{ steps.pick.outputs.full }}
+          cache-dependency-path: "**/go.sum"
+
+      - name: widen the gate in this checkout
+        if: steps.state.outputs.skip == ''
+        env:
+          MINOR: ${{ steps.pick.outputs.minor }}
+        run: |
+          set -euo pipefail
+          sed -i -E "s|^(var verifiedGoMinors = \[\]string\{.*)\}$|\1, \"$MINOR\"}|" odjsonrt/direct.go
+          grep -q "\"$MINOR\"" odjsonrt/direct.go
+          test -z "$(gofmt -l odjsonrt/direct.go)"
+          git --no-pager diff -- odjsonrt/direct.go
+
+      - name: verify on the new toolchain
+        id: verify
+        if: steps.state.outputs.skip == ''
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/verify.log"
+          record() {
+            echo "\$ $*" | tee -a "$log"
+            "$@" 2>&1 | tee -a "$log"
+          }
+
+          record go version
+          record go build ./...
+          record go test -race ./...
+          # The direct path is compiled out under this tag, so the fallback has
+          # to stay correct on the new toolchain too.
+          record go test -tags odjson_safe ./...
+          record go test -run '^TestDirectEnabled$' -v ./odjsonrt/
+
+          # A green suite alone proves nothing here: with the gate shut every
+          # generated method quietly falls back to jsontext's public API and
+          # the tests still pass. This line is what says the direct path is
+          # what ran.
+          grep -q '^--- PASS: TestDirectEnabled' "$log"
+          #
+          # `go tool lint` is deliberately not part of this: staticcheck is
+          # pinned and can refuse a Go release newer than itself, which would
+          # fail the gate for a reason that has nothing to do with jsontext's
+          # layout. CI lints the pull request on go.mod's toolchain anyway.
+          # bench/ is out too — it is a separate module whose third-party JSON
+          # libraries lag a new Go by weeks.
+
+      - name: open the pull request
+        if: steps.state.outputs.skip == '' && steps.verify.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          APP_SLUG: ${{ steps.token.outputs.app-slug }}
+          MINOR: ${{ steps.pick.outputs.minor }}
+          PREV: ${{ steps.state.outputs.prev }}
+          FULL: ${{ steps.pick.outputs.full }}
+          BRANCH: ${{ steps.pick.outputs.branch }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          # The numeric id is what links the commit to the App's bot account;
+          # without it the address still works, it just shows no avatar.
+          bot_id=$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id 2>/dev/null || true)
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${bot_id:+${bot_id}+}${APP_SLUG}[bot]@users.noreply.github.com"
+
+          git switch -c "$BRANCH"
+          git add odjsonrt/direct.go
+          git commit -F - <<EOF
+          feat(odjsonrt): enable the direct path on Go ${MINOR#go}
+
+          Verified on Go ${FULL}: go build, go test -race ./..., the odjson_safe
+          build, and TestDirectEnabled — the last of which is what proves the
+          direct path came up rather than falling back to jsontext's public API.
+
+          The layout itself still has to be read against that release's jsontext
+          by a human before this merges; the pull request says what to look at.
+
+          Run: ${RUN_URL}
+          EOF
+          # --force is safe here and is the recovery path: the branch belongs to
+          # this workflow alone, and the guard above means we only get this far
+          # when no pull request references it — so anything already there is a
+          # previous run that pushed and then failed to open one.
+          git push --force origin "$BRANCH"
+
+          # Where the prose still names the minor this one supersedes. The
+          # bot does not rewrite prose; the reviewer decides what, if anything,
+          # these lines should now say.
+          mentions=$(grep -rnE "Go ${PREV#go}|${PREV}([^0-9]|\$)" --include='*.md' . | head -n 20 || true)
+
+          body="$RUNNER_TEMP/pr.md"
+          cat > "$body" <<EOF
+          Go ${FULL} is out, so this widens \`verifiedGoMinors\` in
+          \`odjsonrt/direct.go\` to accept \`${MINOR}\`. Opened by
+          [\`go-minor.yml\`](${RUN_URL}) — draft on purpose, see the last section.
+
+          ## What was verified, on Go ${FULL}
+
+          | Check | Why it is here |
+          | --- | --- |
+          | \`go build ./...\` | the tree compiles on the new toolchain |
+          | \`go test -race ./...\` | the whole suite, including \`internal/testfixture/v2parity\`, which is what pins the \`*Strict\` parsers to what jsontext rejects |
+          | \`go test -tags odjson_safe ./...\` | the fallback with the direct path compiled out |
+          | \`go test -run '^TestDirectEnabled\$' -v ./odjsonrt/\` | **the one that matters.** With the gate shut everything falls back to the public API and the suite still passes; this asserts the direct path actually came up, which means \`calibrateDirect\` found every field it needs and its json/v2 self-tests agreed |
+
+          ## What is still owed, by a human
+
+          \`calibrateDirect\` checks field *shapes* — a name, a kind, a struct of
+          two uint64 words. A rename it would catch; a field that keeps its
+          shape and changes its meaning it would not. So read the diff before
+          merging:
+
+          - [\`jsontext\` at \`go${FULL}\`](https://github.com/golang/go/tree/go${FULL}/src/encoding/json/jsontext)
+          - [\`${PREV}.0...go${FULL}\`](https://github.com/golang/go/compare/${PREV}.0...go${FULL})
+
+          ## What this PR's own CI does *not* cover
+
+          \`ci.yml\` uses \`go-version-file: go.mod\`, which still says
+          \`go ${PREV#go}\`, so nothing on this pull request exercises the widened
+          gate — the evidence above is the run linked at the top. Adding
+          \`${MINOR#go}\` to a matrix in \`ci.yml\` is the durable fix, and is a
+          maintainer's call rather than this workflow's.
+
+          Prose still naming a Go version, for whoever updates it:
+
+          \`\`\`
+          ${mentions:-none}
+          \`\`\`
+          EOF
+
+          url=$(gh pr create --draft --base "${{ github.event.repository.default_branch }}" \
+            --head "$BRANCH" \
+            --title "feat(odjsonrt): enable the direct path on Go ${MINOR#go}" \
+            --body-file "$body")
+          echo "opened $url"
+          echo "Opened $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: file an issue when the verification fails
+        if: steps.state.outputs.skip == '' && steps.verify.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          MINOR: ${{ steps.pick.outputs.minor }}
+          FULL: ${{ steps.pick.outputs.full }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          body="$RUNNER_TEMP/issue.md"
+          cat > "$body" <<EOF
+          Go ${FULL} is out. \`go-minor.yml\` widened \`verifiedGoMinors\` in
+          \`odjsonrt/direct.go\` to \`${MINOR}\` in a scratch checkout and one of
+          the checks failed, so no pull request was opened and the gate is
+          unchanged: on ${MINOR} the generated methods keep using jsontext's
+          public API, which is correct and slower.
+
+          Run: ${RUN_URL}
+
+          Where to start: if \`TestDirectEnabled\` is the failure, \`calibrateDirect\`
+          declined — a field it reads by name and kind moved, or its json/v2
+          self-test disagreed with the public path. Read
+          [\`jsontext\` at \`go${FULL}\`](https://github.com/golang/go/tree/go${FULL}/src/encoding/json/jsontext),
+          fix the layout, then re-run this workflow from the Actions tab with
+          \`go_version: ${FULL}\`. **Close this issue first** — it is what stops
+          the nightly run from filing another one.
+
+          Tail of the log:
+
+          \`\`\`
+          $(tail -n 120 "$RUNNER_TEMP/verify.log")
+          \`\`\`
+          EOF
+
+          url=$(gh issue create \
+            --title "direct path: the gate cannot be widened to ${MINOR} yet" \
+            --body-file "$body")
+          echo "::error::verification failed on Go ${FULL}; filed $url"
+          echo "Verification failed on Go ${FULL}. Filed $url" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
