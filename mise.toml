@@ -5,3 +5,15 @@ gh = "latest"
 go = "1.27"
 "go:golang.org/x/tools/gopls" = "0.23.0"
 goreleaser = "2"
+
+# The canonical linter: the tools/lint module (go vet's analyzers +
+# staticcheck + stylecheck). It is a module of its own so that staticcheck
+# stays out of the root module's dependency graph, so it has to be built
+# first and then run from here, where `./...` resolves against the root
+# module. See AGENTS.md § Linting.
+[tasks.lint]
+description = "Run the canonical linter over the root module"
+run = [
+  "go build -C tools/lint -o lint .",
+  "./tools/lint/lint ./...",
+]

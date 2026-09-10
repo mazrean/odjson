@@ -42,11 +42,22 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: "**/go.sum"
 
-      # The canonical linter for this repo: the tools/lint package (go vet's
-      # analyzers + staticcheck + stylecheck), wired in via the go.mod `tool`
-      # directive. Not golangci-lint.
-      - name: go tool lint
-        run: go tool lint ./...
+      # The canonical linter for this repo: the tools/lint module (go vet's
+      # analyzers + staticcheck + stylecheck). Not golangci-lint. It is a
+      # module of its own so that staticcheck stays out of the root module's
+      # dependency graph, which means it is built first and then run from the
+      # repository root, where its `./...` resolves against the root module.
+      - name: build lint
+        run: go build -C tools/lint -o lint .
+
+      - name: lint
+        run: ./tools/lint/lint ./...
+
+      # `./...` from the root skips nested modules, so the linter's own
+      # sources are checked here, from inside its module.
+      - name: lint tools/lint
+        working-directory: tools/lint
+        run: ./lint ./...
 
   bench:
     name: Benchmarks module

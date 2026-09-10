@@ -107,12 +107,21 @@ Generation strategy:
 
 ## Repository layout
 
-Two Go modules:
+Three Go modules:
 
-| Path       | Module                             | Purpose                                        |
-| ---------- | ---------------------------------- | ---------------------------------------------- |
-| `.` (root) | `github.com/mazrean/odjson`        | `package main` — the `odjson` CLI + `odjsonrt` |
-| `bench/`   | `github.com/mazrean/odjson/bench`  | Benchmarks against the four JSON libraries     |
+| Path          | Module                                 | Purpose                                        |
+| ------------- | -------------------------------------- | ---------------------------------------------- |
+| `.` (root)    | `github.com/mazrean/odjson`            | `package main` — the `odjson` CLI + `odjsonrt` |
+| `bench/`      | `github.com/mazrean/odjson/bench`      | Benchmarks against the four JSON libraries     |
+| `tools/lint/` | `github.com/mazrean/odjson/tools/lint` | The repo's linter binary (see Linting)         |
+
+Both nested modules exist to keep dependencies **out of the root module's
+graph**, because everything in it is downloaded by anyone who depends on
+odjson. Neither imports the root module, so neither needs a `replace`
+directive — which is what keeps `go install github.com/mazrean/odjson@latest`
+working (`go help install`: it refuses a module whose `go.mod` carries
+replace directives). Never add a benchmark-only or lint-only dependency to
+the root `go.mod`.
 
 Within the root module:
 
@@ -149,8 +158,6 @@ Every fixture's generated file is committed, and `internal/generate`'s tests
 regenerate each one and fail on any difference. Regenerate with
 `go generate ./...` from the repo root (and again from `bench/gen` — a separate
 module) whenever the generator changes.
-- `tools/lint/` — the repo's linter binary, wired in through the `tool`
-  directive (see Linting).
 - `docs/internals.md` — the measurement record and the implementation detail
   behind `README.md`'s summary: the public API ceiling, the direct path, what
   the decode side pays, the v1/v2 semantics table, and why sonic and go-json
@@ -159,15 +166,21 @@ module) whenever the generator changes.
 
 `bench/` is a separate module on purpose: benchmarking pulls in `sonic`,
 `goccy/go-json` and friends, and those must never become dependencies of the
-root module. Never add a benchmark-only dependency to the root `go.mod`.
+root module. `tools/lint/` is separate for the same reason: it pulls in
+`staticcheck`, which nobody who merely uses odjson should have to download.
 
 The CLI version is read from `runtime/debug.ReadBuildInfo()`. Do **not**
 introduce `-X`/`ldflags` version injection, and do not disable `-buildvcs`.
 
 ## Tooling
 
-- Build/generate/lint tools are managed with the Go 1.24+ `tool` directive in
-  `go.mod`. Do **not** create or reinstate a `tools.go` file.
+- Build/generate tools are managed with the Go 1.24+ `tool` directive in
+  `go.mod`. Do **not** create or reinstate a `tools.go` file. The linter is
+  the exception: it lives in its own module and is built rather than declared
+  as a tool (see Linting).
+- Repeated commands are `mise` tasks in `mise.toml` (`mise run lint`); each
+  one stays a plain shell command you can also type by hand, because CI runs
+  `setup-go`, not `mise`.
 - CLI tool versions are pinned in `mise.toml` at the repository root
   (Go toolchain, `gopls`, `goreleaser`, `gh`, …). The coding-agent CLI itself
   is not pinned there.
@@ -175,27 +188,37 @@ introduce `-X`/`ldflags` version injection, and do not disable `-buildvcs`.
 
 ## Linting
 
-- `tools/lint/` is a package **inside the root module** producing a single
-  linter binary that combines the `go vet` analyzer suite
+- `tools/lint/` is a **module of its own** producing a single linter binary
+  that combines the `go vet` analyzer suite
   (`golang.org/x/tools/go/analysis/suite/vet`) with `staticcheck` and
   `stylecheck`, via `multichecker`. Analyzers that staticcheck marks
   non-default are skipped, matching upstream staticcheck defaults.
 - Run it from the repository root:
 
   ```sh
-  go tool lint ./...
+  go build -C tools/lint -o lint . && ./tools/lint/lint ./...
+  # or: mise run lint
   ```
 
+  The binary has to be **built first and then run from the repository root**:
+  a separate module cannot be reached by the root module's `tool` directive,
+  and the package patterns it is given (`./...`) resolve against whatever
+  module the process is started in. `-C` must be the first flag after `build`;
+  `-o lint` resolves after the directory change, so the binary lands at
+  `tools/lint/lint`, which `.gitignore` already covers.
 - Do **not** pin or introduce `golangci-lint`. `tools/lint` is the canonical
   linter.
 - Lint failures are blockers before commit.
-- To add or bump a linter dependency, edit the root `go.mod`.
-- **Why it is not its own module** (a deliberate deviation from the org-wide
-  convention): a nested module would have to be wired in with `replace ./tools/lint`,
-  and `go install github.com/mazrean/odjson@latest` refuses to install a module
-  whose `go.mod` carries replace directives (`go help install`). odjson is a
-  CLI whose primary install path is `go install`, so the replace cannot exist.
-  The cost is that `staticcheck` appears in the root module graph.
+- To add or bump a linter dependency, edit `tools/lint/go.mod` — never the
+  root one. Keeping `staticcheck` out of the root module graph is the whole
+  point of the split: the root module is what every consumer of
+  `github.com/mazrean/odjson/odjsonrt` downloads.
+- The module imports nothing from the root module, so it needs no `replace`
+  directive. Do not add one: `go install github.com/mazrean/odjson@latest`
+  refuses a module whose `go.mod` carries replace directives (`go help
+  install`), and odjson is a CLI whose primary install path is `go install`.
+- `./...` from the root does not reach it (a nested module is excluded), so
+  CI lints and vets `tools/lint` in its own step.
 
 ## Testing
 
