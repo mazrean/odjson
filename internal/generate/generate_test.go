@@ -25,6 +25,7 @@ func TestFixturesAreUpToDate(t *testing.T) {
 		{dir: "../testfixture/suitev2", command: "odjson"},
 		{dir: "../testfixture/v2parity/gen", command: "odjson"},
 		{dir: "../testfixture/withmethods", command: "odjson"},
+		{dir: "../testfixture/unexported", command: "odjson"},
 	}
 
 	for _, tc := range cases {

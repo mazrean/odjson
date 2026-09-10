@@ -54,7 +54,7 @@ func run(args []string) error {
 		fmt.Fprint(fs.Output(), usage)
 		fs.PrintDefaults()
 	}
-	fs.StringVar(&cfg.types, "type", "", "comma separated list of struct types to generate for (default: every exported struct in the package)")
+	fs.StringVar(&cfg.types, "type", "", "comma separated list of struct types to generate for (default: every struct in the package)")
 	fs.StringVar(&cfg.output, "output", "odjson_gen.go", "name of the generated file, written into each matched package directory")
 	fs.BoolVar(&cfg.escapeHTML, "escape-html", true, "escape <, > and & like encoding/json does by default")
 	fs.BoolVar(&cfg.caseInsensitive, "case-insensitive", false, "in UnmarshalJSON, fall back to a case-insensitive field match the way encoding/json v1\n\tdoes. Off by default, matching encoding/json/v2")

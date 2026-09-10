@@ -163,8 +163,10 @@ Within the root module:
   package covers every scalar and composite field shape, `embed` covers field
   promotion and conflict resolution, `fallback` covers what the generator hands
   back to reflection, `crosspkg` covers types imported from another package,
-  `suite` runs the JSON Test Suite through generated decoders, and
-  `withmethods` covers a minimal type reached through every library.
+  `suite` runs the JSON Test Suite through generated decoders,
+  `withmethods` covers a minimal type reached through every library, and
+  `unexported` covers the default type selection, which takes unexported
+  struct types too.
 
   Because the generated methods are what `encoding/json` now calls, the parity
   oracle cannot be `json.Marshal` on the fixture type itself. Each affected
@@ -173,7 +175,9 @@ Within the root module:
   `plainref.SameLayout`, asserted by a `TestSameLayout` in each fixture, is
   what keeps the two declarations from drifting. Where no field type carries a
   generated codec (`fallback`, `crosspkg`) a locally defined type is enough
-  and no `plain` package exists. Parity tests call `MarshalJSON` /
+  and no `plain` package exists; `unexported` does the same, its wrapper's
+  oracle reaching the generated codec of the very type whose parity the
+  fixture pins standalone. Parity tests call `MarshalJSON` /
   `UnmarshalJSON` directly, because `json.Marshal` would reach the v2 methods
   and their v2 semantics instead.
 
