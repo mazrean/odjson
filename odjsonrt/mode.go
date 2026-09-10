@@ -241,7 +241,31 @@ func appendStringChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
 		}
 		if b := src[i]; b >= utf8.RuneSelf {
 			// The run stays part of the pending copy: a valid sequence
-			// holds nothing that needs escaping.
+			// holds nothing that needs escaping. A two byte sequence is
+			// settled here without the call, and the words after it are
+			// taken whole while they are accented Latin text (see
+			// swarLatin), which would otherwise stop the scan at every
+			// letter; the first word without a non-ASCII byte hands back
+			// to the scan above.
+			if b-0xC2 < 0x1E && i+1 < len(src) && src[i+1]&0xC0 == 0x80 {
+				i += 2
+				if i < len(src) && src[i] >= utf8.RuneSelf {
+					// A dense run (Cyrillic, Greek): skipNonASCII takes
+					// it a word at a time.
+					if i = skipNonASCII(src, i); i < 0 {
+						return dst[:mark], ErrInvalidUTF8
+					}
+					continue
+				}
+				for i+8 <= len(src) {
+					w := binary.LittleEndian.Uint64(src[i:])
+					if w&swarHi == 0 || swarUnsafe(w) != 0 || !swarLatin(w) {
+						break
+					}
+					i += 8
+				}
+				continue
+			}
 			if i = skipNonASCII(src, i); i < 0 {
 				return dst[:mark], ErrInvalidUTF8
 			}

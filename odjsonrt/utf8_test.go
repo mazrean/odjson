@@ -65,6 +65,24 @@ func TestSkipNonASCIIMatchesUTF8Valid(t *testing.T) {
 		check(s + " suffix")
 		check(strings.Repeat(s, 3))
 	}
+	// Every lead and second byte pair, with valid continuation bytes after
+	// them, at every position within a word and truncated at every length:
+	// the boundary leads and the word paths are decided by exactly those
+	// two bytes.
+	for lead := 0x80; lead < 0x100; lead++ {
+		for second := 0; second < 0x100; second++ {
+			seq := []byte{byte(lead), byte(second), 0x80, 0x80}
+			for _, pad := range []string{"", "a", "日", "ab", "abc", "日本", "éé", "😀", "abcdefg"} {
+				full := pad + string(seq)
+				for n := 0; n <= len(seq); n++ {
+					check(pad + string(seq[:n]))
+					check(pad + string(seq[:n]) + "z")
+				}
+				check(full + full)
+				check(full + "日本語" + full)
+			}
+		}
+	}
 	// Random byte strings, and random valid strings with a byte disturbed.
 	r := rand.New(rand.NewPCG(1, 2))
 	for range 200000 {

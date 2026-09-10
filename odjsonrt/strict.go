@@ -128,6 +128,27 @@ func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, er
 			return i, hasEscape, nonASCII, errChar(data, i, "in string literal")
 		case c >= utf8.RuneSelf:
 			nonASCII = true
+			// A two byte sequence is settled here without the call, and
+			// the words after it are taken whole while they are accented
+			// Latin text (see swarLatin), which would otherwise stop the
+			// scan at every letter.
+			if c-0xC2 < 0x1E && i+1 < len(data) && data[i+1]&0xC0 == 0x80 {
+				i += 2
+				if i < len(data) && data[i] >= utf8.RuneSelf {
+					// A dense run (Cyrillic, Greek): skipNonASCII takes
+					// it a word at a time; the ordinary path below
+					// reports what it refuses.
+				} else {
+					for i+8 <= len(data) {
+						w := binary.LittleEndian.Uint64(data[i:])
+						if w&swarHi == 0 || swarStringStop(w) != 0 || !swarLatin(w) {
+							break
+						}
+						i += 8
+					}
+					continue
+				}
+			}
 			if next := skipNonASCII(data, i); next >= 0 {
 				i = next
 			} else if bytes.IndexByte(data[i:], '"') < 0 {

@@ -42,6 +42,34 @@ func swarStringStop(w uint64) uint64 {
 	return ((w-swarLo*0x20)&^w | (q-swarLo)&^q | (e-swarLo)&^e) & swarHi
 }
 
+// swarLatin reports whether every non-ASCII byte of w belongs to a complete
+// two byte sequence with a lead of C2-DF that lies inside the word: the shape
+// of Latin text with accents, and of Greek, Cyrillic, Hebrew and Arabic. A
+// scan that would otherwise stop at each such letter and validate it on its
+// own can then take the whole word. The word tests are exact: a lane's top
+// bit in nz is set when the lane is nonzero, computed without a borrow
+// crossing into the next lane.
+func swarLatin(w uint64) bool {
+	const lo7 = 0x7F7F7F7F7F7F7F7F
+	hi := w & swarHi
+	// Lanes of the form 110xxxxx, then lanes of the form 10xxxxxx.
+	x := w&0xE0E0E0E0E0E0E0E0 ^ 0xC0C0C0C0C0C0C0C0
+	lead := ^((x&lo7 + lo7) | x) & swarHi
+	y := w&0xC0C0C0C0C0C0C0C0 ^ 0x8080808080808080
+	cont := ^((y&lo7 + lo7) | y) & swarHi
+	// Every high byte is a lead or a continuation, and the continuations
+	// are exactly the lanes after the leads. A lead in the top lane would
+	// shift out of the comparison, so it is refused on its own; a
+	// continuation in the bottom lane has no lead before it and fails.
+	if hi != lead|cont || cont != lead<<8 || lead>>63 != 0 {
+		return false
+	}
+	// A lead below C2 (C0 or C1, the overlong forms) has bits 1-4 clear.
+	z := w & 0x1E1E1E1E1E1E1E1E
+	nz := ((z&lo7 + lo7) | z) & swarHi
+	return nz&lead == lead
+}
+
 // swarIndex returns the byte offset of the lowest set lane of a mask produced
 // by the helpers above, for a word loaded little-endian.
 //
