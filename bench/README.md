@@ -164,8 +164,22 @@ parser winning on small ones, which is what `odjsonrt.WholeValue` now selects
 below 4 KiB, and the direct path in `odjsonrt/direct.go` now bypasses both
 for a top-level value under a plain `json.Marshal` / `json.Unmarshal`. Keep it
 as the record
-behind the root README's "what the drop-in path costs" section; delete it only
-together with that section.
+behind `docs/internals.md`'s "what the drop-in path costs" section; delete it
+only together with that section.
 
-See the root [README](../README.md#benchmarks) for the results table and what it
-means for how you should call odjson.
+See the root [README](../README.md) for the chart and what it means for how you
+should call odjson, and
+[`docs/internals.md`](../docs/internals.md#the-measured-tables) for the absolute
+figures it is drawn from.
+
+## The chart in the root README
+
+`chart/` renders the root README's four tables as a pair of SVG small-multiple
+bar charts (light and dark), written to `docs/assets/`:
+
+```sh
+go run ./chart
+```
+
+Its numbers are literals that mirror the README's tables — the tables stay the
+source of truth, so re-measuring means editing both and regenerating.

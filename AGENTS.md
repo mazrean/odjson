@@ -25,27 +25,28 @@ using the standard library, and take it off whenever you like" is the product,
 and a second entry point contradicts it.
 
 **Positioning** (measured, see `bench/`): the target is `encoding/json/v2`
-(2.0-3.6x faster on all four measurements) and `encoding/json` (1.2-1.5x on
-three of four; the twitter encode is 4% behind because v1's coder flags make
+(2.1-3.5x faster on all four measurements) and `encoding/json` (1.2-1.5x on
+three of four; the twitter encode is 5% behind because v1's coder flags make
 the direct path decline). `github.com/bytedance/sonic` and
 `github.com/goccy/go-json` honour the v1 interfaces too and the generated code
 is correct under them, but odjson does **not** make them faster: it wins only
-their small unmarshal rows (sonic's by 1.13x and go-json's by 1.11x in
+their small unmarshal rows (sonic's by 1.10x and go-json's by 1.09x in
 `bench/ab`), and `bench/floor` proves why the rest cannot be won rather than
 asserting it: with a
-`MarshalJSON` that costs nothing, sonic still spends 105us on the twitter
-payload against 111us for its own path, and go-json 338us against 239us,
+`MarshalJSON` that costs nothing, sonic still spends 107us on the twitter
+payload against 117us for its own path, and go-json 345us against 237us,
 because sonic validates and go-json compacts whatever a marshaler returns.
 On the decode side the floor is the skip-and-validate pass they make before
-calling `UnmarshalJSON`: 284us and 470us on twitter, against their own 491us
-and 655us, so the generated decoder would have to run 2.5x faster than sonic's
+calling `UnmarshalJSON`: 260us and 470us on twitter, against their own 492us
+and 655us, so the generated decoder would have to run 2.2x faster than sonic's
 JIT to break even there. Do not re-open either question without re-running
 `bench/floor` and `bench/ab`. In `README.md` those two libraries are
 **comparison baselines only** — their "with odjson" columns stay out of the
 tables, and the claim to keep honest is that json/v2 + odjson beats go-json on
-all four (the twitter decode by 1.21x, the narrowest) and is level with sonic
-on three of the four (within 5%, in either direction across runs) and 1.7x
-ahead on the small decode. Re-measure before restating any of it.
+all four (the small encode by 1.18x, the narrowest) and is level with sonic
+on three of the four (within 5%, in either direction across runs; `bench/ab`
+in one process reads 1.03x / 1.03x / 1.01x) and 1.7x ahead on the small decode
+(1.58x in `bench/ab`). Re-measure before restating any of it.
 
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,
@@ -66,7 +67,7 @@ methods write into and read from the coder's own buffer through
 reflect-computed offsets and `unsafe`, because `jsontext`'s public API charges
 a floor (365us / 808ns for a marshaler that costs nothing) and a per-name
 duplicate check that put 1.3x out of reach (see "The direct path" and "What
-the decode side pays" in `README.md`). It is gated to the Go minor version it
+the decode side pays" in `docs/internals.md`). It is gated to the Go minor version it
 was verified against (1.27), checked by type at init, self-tested through
 json/v2 before use, and compiled out by `-tags odjson_safe`; every generated
 method keeps the public API path as its fallback. **On a new Go minor,
@@ -150,6 +151,11 @@ regenerate each one and fail on any difference. Regenerate with
 module) whenever the generator changes.
 - `tools/lint/` — the repo's linter binary, wired in through the `tool`
   directive (see Linting).
+- `docs/internals.md` — the measurement record and the implementation detail
+  behind `README.md`'s summary: the public API ceiling, the direct path, what
+  the decode side pays, the v1/v2 semantics table, and why sonic and go-json
+  cannot be sped up. `README.md` stays short and links here; anything measured
+  and rejected belongs in this file rather than being deleted.
 
 `bench/` is a separate module on purpose: benchmarking pulls in `sonic`,
 `goccy/go-json` and friends, and those must never become dependencies of the
