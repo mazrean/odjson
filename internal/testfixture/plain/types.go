@@ -121,3 +121,11 @@ type Recursive struct {
 	Name     string       `json:"name"`
 	Children []*Recursive `json:"children,omitempty"`
 }
+
+// Memberless has no JSON members: its only field is skipped by its tag.
+type Memberless struct {
+	Skipped string `json:"-"`
+}
+
+// Unit is the other shape with nothing to match: no fields at all.
+type Unit struct{}

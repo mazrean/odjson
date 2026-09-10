@@ -64,3 +64,13 @@ type Zoo struct {
 	ZeroTime   time.Time `json:"zero_time,omitzero"`
 	ZeroNested Nested    `json:"zero_nested,omitzero"`
 }
+
+// Memberless has no JSON members: its only field is skipped by its tag. Every
+// member a document carries is unknown to it, so its decoders never look at a
+// name.
+type Memberless struct {
+	Skipped string `json:"-"`
+}
+
+// Unit is the other shape with nothing to match: no fields at all.
+type Unit struct{}

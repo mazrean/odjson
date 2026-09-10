@@ -19,6 +19,8 @@ var (
 	scalarsRef    = plainref.Of[Scalars, plain.Scalars]
 	compositesRef = plainref.Of[Composites, plain.Composites]
 	recursiveRef  = plainref.Of[Recursive, plain.Recursive]
+	memberlessRef = plainref.Of[Memberless, plain.Memberless]
+	unitRef       = plainref.Of[Unit, plain.Unit]
 )
 
 func TestSameLayout(t *testing.T) {
@@ -29,6 +31,8 @@ func TestSameLayout(t *testing.T) {
 		{"Scalars", reflect.TypeFor[Scalars](), reflect.TypeFor[plain.Scalars]()},
 		{"Composites", reflect.TypeFor[Composites](), reflect.TypeFor[plain.Composites]()},
 		{"Recursive", reflect.TypeFor[Recursive](), reflect.TypeFor[plain.Recursive]()},
+		{"Memberless", reflect.TypeFor[Memberless](), reflect.TypeFor[plain.Memberless]()},
+		{"Unit", reflect.TypeFor[Unit](), reflect.TypeFor[plain.Unit]()},
 	}
 	for _, tc := range cases {
 		if err := plainref.SameLayout(tc.a, tc.b); err != nil {
@@ -191,6 +195,29 @@ func TestMarshalRecursive(t *testing.T) {
 	}}
 	marshalParity(t, "tree", v, recursiveRef)
 	marshalParity(t, "leaf", Recursive{Name: "leaf"}, recursiveRef)
+}
+
+// TestMemberless covers the two struct shapes with nothing to match: every
+// member the document carries is unknown, so the decoder never looks at a
+// name.
+func TestMemberless(t *testing.T) {
+	inputs := []string{
+		`{}`,
+		`null`,
+		`  {  }  `,
+		`{"skipped":"v"}`,
+		`{"a":1,"b":[2,{"c":3}],"d":null}`,
+		`{"a":1,"a":2}`,
+		`[]`,
+		`{`,
+		`{"a":1} trailing`,
+	}
+	marshalParity(t, "Memberless", Memberless{Skipped: "invisible"}, memberlessRef)
+	marshalParity(t, "Unit", Unit{}, unitRef)
+	for _, in := range inputs {
+		unmarshalParity(t, "Memberless", in, memberlessRef)
+		unmarshalParity(t, "Unit", in, unitRef)
+	}
 }
 
 func TestUnmarshalScalars(t *testing.T) {

@@ -83,8 +83,14 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 		g.emit(b, varDecl("unknownBuf", arrayType(8, sliceType(id("byte")))))
 		g.emit(b, define(unknown, slice(unknownBuf, nil, num(0))))
 	}
+	// The strict decoder reads the name back for its duplicate check. A
+	// struct with no members and no such check never looks at it, and a
+	// declared and unused key would not compile.
+	keyUsed := len(s.Fields) > 0 || c.strict
 	g.loop(b, func(b *block) {
-		g.emit(b, varDecl("key", sliceType(id("byte"))))
+		if keyUsed {
+			g.emit(b, varDecl("key", sliceType(id("byte"))))
+		}
 		g.emit(b, c.skipSpace())
 		if c.strict {
 			g.emit(b, define(kp, p))
@@ -105,7 +111,11 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 			if c.strict {
 				g.emit(b, assignN(token.ASSIGN, []ast.Expr{key, p, errV}, callRT("ParseKeyV2", data, p, strict)))
 			} else {
-				g.emit(b, assignN(token.ASSIGN, []ast.Expr{key, id("_"), p, errV}, callRT("ParseKey", data, p)))
+				k := ast.Expr(key)
+				if !keyUsed {
+					k = id("_")
+				}
+				g.emit(b, assignN(token.ASSIGN, []ast.Expr{k, id("_"), p, errV}, callRT("ParseKey", data, p)))
 			}
 			g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
 				g.emit(b, ret(p, errV))
