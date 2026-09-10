@@ -40,7 +40,7 @@ type panel struct {
 
 var panels = []panel{
 	{
-		title: "Marshal", sub: "twitter · 616 KiB", unit: "µs", ratio: "3.53",
+		title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "3.53",
 		rows: []row{
 			{label: "encoding/json/v2", value: 392},
 			{label: "+ odjson", value: 111, indent: true, odjson: true, emphasis: true},
@@ -58,7 +58,7 @@ var panels = []panel{
 		},
 	},
 	{
-		title: "Unmarshal", sub: "twitter · 616 KiB", unit: "µs", ratio: "2.12",
+		title: "Unmarshal", sub: "large · 616 KiB", unit: "µs", ratio: "2.12",
 		rows: []row{
 			{label: "encoding/json/v2", value: 1072},
 			{label: "+ odjson", value: 506, indent: true, odjson: true, emphasis: true},
