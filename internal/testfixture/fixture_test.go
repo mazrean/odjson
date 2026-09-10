@@ -82,7 +82,8 @@ func unmarshalParity[T, R any](t *testing.T, name, in string, ref func(*T) *R) {
 	}
 }
 
-func ptr[T any](v T) *T { return &v }
+//go:fix inline
+func ptr[T any](v T) *T { return new(v) }
 
 func scalarCases() map[string]Scalars {
 	n := 7
@@ -129,7 +130,7 @@ func scalarCases() map[string]Scalars {
 			Float64:     1e-7,
 			QuotedFloat: math.SmallestNonzeroFloat64,
 		},
-		"empty-strings": {String: "", Named: "", OmitEmptyPtr: ptr("")},
+		"empty-strings": {String: "", Named: "", OmitEmptyPtr: new("")},
 	}
 }
 
@@ -160,7 +161,7 @@ func TestMarshalComposites(t *testing.T) {
 			ColorMap:  map[Color]int{"red": 1, "blue": 2},
 			Inner:     Inner{ID: 4, Note: "in"},
 			InnerPtr:  inner,
-			DeepPtr:   ptr(inner),
+			DeepPtr:   new(inner),
 			Any:       map[string]any{"n": 1.0, "s": "t", "b": true, "z": nil},
 			Anys:      []any{1.0, "two", nil, false, []any{1.0}},
 			Raw:       json.RawMessage(`{"raw":[1,2,3]}`),

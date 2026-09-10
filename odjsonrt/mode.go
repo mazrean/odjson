@@ -1,6 +1,7 @@
 package odjsonrt
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"unicode/utf8"
@@ -290,10 +291,10 @@ func UnquoteName(name []byte) ([]byte, bool) {
 		return nil, false
 	}
 	body := name[1 : len(name)-1]
-	for i := 0; i < len(body); i++ {
-		if body[i] == '\\' {
-			return unquote(body, false)
-		}
+	// bytes.IndexByte rather than a hand-rolled loop or slices.Contains: this
+	// runs once per member name, and only IndexByte is vectorised.
+	if bytes.IndexByte(body, '\\') >= 0 {
+		return unquote(body, false)
 	}
 	return body, true
 }

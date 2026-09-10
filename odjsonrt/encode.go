@@ -26,7 +26,7 @@ const replacementChar = "\xef\xbf\xbd"
 // entries so that the copy loop stops on non-ASCII bytes and hands them to the
 // UTF-8 decoder.
 var safeSet, htmlSafeSet = func() (safe, html [256]bool) {
-	for c := 0; c < utf8.RuneSelf; c++ {
+	for c := range utf8.RuneSelf {
 		ok := c >= 0x20 && c != '"' && c != '\\'
 		safe[c] = ok
 		html[c] = ok && c != '<' && c != '>' && c != '&'

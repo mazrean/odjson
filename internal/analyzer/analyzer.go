@@ -122,8 +122,8 @@ func Load(opts Options) (*Package, error) {
 }
 
 func dirOf(file string) string {
-	if i := strings.LastIndexByte(file, '/'); i >= 0 {
-		return file[:i]
+	if before, _, ok := strings.CutLast(file, "/"); ok {
+		return before
 	}
 	return "."
 }
