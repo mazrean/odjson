@@ -11,20 +11,12 @@
 // "at least one file in a package should have a package comment") are
 // skipped so that the default behaviour matches upstream staticcheck.
 //
-// It is a module of its own, so that staticcheck and its dependencies stay
-// out of the root module's graph and nobody who depends on
-// github.com/mazrean/odjson downloads them. It imports nothing from the root
-// module, which is why no `replace` directive is needed anywhere — and so
-// `go install github.com/mazrean/odjson@latest`, which refuses a module whose
-// go.mod carries replace directives, keeps working.
+// It lives in the github.com/mazrean/odjson/tools module rather than in the
+// root one, so that staticcheck and its dependencies stay out of the graph
+// that everyone importing odjsonrt downloads. The repository's go.work is
+// what still lets the root module's `tool` shorthand reach it:
 //
-// Because it is a separate module, it cannot be wired in through the root
-// module's `tool` directive. Build it and run the binary from the repository
-// root, where its package patterns resolve against the root module:
-//
-//	go build -C tools/lint -o lint . && ./tools/lint/lint ./...
-//
-// or, equivalently, `mise run lint`.
+//	go tool lint ./... ./tools/...
 package main
 
 import (

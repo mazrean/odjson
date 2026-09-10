@@ -109,19 +109,34 @@ Generation strategy:
 
 Three Go modules:
 
-| Path          | Module                                 | Purpose                                        |
-| ------------- | -------------------------------------- | ---------------------------------------------- |
-| `.` (root)    | `github.com/mazrean/odjson`            | `package main` — the `odjson` CLI + `odjsonrt` |
-| `bench/`      | `github.com/mazrean/odjson/bench`      | Benchmarks against the four JSON libraries     |
-| `tools/lint/` | `github.com/mazrean/odjson/tools/lint` | The repo's linter binary (see Linting)         |
+| Path       | Module                            | Purpose                                        |
+| ---------- | --------------------------------- | ---------------------------------------------- |
+| `.` (root) | `github.com/mazrean/odjson`       | `package main` — the `odjson` CLI + `odjsonrt` |
+| `bench/`   | `github.com/mazrean/odjson/bench` | Benchmarks against the four JSON libraries     |
+| `tools/`   | `github.com/mazrean/odjson/tools` | `lint` and `apicompat` (see Tooling)           |
 
 Both nested modules exist to keep dependencies **out of the root module's
 graph**, because everything in it is downloaded by anyone who depends on
 odjson. Neither imports the root module, so neither needs a `replace`
 directive — which is what keeps `go install github.com/mazrean/odjson@latest`
 working (`go help install`: it refuses a module whose `go.mod` carries
-replace directives). Never add a benchmark-only or lint-only dependency to
+replace directives). Never add a benchmark-only or tool-only dependency to
 the root `go.mod`.
+
+`go.work` at the repository root joins `.` and `./tools`, which is what makes
+`go tool lint` and `go tool apicompat` resolve from the root even though the
+`tool` directives live in `tools/go.mod`. It is committed deliberately,
+against the usual advice not to: a workspace is never seen by `go install
+github.com/mazrean/odjson@latest`, nor by anyone importing `odjsonrt`, so it
+costs consumers nothing and saves every contributor from writing it by hand.
+
+`bench/go.work` (`use .`) exists because a root `go.work` makes every nested
+module directory it does not `use` fail with "directory prefix . does not
+contain modules listed in go.work"; its own one-line workspace is what keeps
+`cd bench && go test` working. `bench/` is kept out of the root workspace on
+purpose: in a workspace MVS runs over the union of every `use`d module, so
+`sonic`'s requirements would start choosing versions for root builds and
+tests.
 
 Within the root module:
 
@@ -158,8 +173,6 @@ Every fixture's generated file is committed, and `internal/generate`'s tests
 regenerate each one and fail on any difference. Regenerate with
 `go generate ./...` from the repo root (and again from `bench/gen` — a separate
 module) whenever the generator changes.
-- `tools/apicompat/` — the public-API gate, wired in through the `tool`
-  directive (see API compatibility).
 - `docs/internals.md` — the measurement record and the implementation detail
   behind `README.md`'s summary: the public API ceiling, the direct path, what
   the decode side pays, the v1/v2 semantics table, and why sonic and go-json
@@ -168,21 +181,25 @@ module) whenever the generator changes.
 
 `bench/` is a separate module on purpose: benchmarking pulls in `sonic`,
 `goccy/go-json` and friends, and those must never become dependencies of the
-root module. `tools/lint/` is separate for the same reason: it pulls in
-`staticcheck`, which nobody who merely uses odjson should have to download.
+root module. `tools/` is separate for the same reason: it pulls in
+`staticcheck` and `golang.org/x/exp`, which nobody who merely uses odjson
+should have to download.
 
 The CLI version is read from `runtime/debug.ReadBuildInfo()`. Do **not**
 introduce `-X`/`ldflags` version injection, and do not disable `-buildvcs`.
 
 ## Tooling
 
-- Build/generate tools are managed with the Go 1.24+ `tool` directive in
-  `go.mod`. Do **not** create or reinstate a `tools.go` file. The linter is
-  the exception: it lives in its own module and is built rather than declared
-  as a tool (see Linting).
-- Repeated commands are `mise` tasks in `mise.toml` (`mise run lint`); each
-  one stays a plain shell command you can also type by hand, because CI runs
-  `setup-go`, not `mise`.
+- Build/generate tools are managed with the Go 1.24+ `tool` directive. Do
+  **not** create or reinstate a `tools.go` file.
+- Those `tool` directives live in **`tools/go.mod`**, not in the root one, and
+  the root `go.work` is what lets `go tool lint` / `go tool apicompat` still
+  be typed from the repository root. The root `go.mod` must **never** regain a
+  `tool` line: that is the exact change that puts `staticcheck` and
+  `golang.org/x/exp` back into the graph of everyone who imports `odjsonrt`.
+- To add a tool, add its package under `tools/` and a `tool` line to
+  `tools/go.mod`. To add or bump a tool dependency, edit `tools/go.mod` —
+  never the root one.
 - CLI tool versions are pinned in `mise.toml` at the repository root
   (Go toolchain, `gopls`, `goreleaser`, `gh`, …). The coding-agent CLI itself
   is not pinned there.
@@ -190,37 +207,22 @@ introduce `-X`/`ldflags` version injection, and do not disable `-buildvcs`.
 
 ## Linting
 
-- `tools/lint/` is a **module of its own** producing a single linter binary
-  that combines the `go vet` analyzer suite
+- `tools/lint` is a single linter binary combining the `go vet` analyzer suite
   (`golang.org/x/tools/go/analysis/suite/vet`) with `staticcheck` and
   `stylecheck`, via `multichecker`. Analyzers that staticcheck marks
   non-default are skipped, matching upstream staticcheck defaults.
 - Run it from the repository root:
 
   ```sh
-  go build -C tools/lint -o lint . && ./tools/lint/lint ./...
-  # or: mise run lint
+  go tool lint ./... ./tools/...
   ```
 
-  The binary has to be **built first and then run from the repository root**:
-  a separate module cannot be reached by the root module's `tool` directive,
-  and the package patterns it is given (`./...`) resolve against whatever
-  module the process is started in. `-C` must be the first flag after `build`;
-  `-o lint` resolves after the directory change, so the binary lands at
-  `tools/lint/lint`, which `.gitignore` already covers.
+  `./...` resolves to the root module only, even in workspace mode, so
+  `./tools/...` is what also lints the tools themselves. Both patterns are
+  needed; neither implies the other.
 - Do **not** pin or introduce `golangci-lint`. `tools/lint` is the canonical
   linter.
 - Lint failures are blockers before commit.
-- To add or bump a linter dependency, edit `tools/lint/go.mod` — never the
-  root one. Keeping `staticcheck` out of the root module graph is the whole
-  point of the split: the root module is what every consumer of
-  `github.com/mazrean/odjson/odjsonrt` downloads.
-- The module imports nothing from the root module, so it needs no `replace`
-  directive. Do not add one: `go install github.com/mazrean/odjson@latest`
-  refuses a module whose `go.mod` carries replace directives (`go help
-  install`), and odjson is a CLI whose primary install path is `go install`.
-- `./...` from the root does not reach it (a nested module is excluded), so
-  CI lints and vets `tools/lint` in its own step.
 
 ## API compatibility
 
@@ -237,8 +239,8 @@ introduce `-X`/`ldflags` version injection, and do not disable `-buildvcs`.
   incompatible change there breaks every tree that has already run the
   generator — including trees whose owners will not regenerate before
   upgrading. The root package is `package main` and has nothing to break.
-- It lives inside the root module, which costs `golang.org/x/exp` a place in
-  the root module graph. Unlike `tools/lint` it has not been split out yet.
+- It lives in the `tools` module, so `golang.org/x/exp` stays out of the root
+  module's graph; `go tool apicompat` reaches it through the root `go.work`.
 - CI (`.github/workflows/ci.yml`, the `apicompat` job) compares against the
   PR's base commit — **not** against `<module>@latest`, which is what
   `mazrean/kessoku` does and which odjson cannot do until it has a release

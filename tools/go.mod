@@ -1,8 +1,14 @@
-module github.com/mazrean/odjson/tools/lint
+module github.com/mazrean/odjson/tools
 
 go 1.27
 
+tool (
+	github.com/mazrean/odjson/tools/apicompat
+	github.com/mazrean/odjson/tools/lint
+)
+
 require (
+	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba
 	golang.org/x/tools v0.50.0
 	honnef.co/go/tools v0.8.1
 )
