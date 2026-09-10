@@ -108,10 +108,31 @@ func wantFlags(t reflect.Type, path ...string) (uintptr, bool) {
 	return off, true
 }
 
+// verifiedGoMinors names the Go minor versions whose jsontext this file's
+// layout has been checked against. Adding one is what turns the direct path on
+// for a new release, and it must never be done blind: re-read jsontext's
+// source for that release, then let .github/workflows/go-minor.yml — or the
+// same steps by hand — prove the layout and the self-tests still hold on that
+// toolchain. The declaration stays on one line; the workflow rewrites it.
+var verifiedGoMinors = []string{"go1.27"}
+
+// goMinorVerified reports whether v, a runtime.Version() string, names one of
+// them. The spellings are "go1.27", "go1.27.1" and "go1.27rc1", so whatever
+// follows the minor has to be anything but another digit: a bare prefix test
+// would also accept a later "go1.270".
+func goMinorVerified(v string) bool {
+	for _, m := range verifiedGoMinors {
+		if rest, ok := strings.CutPrefix(v, m); ok && (rest == "" || rest[0] < '0' || rest[0] > '9') {
+			return true
+		}
+	}
+	return false
+}
+
 func calibrateDirect() (l directLayout) {
-	// The layout below is that of Go 1.27's jsontext. A later release has to
-	// be re-verified before the gate is widened.
-	if !strings.HasPrefix(runtime.Version(), "go1.27") && !strings.HasPrefix(runtime.Version(), "go1.27.") {
+	// The layout below is that of the jsontext those releases ship. A later
+	// one has to be re-verified before it joins them.
+	if !goMinorVerified(runtime.Version()) {
 		return l
 	}
 	encT := reflect.TypeOf(jsontext.Encoder{})
