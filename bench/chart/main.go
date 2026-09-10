@@ -280,28 +280,41 @@ text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,san
 }
 
 func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
-	fmt.Fprintf(b, `<text class="t1" x="%d" y="%d" font-size="13" font-weight="600">%s</text>`, x, y+13, p.title)
-	// 8.7 is the advance of the title's face at 13px semibold, wide enough for
-	// the capitals in "Unmarshal"; the subtitle sits after it.
-	fmt.Fprintf(b, `<text class="t2" x="%d" y="%d" font-size="11">%s · %s</text>`,
-		x+int(float64(len(p.title))*8.7)+8, y+13, p.sub, p.unit)
-	// The headline of the whole chart, so it is the largest thing in the panel
-	// and drawn in the accent — the same colour as the odjson bar below, which
-	// is what says which bar the ratio belongs to without naming it. Anchored
-	// at the panel's right edge so no text width has to be guessed, and with no
-	// t1/t2 class, because a stylesheet fill beats a presentation attribute.
-	fmt.Fprintf(b, `<text x="%d" y="%d" font-size="18" font-weight="700" fill="%s" text-anchor="end">%s× faster</text>`,
-		x+panelW, y+15, t.accent, p.ratio)
-	fmt.Fprintf(b, `<rect x="%d" y="%d" width="%d" height="1" fill="%s"/>`, x, y+21, panelW, t.rule)
-
 	max := 0.0
 	for _, r := range p.rows {
 		if r.value > max {
 			max = r.value
 		}
 	}
-
 	barX := x + labelW + gutter
+
+	// The point of the whole chart, so it is the largest thing in the panel,
+	// drawn in the accent — the colour of the bar it is about. It belongs
+	// beside odjson's own time, which needs the space after that time to be
+	// free; every measured ratio leaves it so, since a bar 2x shorter than
+	// the longest ends before the panel's midpoint. A ratio near 1 would not,
+	// and then the panel header takes it instead of overprinting the time.
+	ratio := p.ratio + "× faster"
+	ratioX, ratioInHeader := 0, true
+	if i := slices.IndexFunc(p.rows, func(r row) bool { return r.odjson }); i >= 0 {
+		w := barW(p.rows[i].value, max)
+		ratioX = barX + w + gutter + len(fmtVal(p.rows[i].value))*7 + 10
+		// The estimate only decides which of the two places the text takes;
+		// nothing is drawn to its width, so a few pixels out costs nothing.
+		ratioInHeader = ratioX+textW(ratio, 16) > x+panelW
+	}
+
+	fmt.Fprintf(b, `<text class="t1" x="%d" y="%d" font-size="13" font-weight="600">%s</text>`, x, y+13, p.title)
+	// 8.7 is the advance of the title's face at 13px semibold, wide enough for
+	// the capitals in "Unmarshal"; the subtitle sits after it.
+	fmt.Fprintf(b, `<text class="t2" x="%d" y="%d" font-size="11">%s · %s</text>`,
+		x+int(float64(len(p.title))*8.7)+8, y+13, p.sub, p.unit)
+	if ratioInHeader {
+		fmt.Fprintf(b, `<text x="%d" y="%d" font-size="16" font-weight="700" fill="%s" text-anchor="end">%s</text>`,
+			x+panelW, y+14, t.accent, ratio)
+	}
+	fmt.Fprintf(b, `<rect x="%d" y="%d" width="%d" height="1" fill="%s"/>`, x, y+21, panelW, t.rule)
+
 	for i, r := range p.rows {
 		top := y + titleH + i*rowH
 		labelX := x
@@ -315,10 +328,7 @@ func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
 		fmt.Fprintf(b, `<text class="mono %s" x="%d" y="%d" font-size="11">%s</text>`,
 			ink, labelX, top+barH-5, esc(r.label))
 
-		w := int(float64(barsW)*r.value/max + 0.5)
-		if w < 2*radius {
-			w = 2 * radius
-		}
+		w := barW(r.value, max)
 		fill := t.neutral
 		if r.odjson {
 			fill = t.accent
@@ -327,9 +337,41 @@ func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
 		fmt.Fprintf(b, `<path d="M%d %d h%d a%d %d 0 0 1 %d %d v%d a%d %d 0 0 1 %d %d h%d z" fill="%s"/>`,
 			barX, top, w-radius, radius, radius, radius, radius, barH-2*radius, radius, radius, -radius, radius, -(w - radius), fill)
 
+		val := fmtVal(r.value)
+		valX := barX + w + gutter
 		fmt.Fprintf(b, `<text class="mono %s" x="%d" y="%d" font-size="11">%s</text>`,
-			ink, barX+w+gutter, top+barH-5, fmtVal(r.value))
+			ink, valX, top+barH-5, val)
+
+		// Same baseline as the time it follows, and no t1/t2 class, because a
+		// stylesheet fill beats a presentation attribute.
+		if r.odjson && !ratioInHeader {
+			fmt.Fprintf(b, `<text x="%d" y="%d" font-size="16" font-weight="700" fill="%s">%s</text>`,
+				ratioX, top+barH-5, t.accent, ratio)
+		}
 	}
+}
+
+// barW is a value's bar, in user units, on a scale whose longest bar is hi.
+// Nothing is drawn narrower than its two rounded corners.
+func barW(v, hi float64) int {
+	return max(int(float64(barsW)*v/hi+0.5), 2*radius)
+}
+
+// textW estimates the width of bold sans text at the given size, in user
+// units. Letters and digits carry most of it; the rest are narrow.
+func textW(s string, size float64) int {
+	w := 0.0
+	for _, r := range s {
+		switch {
+		case r >= '0' && r <= '9', r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+			w += 0.58
+		case r == '.', r == ' ':
+			w += 0.29
+		default:
+			w += 0.6
+		}
+	}
+	return int(w*size + 0.5)
 }
 
 func fmtVal(v float64) string {
