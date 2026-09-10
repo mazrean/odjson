@@ -319,9 +319,58 @@ Four workflows, all under `.github/workflows/`:
   `go.mod` and would have tested the old minor. Do not reach for the App to
   "fix" that — weigh it against a `ci.yml` matrix, which fixes the real gap.
 - `release.yml` — GoReleaser, on a `vX.Y.Z` tag.
+- `renovate.yml` — **self-hosted** Renovate, Saturday 00:00 JST (`0 15 * * 5`,
+  since GitHub reads cron in UTC) plus `workflow_dispatch`. There is no
+  Mend-hosted app on this repository: the bot is this workflow, running as a
+  GitHub App whose `APP_ID` / `APP_PRIVATE_KEY` live in a **`Renovatebot`**
+  environment. That environment must carry **no required reviewers and no wait
+  timer** — a scheduled run has nobody to approve it — which is also why it is
+  not `release.yml`'s `Release`. See "Dependency updates".
 
 `bench.yml` is skipped for PRs from forks, whose token can neither push nor
 comment.
+
+## Dependency updates
+
+Repository configuration is `.github/renovate.json5`; the options Renovate only
+accepts globally live in `renovate.yml` as `RENOVATE_*` variables. The `json5`
+form is deliberate — the reasoning below has to sit next to the rules it
+explains.
+
+**Renovate has no `go.work` support**: it neither reads the file nor writes
+`go.work.sum` (renovatebot/renovate#23359, #37653). Three modules and two
+workspaces make that worth spelling out, and each claim here was measured
+against this tree on go1.27.1:
+
+- `postUpdateOptions: ["gomodTidy"]` is safe. `go mod tidy` is idempotent in
+  all three modules with the workspace active, and `cd bench && go mod tidy` is
+  unmoved by a change to the root module — so `gomodTidyAll` is not needed.
+- A stale `go.work.sum` does **not** break CI: the go command writes the
+  entries it needs on the next build, even under the default `-mod=readonly`.
+  What it does is let the committed file drift, so a `postUpgradeTasks` chain
+  (`go work sync`, `go mod tidy`, `go -C tools mod tidy`, `go -C bench work
+  sync`) puts it back. The chain is a no-op on a clean tree.
+- `go work sync` writes the workspace-selected version into each `use`d
+  module's `go.mod`, and that is the point: in a workspace MVS runs over the
+  union of `.` and `./tools`, so a bump landing in `tools/go.mod` alone already
+  changes what the root module builds against. It only ever *raises* a
+  requirement, so it cannot revert the bump Renovate just made.
+- Do **not** switch to `postUpdateOptions: ["gomodMassage"]` for `bench/`'s
+  `replace github.com/mazrean/odjson => ../`. It comments the replace out
+  before running `go`, which leaves `go get` fetching the placeholder
+  `v0.0.0-00010101000000-000000000000` from the proxy, where it does not exist.
+- A `mise.toml` `go` minor/major bump needs a tick on the dependency dashboard,
+  because odjson's direct path is gated to the Go minor it was verified against
+  and an unattended bump would switch it off silently. Match it with
+  `matchDepNames: ["go"]`: the mise manager's packageName for it is
+  `golang/go`, so a `matchPackageNames: ["go"]` rule would never fire.
+
+Validate a change to the config before pushing it:
+
+```sh
+npx --yes --package renovate -- renovate-config-validator --strict --no-global \
+  .github/renovate.json5
+```
 
 ## Testing
 
