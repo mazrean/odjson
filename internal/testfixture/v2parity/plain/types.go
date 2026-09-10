@@ -62,3 +62,11 @@ type Zoo struct {
 	ZeroTime   time.Time `json:"zero_time,omitzero"`
 	ZeroNested Nested    `json:"zero_nested,omitzero"`
 }
+
+// Memberless is the reflection oracle for gen.Memberless.
+type Memberless struct {
+	Skipped string `json:"-"`
+}
+
+// Unit is the reflection oracle for gen.Unit.
+type Unit struct{}

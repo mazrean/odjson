@@ -88,8 +88,15 @@ func (g *generator) decodeStructFrom(b *block, s *analyzer.StructInfo) {
 	})
 	g.readToken(b)
 	g.forStmt(b, nil, bin(nextKind(), token.NEQ, chr('}')), nil, func(b *block) {
-		g.emit(b, varDecl("key", jsontextValue()))
-		g.emit(b, assignN(token.ASSIGN, []ast.Expr{key, errV}, call(sel(dec, "ReadValue"))))
+		// A struct with no members never reads the name back, so it goes to
+		// the blank identifier: declaring key there would not compile.
+		lhs := ast.Expr(key)
+		if len(s.Fields) == 0 {
+			lhs = id("_")
+		} else {
+			g.emit(b, varDecl("key", jsontextValue()))
+		}
+		g.emit(b, assignN(token.ASSIGN, []ast.Expr{lhs, errV}, call(sel(dec, "ReadValue"))))
 		g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
 			g.emit(b, ret(errV))
 		})

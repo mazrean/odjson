@@ -4587,3 +4587,529 @@ func (v *Zoo) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	odjsonrt.PutStringCache(sc)
 	return err
 }
+
+// odjsonAppend appends the JSON encoding of v to dst.
+func (v *Memberless) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
+	var err error
+	_ = err
+	start := len(dst)
+	if len(dst) == start {
+		dst = append(dst, '{', '}')
+	} else {
+		dst[start] = '{'
+		dst = append(dst, '}')
+	}
+	return dst, nil
+}
+
+// odjsonParse decodes the JSON object starting at p into v and
+// returns the offset just past it. Strings are interned through
+// sc, which may be nil.
+func (v *Memberless) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, error) {
+	var err error
+	_ = err
+	p = odjsonrt.SkipSpace(data, p)
+	if np, ok := odjsonrt.ParseNull(data, p); ok {
+		return np, nil
+	}
+	if p >= len(data) || data[p] != '{' {
+		return p, odjsonrt.ErrType(data, p, "Memberless")
+	}
+	p++
+	p = odjsonrt.SkipSpace(data, p)
+	if p < len(data) && data[p] == '}' {
+		return p + 1, nil
+	}
+	for {
+		p = odjsonrt.SkipSpace(data, p)
+		idx := -1
+		if idx >= 0 {
+			if p < len(data) && data[p] == ':' {
+				p = odjsonrt.SkipSpace(data, p+1)
+			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
+				return p, err
+			}
+		} else {
+			_, _, p, err = odjsonrt.ParseKey(data, p)
+			if err != nil {
+				return p, err
+			}
+		}
+		switch idx {
+		default:
+			p = odjsonrt.SkipSpace(data, p)
+			p, err = odjsonrt.SkipValue(data, p)
+			if err != nil {
+				return p, err
+			}
+		}
+		p = odjsonrt.SkipSpace(data, p)
+		if p >= len(data) {
+			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
+		}
+		switch data[p] {
+		case ',':
+			p++
+		case '}':
+			return p + 1, nil
+		default:
+			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
+		}
+	}
+}
+
+// odjsonParseV2 is odjsonParse under encoding/json/v2's semantics, for
+// input a jsontext.Decoder has already validated when strict is false,
+// and for bytes nobody has looked at when it is true.
+func (v *Memberless) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict bool) (int, error) {
+	var err error
+	_ = err
+	p = odjsonrt.SkipSpace(data, p)
+	if np, ok := odjsonrt.ParseNull(data, p); ok {
+		*v = Memberless{}
+		return np, nil
+	}
+	if p >= len(data) || data[p] != '{' {
+		return p, odjsonrt.ErrType(data, p, "Memberless")
+	}
+	p++
+	p = odjsonrt.SkipSpace(data, p)
+	if p < len(data) && data[p] == '}' {
+		return p + 1, nil
+	}
+	var seen [1]uint64
+	_ = seen
+	var unknownBuf [8][]byte
+	unknown := unknownBuf[:0]
+	for {
+		var key []byte
+		p = odjsonrt.SkipSpace(data, p)
+		kp := p
+		idx := -1
+		if idx >= 0 {
+			if p < len(data) && data[p] == ':' {
+				p = odjsonrt.SkipSpace(data, p+1)
+			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
+				return p, err
+			}
+		} else {
+			key, p, err = odjsonrt.ParseKeyV2(data, p, strict)
+			if err != nil {
+				return p, err
+			}
+		}
+		switch idx {
+		default:
+			if strict {
+				for _, u := range unknown {
+					if string(u) == string(key) {
+						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+					}
+				}
+				unknown = append(unknown, key)
+			}
+			p = odjsonrt.SkipSpace(data, p)
+			p, err = odjsonrt.SkipValueV2(data, p, strict)
+			if err != nil {
+				return p, err
+			}
+		}
+		p = odjsonrt.SkipSpace(data, p)
+		if p >= len(data) {
+			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
+		}
+		switch data[p] {
+		case ',':
+			p++
+		case '}':
+			return p + 1, nil
+		default:
+			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
+		}
+	}
+}
+
+// odjsonParseFrom decodes the next value in dec into v,
+// driving the decoder token by token so the document is
+// parsed once rather than twice.
+func (v *Memberless) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) error {
+	var err error
+	_ = err
+	if odjsonrt.WholeValue(dec) {
+		var val jsontext.Value
+		if val, err = dec.ReadValue(); err != nil {
+			return err
+		}
+		_, err = v.odjsonParseV2(val, 0, sc, false)
+		return err
+	}
+	switch odjsonrt.NextKind(dec) {
+	case 'n':
+		if _, err = dec.ReadToken(); err != nil {
+			return err
+		}
+		*v = Memberless{}
+		return nil
+	case '{':
+	default:
+		return odjsonrt.ErrKindFrom(dec, "Memberless")
+	}
+	if _, err = dec.ReadToken(); err != nil {
+		return err
+	}
+	for odjsonrt.NextKind(dec) != '}' {
+		_, err = dec.ReadValue()
+		if err != nil {
+			return err
+		}
+		idx := -1
+		switch idx {
+		default:
+			if _, err = dec.ReadValue(); err != nil {
+				return err
+			}
+		}
+	}
+	_, err = dec.ReadToken()
+	return err
+}
+
+// odjsonSizeMemberless sizes the buffer the encoders allocate.
+var odjsonSizeMemberless odjsonrt.SizeHint
+
+// MarshalJSON implements encoding/json.Marshaler.
+func (v Memberless) MarshalJSON() ([]byte, error) {
+	buf, err := v.odjsonAppend(odjsonSizeMemberless.New(), odjsonrt.ModeHTML)
+	if err != nil {
+		return nil, err
+	}
+	odjsonSizeMemberless.Record(buf)
+	return buf, nil
+}
+
+// UnmarshalJSON implements encoding/json.Unmarshaler.
+func (v *Memberless) UnmarshalJSON(data []byte) error {
+	// The cache plays the part of encoding/json/v2's string cache: a
+	// value that recurs in the document is allocated once.
+	sc := odjsonrt.GetStringCache()
+	p, err := v.odjsonParse(data, odjsonrt.SkipSpace(data, 0), sc)
+	odjsonrt.PutStringCache(sc)
+	if err != nil {
+		return err
+	}
+	return odjsonrt.EndOfDocument(data, p)
+}
+
+// MarshalJSONTo implements encoding/json/v2.MarshalerTo.
+func (v Memberless) MarshalJSONTo(enc *jsontext.Encoder) error {
+	// A top-level value under a plain json.Marshal is appended straight
+	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
+	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
+	// json/v2's own escaping and rejects invalid UTF-8 itself.
+	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
+		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+		if err != nil {
+			return err
+		}
+		odjsonSizeMemberless.Record(buf)
+		odjsonrt.EndDirectEncode(enc, buf)
+		return nil
+	}
+	// Otherwise WriteValue copies what it is given, so the scratch buffer
+	// can go straight back to the pool. ModeStream leaves the HTML escaping
+	// and the UTF-8 validation to the encoder, which performs both while
+	// reformatting the value either way.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	if buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeStream); err == nil {
+		odjsonSizeMemberless.Record(buf.B)
+		err = enc.WriteValue(buf.B)
+	}
+	odjsonrt.PutBuffer(buf)
+	return err
+}
+
+// UnmarshalJSONFrom implements encoding/json/v2.UnmarshalerFrom.
+func (v *Memberless) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	// The cache plays the part of json/v2's own string cache: a value
+	// that recurs in the document is allocated once.
+	sc := odjsonrt.GetStringCache()
+	var err error
+	// A top-level value under a plain json.Unmarshal is parsed straight
+	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
+	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
+	// what jsontext would have.
+	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+		var end int
+		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
+			odjsonrt.EndDirectDecode(dec, end)
+		}
+	} else {
+		err = v.odjsonParseFrom(dec, sc)
+	}
+	odjsonrt.PutStringCache(sc)
+	return err
+}
+
+// odjsonAppend appends the JSON encoding of v to dst.
+func (v *Unit) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
+	var err error
+	_ = err
+	start := len(dst)
+	if len(dst) == start {
+		dst = append(dst, '{', '}')
+	} else {
+		dst[start] = '{'
+		dst = append(dst, '}')
+	}
+	return dst, nil
+}
+
+// odjsonParse decodes the JSON object starting at p into v and
+// returns the offset just past it. Strings are interned through
+// sc, which may be nil.
+func (v *Unit) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, error) {
+	var err error
+	_ = err
+	p = odjsonrt.SkipSpace(data, p)
+	if np, ok := odjsonrt.ParseNull(data, p); ok {
+		return np, nil
+	}
+	if p >= len(data) || data[p] != '{' {
+		return p, odjsonrt.ErrType(data, p, "Unit")
+	}
+	p++
+	p = odjsonrt.SkipSpace(data, p)
+	if p < len(data) && data[p] == '}' {
+		return p + 1, nil
+	}
+	for {
+		p = odjsonrt.SkipSpace(data, p)
+		idx := -1
+		if idx >= 0 {
+			if p < len(data) && data[p] == ':' {
+				p = odjsonrt.SkipSpace(data, p+1)
+			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
+				return p, err
+			}
+		} else {
+			_, _, p, err = odjsonrt.ParseKey(data, p)
+			if err != nil {
+				return p, err
+			}
+		}
+		switch idx {
+		default:
+			p = odjsonrt.SkipSpace(data, p)
+			p, err = odjsonrt.SkipValue(data, p)
+			if err != nil {
+				return p, err
+			}
+		}
+		p = odjsonrt.SkipSpace(data, p)
+		if p >= len(data) {
+			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
+		}
+		switch data[p] {
+		case ',':
+			p++
+		case '}':
+			return p + 1, nil
+		default:
+			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
+		}
+	}
+}
+
+// odjsonParseV2 is odjsonParse under encoding/json/v2's semantics, for
+// input a jsontext.Decoder has already validated when strict is false,
+// and for bytes nobody has looked at when it is true.
+func (v *Unit) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict bool) (int, error) {
+	var err error
+	_ = err
+	p = odjsonrt.SkipSpace(data, p)
+	if np, ok := odjsonrt.ParseNull(data, p); ok {
+		*v = Unit{}
+		return np, nil
+	}
+	if p >= len(data) || data[p] != '{' {
+		return p, odjsonrt.ErrType(data, p, "Unit")
+	}
+	p++
+	p = odjsonrt.SkipSpace(data, p)
+	if p < len(data) && data[p] == '}' {
+		return p + 1, nil
+	}
+	var seen [1]uint64
+	_ = seen
+	var unknownBuf [8][]byte
+	unknown := unknownBuf[:0]
+	for {
+		var key []byte
+		p = odjsonrt.SkipSpace(data, p)
+		kp := p
+		idx := -1
+		if idx >= 0 {
+			if p < len(data) && data[p] == ':' {
+				p = odjsonrt.SkipSpace(data, p+1)
+			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
+				return p, err
+			}
+		} else {
+			key, p, err = odjsonrt.ParseKeyV2(data, p, strict)
+			if err != nil {
+				return p, err
+			}
+		}
+		switch idx {
+		default:
+			if strict {
+				for _, u := range unknown {
+					if string(u) == string(key) {
+						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+					}
+				}
+				unknown = append(unknown, key)
+			}
+			p = odjsonrt.SkipSpace(data, p)
+			p, err = odjsonrt.SkipValueV2(data, p, strict)
+			if err != nil {
+				return p, err
+			}
+		}
+		p = odjsonrt.SkipSpace(data, p)
+		if p >= len(data) {
+			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
+		}
+		switch data[p] {
+		case ',':
+			p++
+		case '}':
+			return p + 1, nil
+		default:
+			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
+		}
+	}
+}
+
+// odjsonParseFrom decodes the next value in dec into v,
+// driving the decoder token by token so the document is
+// parsed once rather than twice.
+func (v *Unit) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) error {
+	var err error
+	_ = err
+	if odjsonrt.WholeValue(dec) {
+		var val jsontext.Value
+		if val, err = dec.ReadValue(); err != nil {
+			return err
+		}
+		_, err = v.odjsonParseV2(val, 0, sc, false)
+		return err
+	}
+	switch odjsonrt.NextKind(dec) {
+	case 'n':
+		if _, err = dec.ReadToken(); err != nil {
+			return err
+		}
+		*v = Unit{}
+		return nil
+	case '{':
+	default:
+		return odjsonrt.ErrKindFrom(dec, "Unit")
+	}
+	if _, err = dec.ReadToken(); err != nil {
+		return err
+	}
+	for odjsonrt.NextKind(dec) != '}' {
+		_, err = dec.ReadValue()
+		if err != nil {
+			return err
+		}
+		idx := -1
+		switch idx {
+		default:
+			if _, err = dec.ReadValue(); err != nil {
+				return err
+			}
+		}
+	}
+	_, err = dec.ReadToken()
+	return err
+}
+
+// odjsonSizeUnit sizes the buffer the encoders allocate.
+var odjsonSizeUnit odjsonrt.SizeHint
+
+// MarshalJSON implements encoding/json.Marshaler.
+func (v Unit) MarshalJSON() ([]byte, error) {
+	buf, err := v.odjsonAppend(odjsonSizeUnit.New(), odjsonrt.ModeHTML)
+	if err != nil {
+		return nil, err
+	}
+	odjsonSizeUnit.Record(buf)
+	return buf, nil
+}
+
+// UnmarshalJSON implements encoding/json.Unmarshaler.
+func (v *Unit) UnmarshalJSON(data []byte) error {
+	// The cache plays the part of encoding/json/v2's string cache: a
+	// value that recurs in the document is allocated once.
+	sc := odjsonrt.GetStringCache()
+	p, err := v.odjsonParse(data, odjsonrt.SkipSpace(data, 0), sc)
+	odjsonrt.PutStringCache(sc)
+	if err != nil {
+		return err
+	}
+	return odjsonrt.EndOfDocument(data, p)
+}
+
+// MarshalJSONTo implements encoding/json/v2.MarshalerTo.
+func (v Unit) MarshalJSONTo(enc *jsontext.Encoder) error {
+	// A top-level value under a plain json.Marshal is appended straight
+	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
+	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
+	// json/v2's own escaping and rejects invalid UTF-8 itself.
+	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
+		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+		if err != nil {
+			return err
+		}
+		odjsonSizeUnit.Record(buf)
+		odjsonrt.EndDirectEncode(enc, buf)
+		return nil
+	}
+	// Otherwise WriteValue copies what it is given, so the scratch buffer
+	// can go straight back to the pool. ModeStream leaves the HTML escaping
+	// and the UTF-8 validation to the encoder, which performs both while
+	// reformatting the value either way.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	if buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeStream); err == nil {
+		odjsonSizeUnit.Record(buf.B)
+		err = enc.WriteValue(buf.B)
+	}
+	odjsonrt.PutBuffer(buf)
+	return err
+}
+
+// UnmarshalJSONFrom implements encoding/json/v2.UnmarshalerFrom.
+func (v *Unit) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	// The cache plays the part of json/v2's own string cache: a value
+	// that recurs in the document is allocated once.
+	sc := odjsonrt.GetStringCache()
+	var err error
+	// A top-level value under a plain json.Unmarshal is parsed straight
+	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
+	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
+	// what jsontext would have.
+	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+		var end int
+		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
+			odjsonrt.EndDirectDecode(dec, end)
+		}
+	} else {
+		err = v.odjsonParseFrom(dec, sc)
+	}
+	odjsonrt.PutStringCache(sc)
+	return err
+}

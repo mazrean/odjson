@@ -314,3 +314,72 @@ func TestDuplicateNamesRejectedLikeJSONV2(t *testing.T) {
 		}
 	}
 }
+
+// TestMemberlessMatchesJSONV2 covers the two struct shapes with nothing to
+// match: every member a document carries is unknown, so the decoder never
+// looks at a name. Documents on both sides of odjsonrt.WholeValue's threshold
+// are used, because only the large one is driven token by token.
+func TestMemberlessMatchesJSONV2(t *testing.T) {
+	var big strings.Builder
+	big.WriteString(`{"unknown":[`)
+	for i := range 400 {
+		if i > 0 {
+			big.WriteString(",")
+		}
+		fmt.Fprintf(&big, `{"id":%d,"note":"note %d"}`, i, i)
+	}
+	big.WriteString(`],"another":{"a":1}}`)
+
+	docs := []string{
+		`{}`,
+		`null`,
+		`{"skipped":"v"}`,
+		`{"a":1,"b":[2,{"c":3}],"d":null}`,
+		`{"a":1,"a":2}`,
+		`{"a" : 1 }`,
+		`[]`,
+		`{`,
+		big.String(),
+	}
+	for _, doc := range docs {
+		memberlessParity[gen.Memberless, plain.Memberless](t, doc)
+		memberlessParity[gen.Unit, plain.Unit](t, doc)
+	}
+}
+
+// memberlessParity requires the generated methods on G to accept what json/v2
+// accepts for its oracle P and to encode to the same bytes, through the whole
+// value path, the streaming path and the encoder.
+func memberlessParity[G, P any](t *testing.T, doc string) {
+	t.Helper()
+	decoders := map[string]func([]byte, any) error{
+		"Unmarshal": func(b []byte, v any) error { return jsonv2.Unmarshal(b, v) },
+		"chunked": func(b []byte, v any) error {
+			return jsonv2.UnmarshalRead(&chunkReader{b: b, n: 7}, v)
+		},
+	}
+	for name, decode := range decoders {
+		var g G
+		var p P
+		errGot := decode([]byte(doc), &g)
+		errWant := decode([]byte(doc), &p)
+		if (errGot != nil) != (errWant != nil) {
+			t.Errorf("%T/%s %s: acceptance mismatch: json/v2=%v odjson=%v", g, name, doc, errWant, errGot)
+			continue
+		}
+		if errWant != nil {
+			continue
+		}
+		got, err := jsonv2.Marshal(g)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := jsonv2.Marshal(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("%T/%s %s:\n json/v2: %s\n odjson:  %s", g, name, doc, want, got)
+		}
+	}
+}
