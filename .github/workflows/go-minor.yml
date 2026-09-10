@@ -139,7 +139,7 @@ jobs:
             echo "prev=$prev"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         if: steps.state.outputs.skip == ''
         with:
           go-version: ${{ steps.pick.outputs.full }}
