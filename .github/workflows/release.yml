@@ -6,12 +6,15 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   goreleaser:
     name: GoReleaser
     runs-on: ubuntu-latest
+    # Holds APP_ID (variable) and APP_PRIVATE_KEY (secret) for the GitHub App
+    # whose installation token replaces the release PATs.
+    environment: Release
     steps:
       - uses: actions/checkout@v5
         with:
@@ -24,6 +27,16 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: "**/go.sum"
 
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          repositories: |
+            odjson
+            homebrew-tap
+
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -31,9 +44,7 @@ jobs:
           args: release --clean
         env:
           # Creates the GitHub release and uploads the archives / nfpm packages.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # PAT with `contents: write` on github.com/mazrean/homebrew-tap.
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-          # PAT with `contents: write` on the github.com/mazrean/winget-pkgs
-          # fork and `pull_requests: write` on microsoft/winget-pkgs.
-          WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+          # Same App token: the installation covers
+          # github.com/mazrean/homebrew-tap, so no separate PAT is needed.
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
