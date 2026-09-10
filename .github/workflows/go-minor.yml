@@ -30,6 +30,8 @@ on:
   workflow_dispatch:
     inputs:
       go_version:
+        # setup-go's spelling, which is not go.dev's: a prerelease is
+        # "1.28.0-rc.1" here and "go1.28rc1" there.
         description: "Go version to verify, e.g. 1.28.0 (default: the newest stable release)"
         required: false
         type: string
@@ -272,8 +274,9 @@ jobs:
           \`\`\`
           EOF
 
-          url=$(gh pr create --draft --base "${{ github.event.repository.default_branch }}" \
-            --head "$BRANCH" \
+          # No --base: gh infers the repository's default branch, and the
+          # `schedule` event's payload is not a place to go looking for it.
+          url=$(gh pr create --draft --head "$BRANCH" \
             --title "feat(odjsonrt): enable the direct path on Go ${MINOR#go}" \
             --body-file "$body")
           echo "opened $url"
