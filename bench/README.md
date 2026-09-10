@@ -133,6 +133,47 @@ cd bench && go test -bench . -count 5 ./ab/
 whether odjson wins their small unmarshal (sonic's by 1.15x, go-json's by
 1.12x) and loses everything else on them (it does, by the floor).
 
+## `shapes`
+
+`bench/shapes` asks whether the tuning generalises. Everything the generator
+and `odjsonrt` were tuned on is `twitter` or `small`, and both hold a lot
+fixed: one top-level object, indented, Japanese text, few floats, strings that
+repeat. Each shape here changes one of those and measures gen against plain in
+one process, the way `ab` does, so the ratio between the two rows says whether
+the generated codec still pays for itself on that shape:
+
+| shape | what it varies |
+| --- | --- |
+| `twitter`, `small` | the README's payloads, as the reference rows |
+| `twitter-compact`, `page-12k-indented` | whitespace |
+| `page-3k`, `page-12k`, `page-100k` | one top-level object at the sizes between the two fixtures |
+| `array-items`, `array-pages`, `map-items` | a top-level `[]T` / `map[string]T` of a generated type, which the direct path does not cover; the element size puts `array-items` under `odjsonrt.WholeValue`'s threshold and `array-pages` over it |
+| `generic` | the same document decoded into `any` |
+| `text-*` | strings of ASCII, Latin-1, Cyrillic, CJK, Hangul, emoji, and escape-heavy content |
+| `unique-strings` | strings that never repeat, so the decoder's string cache never hits |
+| `numbers`, `floats` | full precision floats, exponents, float32, integer extremes |
+| `dense`, `sparse` | 56 short scalars per row; 48 optional members of which 10 are present |
+| `skip` | documents whose members are mostly unknown to the struct (unmarshal only) |
+| `canada`, `citm` | nativejson-benchmark's other two corpora, when `ODJSON_BENCH_CORPUS` points at a directory holding them; skipped otherwise |
+
+The synthetic documents are built from a fixed seed, so they are the same on
+every run. `canada.json` and `citm_catalog.json` are not committed: their
+provenance is less clear than `twitter.json`'s. Fetch them from
+`miloyip/nativejson-benchmark`'s `data/` directory and point the variable at
+it.
+
+```sh
+cd bench
+go test -run TestShapes -v ./shapes/                 # every shape, its size and what it varies
+go test -run '^$' -bench . -benchmem -count 6 ./shapes/ > shapes.txt
+benchstat -col /side -row .name,/shape,/lib shapes.txt
+```
+
+The benchmark names carry `shape=`, `lib=` and `side=` keys so `benchstat`
+can pivot on them: `-col /side` puts gen and plain side by side with the
+ratio between them. What the shapes found is recorded in
+[`docs/internals.md`](../docs/internals.md#what-the-other-shapes-say).
+
 ## `floor`
 
 `bench/floor` answers a different question: not "how fast is the generated
