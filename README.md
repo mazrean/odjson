@@ -20,7 +20,7 @@ $ rm odjson_gen.go      # and this is the entire uninstall
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bench-dark.svg">
-  <img alt="Time per operation, lower is better. Marshal twitter: encoding/json/v2 392 µs, with odjson 111 µs, sonic 117 µs, go-json 237 µs. Marshal small: 1025 ns, with odjson 317 ns, sonic 308 ns, go-json 374 ns. Unmarshal twitter: 1072 µs, with odjson 506 µs, sonic 492 µs, go-json 655 µs. Unmarshal small: 1842 ns, with odjson 573 ns, sonic 977 ns, go-json 770 ns." src="./docs/assets/bench-light.svg" width="912">
+  <img alt="Time per operation, lower is better. Marshal large: encoding/json/v2 392 µs, with odjson 111 µs, sonic 117 µs, go-json 237 µs. Marshal small: 1025 ns, with odjson 317 ns, sonic 308 ns, go-json 374 ns. Unmarshal large: 1072 µs, with odjson 506 µs, sonic 492 µs, go-json 655 µs. Unmarshal small: 1842 ns, with odjson 573 ns, sonic 977 ns, go-json 770 ns." src="./docs/assets/bench-light.svg" width="912">
 </picture>
 
 **2.1×–3.5× on `encoding/json/v2`** across all four measurements — ahead of
@@ -31,10 +31,12 @@ standard library, with no third-party codec in your build. (One module does
 come along: generated files import `github.com/mazrean/odjson/odjsonrt`, the
 runtime support package — see [Requirements](#requirements).)
 
-The payloads are sonic's own fixtures: `twitter` (616 KiB, deeply nested and
-full of `interface{}` fields) and `small` (340 B, fully typed, the per-call
-overhead case). The only difference between a baseline bar and an odjson bar
-is the generated file.
+The payloads are sonic's own fixtures, under the names sonic gives them:
+`large` (616 KiB, deeply nested and full of `interface{}` fields — sonic's
+`twitter.json`, which [`bench/`](./bench) and
+[docs/internals.md](./docs/internals.md) still call `twitter`) and `small`
+(340 B, fully typed, the per-call overhead case). The only difference between
+a baseline bar and an odjson bar is the generated file.
 
 <details>
 <summary>How to read the numbers, and how to reproduce them</summary>
@@ -59,9 +61,9 @@ go test -bench . -benchmem ./...
   absolute terms but not for small differences between a generated row and its
   baseline. For those use `bench/ab`, which measures both sides in one
   process: it puts every sonic row within 3% of the chart's, and sonic's own
-  `twitter` decode has drifted between 480 and 550 µs across runs.
+  `large` decode has drifted between 480 and 550 µs across runs.
 - `encoding/json` v1 gains too — 1.2×–1.5× on three of the four, and 5% behind
-  on the `twitter` encode. Its rows are in
+  on the `large` encode. Its rows are in
   [the measured tables](./docs/internals.md#the-measured-tables), left out of
   the chart to keep the `json/v2` story legible.
 
