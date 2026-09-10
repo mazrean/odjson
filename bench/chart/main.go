@@ -281,8 +281,17 @@ text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,san
 
 func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
 	fmt.Fprintf(b, `<text class="t1" x="%d" y="%d" font-size="13" font-weight="600">%s</text>`, x, y+13, p.title)
-	fmt.Fprintf(b, `<text class="t2" x="%d" y="%d" font-size="11">%s · %s · odjson %s× faster</text>`,
-		x+len(p.title)*8+8, y+13, p.sub, p.unit, p.ratio)
+	// 8.7 is the advance of the title's face at 13px semibold, wide enough for
+	// the capitals in "Unmarshal"; the subtitle sits after it.
+	fmt.Fprintf(b, `<text class="t2" x="%d" y="%d" font-size="11">%s · %s</text>`,
+		x+int(float64(len(p.title))*8.7)+8, y+13, p.sub, p.unit)
+	// The headline of the whole chart, so it is the largest thing in the panel
+	// and drawn in the accent — the same colour as the odjson bar below, which
+	// is what says which bar the ratio belongs to without naming it. Anchored
+	// at the panel's right edge so no text width has to be guessed, and with no
+	// t1/t2 class, because a stylesheet fill beats a presentation attribute.
+	fmt.Fprintf(b, `<text x="%d" y="%d" font-size="18" font-weight="700" fill="%s" text-anchor="end">%s× faster</text>`,
+		x+panelW, y+15, t.accent, p.ratio)
 	fmt.Fprintf(b, `<rect x="%d" y="%d" width="%d" height="1" fill="%s"/>`, x, y+21, panelW, t.rule)
 
 	max := 0.0
