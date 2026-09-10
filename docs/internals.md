@@ -336,7 +336,10 @@ plain in one process. Measured 2026-09-11 on
 the same Ryzen 9 7950X, Go 1.27.1, `-count 6` for the two standard libraries,
 `-count 3` for sonic and go-json; the ratio is plain over gen, so 2× means the
 generated codec halves the time and anything under 1× means it is slower than
-reflection.
+reflection. Every row is within ±3% by `benchstat` except the `small` json/v2
+encode (±8%), `dense` and `citm` (±4%) and the `canada` plain decode (±6%),
+so a ratio between 0.94× and 1.06× is read as level below; the bold rows are
+the ones outside that band on the wrong side.
 
 | shape | v2 Marshal | v2 Unmarshal | v1 Marshal | v1 Unmarshal |
 | --- | --- | --- | --- | --- |
@@ -345,15 +348,15 @@ reflection.
 | `twitter-compact` | 3.59× | 2.28× | 0.95× | 1.30× |
 | `page-3k` / `page-12k` / `page-100k` | 2.14× / 2.18× / 2.14× | 2.19× / 2.16× / 2.17× | 1.39× / 1.38× / 1.34× | 1.54× / 1.33× / 1.31× |
 | `array-items` (`[]Item`) | **0.84×** | 1.22× | 1.12× | 1.31× |
-| `array-pages` (`[]Page`) | **1.00×** | 1.24× | 1.33× | 1.32× |
+| `array-pages` (`[]Page`) | 1.00× | 1.24× | 1.33× | 1.32× |
 | `map-items` (`map[string]Item`) | **0.83×** | 1.17× | 1.11× | 1.26× |
 | `generic` (`any`) | 1.64× | 1.43× | 1.24× | 2.21× |
 | `text-ascii` | 2.11× | 1.77× | 0.93× | 0.95× |
 | `text-cjk` (as `twitter`) | 1.66× | 1.89× | **0.43×** | 1.07× |
 | `text-hangul` | 1.39× | 1.73× | **0.44×** | 1.10× |
-| `text-latin` | **0.77×** | **0.96×** | **0.46×** | 1.00× |
+| `text-latin` | **0.77×** | 0.96× | **0.46×** | 1.00× |
 | `text-cyrillic` | **0.81×** | **0.90×** | **0.45×** | 1.03× |
-| `text-emoji` | **0.94×** | 1.09× | **0.46×** | 1.00× |
+| `text-emoji` | 0.94× | 1.09× | **0.46×** | 1.00× |
 | `text-escaped` | 1.48× | 1.28× | **0.55×** | **0.82×** |
 | `unique-strings` | 2.06× | 1.54× | 1.00× | 1.00× |
 | `numbers` | 1.16× | 1.10× | **0.68×** | **0.87×** |
@@ -383,14 +386,15 @@ What does not hold, in order of how much of real traffic it touches:
   reformat costs more than reflection saves. The decode side still wins there
   (1.17–1.24×), because a whole-value read plus the byte parser is cheaper than
   reflection even after the decoder's own validation pass. `encoding/json` v1
-  never has the direct path and pays the reformat on every shape, which is
-  why its `[]Item` row (1.12×) is no worse than its top-level ones.
+  never has the direct path and pays the reformat at the top level too, so
+  its drop from `page-12k` to `[]Item` is small (1.38× to 1.12×) where json/v2's
+  is the whole win (2.18× to 0.84×).
 - **Non-ASCII text outside the CJK three byte range is slower than
   reflection.** The fused UTF-8 scan in `odjsonrt/utf8.go` settles only three
   byte sequences with leads E1–EC and EE–EF on its own and hands everything
   else to `utf8.DecodeRune`, one rune per call. Latin-1 and Cyrillic (two byte
   sequences) encode 0.77× and 0.81× and decode 0.96× and 0.90×; emoji (four
-  byte) encodes 0.94×. CJK, the fixture's script, encodes 1.66× and Hangul
+  byte) is level both ways (0.94× and 1.09×). CJK, the fixture's script, encodes 1.66× and Hangul
   (leads EA–ED, of which ED is excluded) 1.39×. ASCII is 2.11×, so the loss
   is specific to the sequences the fast path declines, not to non-ASCII as
   such.
@@ -414,8 +418,9 @@ anything in the generated code. The second is a bounded change to one
 function. The third is the price of not running Ryu and is unlikely to move.
 
 sonic and go-json behave as the floor predicts on every shape: the generated
-codec is slower on all 25 encode rows (0.13–0.67× on sonic, 0.24–1.06× on
-go-json) and on most decode rows; the exceptions are the ones the README
+codec is slower on all 25 encode rows on sonic (0.13–0.67×) and on 24 of 25
+on go-json (0.24–0.82×, with `generic` level at 1.06×), and on most decode
+rows; the exceptions are the ones the README
 already names, `small` (1.16× / 1.03×), and two shapes of the same kind,
 `dense` (1.33× / 1.06×) and `sparse` (1.17× on sonic), where the document is
 mostly member names and the skip-and-validate pass they make before calling
