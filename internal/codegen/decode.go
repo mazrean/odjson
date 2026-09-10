@@ -277,7 +277,7 @@ func (g *generator) rawKeyTree(b *block, cands []rawCand, c ctx, known int, used
 		g.switchStmt(b, index(rest, num(int64(j))), func(sw *block) {
 			for _, by := range order {
 				g.caseClause(sw, []ast.Expr{chr(by)}, func(b *block) {
-					g.rawKeyTree(b, groups[by], c, known, append(used[:len(used):len(used)], j))
+					g.rawKeyTree(b, groups[by], c, known, append(slices.Clip(used), j))
 				})
 			}
 		})

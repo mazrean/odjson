@@ -238,8 +238,7 @@ func cloneNode(n ast.Node) ast.Node {
 	}
 	c := reflect.New(v.Elem().Type())
 	c.Elem().Set(v.Elem())
-	for i := 0; i < c.Elem().NumField(); i++ {
-		f := c.Elem().Field(i)
+	for _, f := range c.Elem().Fields() {
 		switch f.Kind() {
 		case reflect.Pointer, reflect.Interface:
 			if !f.IsNil() && f.Type().Implements(nodeType) {
@@ -311,8 +310,8 @@ func mapPos(n ast.Node, f func(token.Pos) token.Pos) {
 			return false
 		}
 		v := reflect.ValueOf(n).Elem()
-		for i := 0; i < v.NumField(); i++ {
-			if fv := v.Field(i); fv.Type() == posType && fv.Int() != 0 {
+		for _, fv := range v.Fields() {
+			if fv.Type() == posType && fv.Int() != 0 {
 				fv.SetInt(int64(f(token.Pos(fv.Int()))))
 			}
 		}

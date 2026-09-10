@@ -67,18 +67,16 @@ func unmarshalParity[T, R any](t *testing.T, name, in string, ref func(*T) *R) {
 
 func sample() Promoted {
 	p := Promoted{
-		Mid: Mid{
-			Deep:    Deep{DeepOnly: "d", Shared: "deep-shared"},
-			Shared:  "mid-shared",
-			MidOnly: 1,
-		},
+		Deep:          Deep{DeepOnly: "d", Shared: "deep-shared"},
+		Shared:        "mid-shared",
+		MidOnly:       1,
 		LeftConflict:  LeftConflict{Clash: "l", Left: "left"},
 		RightConflict: RightConflict{Clash: "r", Right: "right"},
 		UntaggedSide:  UntaggedSide{Winner: "untagged"},
 		TaggedSide:    TaggedSide{Winner: "tagged"},
 		PtrPart:       &PtrPart{PtrOnly: 7},
 		Label:         "label",
-		Named:         Named{Value: 3},
+		Value:         3,
 		Own:           "own",
 	}
 	return p

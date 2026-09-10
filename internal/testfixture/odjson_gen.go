@@ -4431,7 +4431,7 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 	}
 	dst = append(dst, ",\"byte_array\":"...)
 	dst = append(dst, '[')
-	for i539 := 0; i539 < 4; i539++ {
+	for i539 := range 4 {
 		if i539 > 0 {
 			dst = append(dst, ',')
 		}
@@ -4440,7 +4440,7 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 	dst = append(dst, ']')
 	dst = append(dst, ",\"int_array\":"...)
 	dst = append(dst, '[')
-	for i540 := 0; i540 < 3; i540++ {
+	for i540 := range 3 {
 		if i540 > 0 {
 			dst = append(dst, ',')
 		}

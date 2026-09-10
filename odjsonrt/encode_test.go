@@ -62,7 +62,7 @@ func stringCorpus() []string {
 		"\xf0\x9f\x98\x80", // U+1F600
 		strings.Repeat("x", 300) + "\xff",
 	}
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		corpus = append(corpus, string([]byte{byte(i)}))
 		corpus = append(corpus, "a"+string([]byte{byte(i)})+"b")
 	}
@@ -71,7 +71,6 @@ func stringCorpus() []string {
 
 func TestAppendString(t *testing.T) {
 	for _, s := range stringCorpus() {
-		s := s
 		t.Run(strconv.Quote(s), func(t *testing.T) {
 			if got, want := odjsonrt.AppendString(nil, s, true), marshalHTML(t, s); !bytes.Equal(got, want) {
 				t.Errorf("escapeHTML=true: got %s want %s", got, want)
@@ -100,7 +99,6 @@ func TestAppendStringQuoted(t *testing.T) {
 		S string `json:"s,string"`
 	}
 	for _, s := range stringCorpus() {
-		s := s
 		t.Run(strconv.Quote(s), func(t *testing.T) {
 			got := odjsonrt.AppendStringQuoted(nil, s, true)
 			want := bytes.TrimSuffix(bytes.TrimPrefix(marshalHTML(t, quoted{s}), []byte(`{"s":`)), []byte("}"))
@@ -182,7 +180,7 @@ func TestAppendFloat64(t *testing.T) {
 		check(t, v)
 	}
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50000; i++ {
+	for range 50000 {
 		v := math.Float64frombits(rng.Uint64())
 		if math.IsNaN(v) || math.IsInf(v, 0) {
 			continue
@@ -190,7 +188,7 @@ func TestAppendFloat64(t *testing.T) {
 		check(t, v)
 	}
 	// Also cover "normal" magnitudes densely.
-	for i := 0; i < 20000; i++ {
+	for range 20000 {
 		v := (rng.Float64() - 0.5) * math.Pow(10, float64(rng.Intn(60)-30))
 		check(t, v)
 	}
@@ -211,7 +209,7 @@ func TestAppendFloat32(t *testing.T) {
 		check(t, v)
 	}
 	rng := rand.New(rand.NewSource(2))
-	for i := 0; i < 50000; i++ {
+	for range 50000 {
 		v := math.Float32frombits(rng.Uint32())
 		if math.IsNaN(float64(v)) || math.IsInf(float64(v), 0) {
 			continue
@@ -367,7 +365,7 @@ func TestAppendAny(t *testing.T) {
 	}
 	// Deeply nested values are still encoded correctly.
 	var deep any = 1.0
-	for i := 0; i < 500; i++ {
+	for range 500 {
 		deep = []any{deep}
 	}
 	got, err := odjsonrt.AppendAny(nil, deep, true)
@@ -452,7 +450,7 @@ func TestAppendTextMarshaler(t *testing.T) {
 }
 
 func TestBufferPool(t *testing.T) {
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		b := odjsonrt.AcquireBuffer()
 		if len(b) != 0 {
 			t.Fatalf("AcquireBuffer returned length %d", len(b))

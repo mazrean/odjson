@@ -47,7 +47,8 @@ jobs:
             **/go.work.sum
 
       # The canonical linter for this repo: tools/lint (go vet's analyzers +
-      # staticcheck + stylecheck). Not golangci-lint. It lives in the `tools`
+      # modernize + staticcheck + stylecheck). Not golangci-lint. It lives in
+      # the `tools`
       # module so that staticcheck stays out of the root module's dependency
       # graph; the root go.work is what lets `go tool` still reach it.
       # `./...` covers the root module only, so `./tools/...` lints the tools.

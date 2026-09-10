@@ -15,7 +15,7 @@ func TestAppendFloatIntegralFastPath(t *testing.T) {
 		999999999999999, -999999999999999, 1e15, -1e15, 1e15 + 1,
 		1 << 53, -(1 << 53), 0.5, -0.5, 40.8, 1e-7, 1e21, 1e-300, 123456789.5,
 	}
-	for i := 0; i < 100000; i++ {
+	for range 100000 {
 		values = append(values, float64(rand.Int64N(4e15)-2e15))
 		values = append(values, rand.NormFloat64()*1e6)
 	}

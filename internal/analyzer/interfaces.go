@@ -49,8 +49,8 @@ func implements(t types.Type, iface *types.Interface) (val, ptr bool) {
 // hasOwnMethod reports whether the named type declares a method with the given
 // name itself (as opposed to promoting one from an embedded field).
 func hasOwnMethod(named *types.Named, name string) bool {
-	for i := range named.NumMethods() {
-		if named.Method(i).Name() == name {
+	for method := range named.Methods() {
+		if method.Name() == name {
 			return true
 		}
 	}

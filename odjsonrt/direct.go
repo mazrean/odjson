@@ -135,8 +135,8 @@ func calibrateDirect() (l directLayout) {
 	if !goMinorVerified(runtime.Version()) {
 		return l
 	}
-	encT := reflect.TypeOf(jsontext.Encoder{})
-	decT := reflect.TypeOf(jsontext.Decoder{})
+	encT := reflect.TypeFor[jsontext.Encoder]()
+	decT := reflect.TypeFor[jsontext.Decoder]()
 	var ok [11]bool
 	l.encBuf, ok[0] = want(encT, reflect.Slice, reflect.Uint8, "s", "Buf")
 	l.encLast, ok[1] = want(encT, reflect.Uint64, 0, "s", "Tokens", "Last")

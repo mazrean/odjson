@@ -506,7 +506,7 @@ func (v *Zoo) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	}
 	dst = append(dst, ",\"array\":"...)
 	dst = append(dst, '[')
-	for i25 := 0; i25 < 3; i25++ {
+	for i25 := range 3 {
 		if i25 > 0 {
 			dst = append(dst, ',')
 		}

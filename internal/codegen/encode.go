@@ -230,7 +230,7 @@ func (g *generator) encode(b *block, t *analyzer.Type, src ast.Expr, addressable
 	case analyzer.KindArray:
 		i := id(g.tmp("i"))
 		g.emit(b, appendChars("["))
-		g.forStmt(b, define(i, num(0)), bin(i, token.LSS, num(t.Len)), incr(i), func(b *block) {
+		g.rangeStmt(b, i, nil, num(t.Len), func(b *block) {
 			g.ifStmt(b, nil, bin(i, token.GTR, num(0)), func(b *block) {
 				g.emit(b, appendChars(","))
 			})
