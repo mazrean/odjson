@@ -157,7 +157,7 @@ go tool odjson -h
 ```
 
 <details>
-<summary>Standalone binary, Homebrew, WinGet, Linux packages</summary>
+<summary>Standalone binary, Homebrew, Linux packages</summary>
 
 ### As a standalone binary
 
@@ -170,14 +170,6 @@ go install github.com/mazrean/odjson@latest
 ```sh
 brew install --cask mazrean/tap/odjson
 ```
-
-### WinGet (Windows)
-
-```sh
-winget install mazrean.odjson
-```
-
-(available once the manifest PR to `microsoft/winget-pkgs` is merged)
 
 ### Linux packages
 

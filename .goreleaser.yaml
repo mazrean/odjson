@@ -125,52 +125,6 @@ homebrew_casks:
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/odjson"]
           end
 
-# Winget. Requires the fork github.com/mazrean/winget-pkgs and a PAT with
-# write access to it, exposed as WINGET_GITHUB_TOKEN. GoReleaser pushes a
-# branch to the fork and opens a PR against microsoft/winget-pkgs.
-winget:
-  - name: odjson
-    package_identifier: mazrean.odjson
-    publisher: mazrean
-    publisher_url: https://github.com/mazrean
-    publisher_support_url: https://github.com/mazrean/odjson/issues
-    homepage: https://github.com/mazrean/odjson
-    short_description: Reflection-free JSON marshal/unmarshal code generator for Go
-    description: |-
-      odjson is a CLI code generator that speeds up JSON encoding and decoding
-      in Go. It reads a struct's field tags, so it knows at compile time exactly
-      which JSON fields are acceptable, and emits dedicated reflection-free
-      MarshalJSON/UnmarshalJSON (plus encoding/json/v2's MarshalJSONTo and
-      UnmarshalJSONFrom) implementations for each struct.
-    license: MIT
-    license_url: https://github.com/mazrean/odjson/blob/main/LICENSE
-    copyright: mazrean
-    tags:
-      - go
-      - golang
-      - json
-      - codegen
-      - performance
-    ids:
-      - odjson
-    commit_author:
-      name: mazrean
-      email: mazrean@users.noreply.github.com
-    commit_msg_template: "New version: {{ .PackageIdentifier }} version {{ .Tag }}"
-    repository:
-      owner: mazrean
-      name: winget-pkgs
-      # Must be templated: a fixed branch name collides on the second release.
-      branch: "odjson-{{ .Version }}"
-      token: "{{ .Env.WINGET_GITHUB_TOKEN }}"
-      pull_request:
-        enabled: true
-        draft: false
-        base:
-          owner: microsoft
-          name: winget-pkgs
-          branch: master
-
 # Linux packages: deb (apt), rpm (yum/dnf) and apk (Alpine).
 nfpms:
   - id: odjson
