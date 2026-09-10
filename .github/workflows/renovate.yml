@@ -20,14 +20,9 @@ on:
   schedule:
     # Sunday 22:00 UTC — Monday 07:00 JST, matching renovate.json5's timezone.
     - cron: "0 22 * * 0"
-  # Merging a change to the configuration runs it straight away, so a mistake
-  # in it surfaces now rather than at the next cron fire.
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/renovate.json5"
-      - ".github/workflows/renovate.yml"
+  # No `push` trigger on the configuration: merging a change to it would then
+  # be a live run, which takes the choice of when to first fire the bot away
+  # from whoever merges. Dispatch it instead.
   workflow_dispatch:
     inputs:
       dry-run:
@@ -82,6 +77,14 @@ jobs:
           echo "user=${user}" >> "$GITHUB_OUTPUT"
           echo "email=${id}+${user}@users.noreply.github.com" >> "$GITHUB_OUTPUT"
 
+      # `dryRun` is a string enum with no "off" spelling, and Renovate's own
+      # config validator accepts any string for it — including nonsense — so
+      # there is nothing to lean on if the variable is set to the wrong word.
+      # Define it only when it is wanted instead.
+      - name: Request a dry run
+        if: inputs.dry-run
+        run: echo "RENOVATE_DRY_RUN=full" >> "$GITHUB_ENV"
+
       # Pinned exactly: renovatebot/github-action publishes no floating major
       # tag, and Renovate keeps this line up to date itself.
       - uses: renovatebot/github-action@v46.2.6
@@ -98,8 +101,6 @@ jobs:
           # to onboard. Without this, a cron fire opens a "Configure Renovate"
           # PR proposing the renovate.json this repository does not want.
           RENOVATE_ONBOARDING: "false"
-
-          RENOVATE_DRY_RUN: ${{ inputs.dry-run && 'full' || 'null' }}
 
           # postUpgradeTasks are refused unless the command matches an entry
           # here, and this list can only be set globally — which is why the
