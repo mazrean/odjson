@@ -232,6 +232,11 @@ func table(footer string) []byte {
 		b.WriteByte('\n')
 	}
 
+	// The same sentence the panels carry, for the same reason: a bare "3.53×"
+	// does not say what it is against.
+	if i := slices.IndexFunc(panels[0].rows, func(r row) bool { return r.odjson }); i > 0 {
+		fmt.Fprintf(&b, "\n× is odjson against %s.\n", panels[0].rows[i-1].label)
+	}
 	fmt.Fprintf(&b, "\n%s\n", footer)
 	return b.Bytes()
 }
@@ -296,19 +301,31 @@ func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
 	// and then the panel header takes it instead of overprinting the time.
 	ratio := p.ratio + "× faster"
 	ratioX, ratioInHeader := 0, true
+	// The row the ratio is against: the one odjson is drawn indented under.
+	baseline, baseW := "", 0
 	if i := slices.IndexFunc(p.rows, func(r row) bool { return r.odjson }); i >= 0 {
 		w := barW(p.rows[i].value, max)
 		ratioX = barX + w + gutter + len(fmtVal(p.rows[i].value))*7 + 10
 		// The estimate only decides which of the two places the text takes;
 		// nothing is drawn to its width, so a few pixels out costs nothing.
 		ratioInHeader = ratioX+textW(ratio, 16) > x+panelW
+		if i > 0 {
+			baseline = p.rows[i-1].label
+			baseW = barW(p.rows[i-1].value, max)
+		}
 	}
 
 	fmt.Fprintf(b, `<text class="t1" x="%d" y="%d" font-size="13" font-weight="600">%s</text>`, x, y+13, p.title)
 	// 8.7 is the advance of the title's face at 13px semibold, wide enough for
-	// the capitals in "Unmarshal"; the subtitle sits after it.
-	fmt.Fprintf(b, `<text class="t2" x="%d" y="%d" font-size="11">%s · %s</text>`,
-		x+int(float64(len(p.title))*8.7)+8, y+13, p.sub, p.unit)
+	// the capitals in "Unmarshal"; the subtitle sits after it. It ends by
+	// naming what the ratio is against, because the ratio itself has no room
+	// to say it and the indented row only implies it.
+	sub := fmt.Sprintf("%s · %s", p.sub, p.unit)
+	if baseline != "" {
+		sub += " · odjson vs " + baseline
+	}
+	fmt.Fprintf(b, `<text class="t2" x="%d" y="%d" font-size="11">%s</text>`,
+		x+int(float64(len(p.title))*8.7)+8, y+13, esc(sub))
 	if ratioInHeader {
 		fmt.Fprintf(b, `<text x="%d" y="%d" font-size="16" font-weight="700" fill="%s" text-anchor="end">%s</text>`,
 			x+panelW, y+14, t.accent, ratio)
@@ -347,6 +364,16 @@ func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
 		// 16px would ride high. No t1/t2 class, because a stylesheet fill
 		// beats a presentation attribute.
 		if r.odjson && !ratioInHeader {
+			// Between the two bars, a tick-ended rule across the length the
+			// baseline has and odjson does not. It ends under the bar it is
+			// measuring against, so the pair the ratio is about is drawn
+			// rather than left to be inferred from the indent.
+			if x0, x1 := barX+w, barX+baseW; x1-x0 >= 3*gutter {
+				// Halves, so a 1px stroke lands on a pixel rather than across two.
+				mid := float64(top-(rowH-barH)/2) + 0.5
+				fmt.Fprintf(b, `<path d="M%.1f %.1f v6 m0 -3 H%.1f m0 -3 v6" stroke="%s" stroke-width="1" opacity="0.5" fill="none"/>`,
+					float64(x0)+0.5, mid-3, float64(x1)+0.5, t.accent)
+			}
 			fmt.Fprintf(b, `<text x="%d" y="%d" font-size="16" font-weight="700" fill="%s">%s</text>`,
 				ratioX, top+barH/2+capH(16), t.accent, ratio)
 		}
