@@ -35,8 +35,6 @@ cd bench
 go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(json-v2|go-json|sonic)/' -benchmem -count 10 ./gen/ ./plain/
 ```
 
-測定中は他のプロセスを動かさないでください。並行して lint やテストを回すと ±44% の外れ値が出ます。
-
 ### 測定環境
 
 | 項目 | 内容 |
@@ -69,7 +67,7 @@ go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(json-v2|go-json|sonic)/' 
 </details>
 
 > [!IMPORTANT]
-> odjson は `encoding/json/v2`/`encoding/jsontext` の内部実装に強く依存しています。このため、検証済みの Go マイナーバージョン以外では高速化が自動的に無効化され、速度が低下します。生成コードの削除のみで即座に使用を止めることもできます。
+> odjson は `encoding/json/v2`/`encoding/jsontext` の内部実装に強く依存しています。このため、検証済みの Go マイナーバージョン(Go 1.27)以外では高速化が自動的に無効化され、速度が低下します。生成コードの削除のみで即座に使用を止めることもできます。
 
 ## 動作要件
 

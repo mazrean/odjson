@@ -35,8 +35,6 @@ cd bench
 go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(json-v2|go-json|sonic)/' -benchmem -count 10 ./gen/ ./plain/
 ```
 
-Run nothing else on the machine while measuring: a concurrent lint or test run produces ±44% outliers.
-
 ### Environment
 
 | Item | Value |
@@ -69,7 +67,7 @@ The method and the assumptions behind it are written up in [bench/README.md](./b
 </details>
 
 > [!IMPORTANT]
-> odjson depends heavily on the internals of `encoding/json/v2` and `encoding/jsontext`. On any Go minor version it has not been verified against, the acceleration disables itself and the speed drops. Deleting the generated file also stops all of it immediately.
+> odjson depends heavily on the internals of `encoding/json/v2` and `encoding/jsontext`. On any Go minor version other than the one it has been verified against (Go 1.27), the acceleration disables itself and the speed drops. Deleting the generated file also stops all of it immediately.
 
 ## Requirements
 
