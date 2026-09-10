@@ -28,7 +28,8 @@ type Options struct {
 	// Pattern is the go/packages pattern identifying the package.
 	Pattern string
 	// Types restricts generation to the named types. When empty every
-	// exported struct type declared in the package is used.
+	// struct type declared in the package is used, unexported ones
+	// included.
 	Types []string
 	// Recursive pulls in struct types referenced by the selected types so
 	// that nested values are encoded without falling back to reflection.
@@ -157,8 +158,10 @@ func (a *Analyzer) roots(pkg *packages.Package, want []string) ([]*types.Named, 
 		return out, nil
 	}
 
-	// Default: every exported struct type declared in the package, in
-	// source order.
+	// Default: every struct type declared in the package, in source order.
+	// Unexported types are included: a generated method on an unexported
+	// type is still what encoding/json calls once a value of it is reached
+	// from an exported one.
 	var out []*types.Named
 	seen := map[string]bool{}
 	for _, file := range pkg.Syntax {
@@ -169,7 +172,7 @@ func (a *Analyzer) roots(pkg *packages.Package, want []string) ([]*types.Named, 
 			}
 			for _, spec := range gd.Specs {
 				ts, ok := spec.(*ast.TypeSpec)
-				if !ok || ts.Assign.IsValid() || !ts.Name.IsExported() || seen[ts.Name.Name] {
+				if !ok || ts.Assign.IsValid() || seen[ts.Name.Name] {
 					continue
 				}
 				obj := scope.Lookup(ts.Name.Name)

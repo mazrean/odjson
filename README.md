@@ -167,7 +167,7 @@ With no package argument odjson generates for the package in the current directo
 
 | Flag                | Default          | Description                                                                                                   |
 | ------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------- |
-| `-type`             | all              | Comma-separated struct type names to generate for. The default is every exported struct in the package.         |
+| `-type`             | all              | Comma-separated struct type names to generate for. The default is every struct declared in the package, unexported ones included.         |
 | `-output`           | `odjson_gen.go`  | File name written into each matched package directory. A name, not a path.                                     |
 | `-recursive`        | `true`           | Also generate codecs for struct types reachable from the selected ones, so nested values skip reflection too.  |
 | `-escape-html`      | `true`           | Escape `<`, `>` and `&` in strings, matching `encoding/json`'s default.                                        |
