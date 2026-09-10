@@ -369,10 +369,11 @@ func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
 			// measuring against, so the pair the ratio is about is drawn
 			// rather than left to be inferred from the indent.
 			if x0, x1 := barX+w, barX+baseW; x1-x0 >= 3*gutter {
-				// Halves, so a 1px stroke lands on a pixel rather than across two.
-				mid := float64(top-(rowH-barH)/2) + 0.5
-				fmt.Fprintf(b, `<path d="M%.1f %.1f v6 m0 -3 H%.1f m0 -3 v6" stroke="%s" stroke-width="1" opacity="0.5" fill="none"/>`,
-					float64(x0)+0.5, mid-3, float64(x1)+0.5, t.accent)
+				// 2px on whole coordinates, which is where an even stroke
+				// lands on the pixel grid rather than across two.
+				mid := top - (rowH-barH)/2
+				fmt.Fprintf(b, `<path d="M%d %d v6 m0 -3 H%d m0 -3 v6" stroke="%s" stroke-width="2" fill="none"/>`,
+					x0, mid-3, x1, t.accent)
 			}
 			fmt.Fprintf(b, `<text x="%d" y="%d" font-size="16" font-weight="700" fill="%s">%s</text>`,
 				ratioX, top+barH/2+capH(16), t.accent, ratio)
