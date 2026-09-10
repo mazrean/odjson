@@ -326,7 +326,7 @@ imposing one set on both:
 | array length mismatch (decode) | padded or truncated | rejected |
 | case-insensitive member match (decode) | opt-in (`-case-insensitive`) | no |
 | `null` into a scalar, struct, `time.Time` or `,string` field (decode) | left untouched | zeroed |
-| map member order | sorted by name | map iteration order |
+| map member order | sorted by name | sorted by name |
 
 **Which column a call site lands in is the host library's choice, not
 odjson's.** `encoding/json/v2` prefers `MarshalJSONTo` when a type offers
@@ -338,11 +338,13 @@ v1's spellings — `null` for a nil slice, a zero dropped by `omitempty`, a
 case-insensitive member match — that is the one thing generating a codec does
 change, and `-case-insensitive` covers the last of the three.
 
-The map row is the one that costs something: `encoding/json/v2` does not sort
-map members, so neither does the generated `MarshalJSONTo`. Its output for a
-document containing maps is therefore no more byte-stable than `json/v2`'s own
-— which is the point of following the interface's rules rather than imposing
-`encoding/json`'s.
+The map row is the one place the generated code does *not* follow its
+interface's rules. `encoding/json/v2` leaves map members in iteration order;
+`odjsonAppend` sorts them (`slices.Sort` over the collected keys) in every
+mode, so generated output stays byte-stable for a document containing maps
+whichever method runs. That is a deliberate departure — byte stability is
+worth more to a caller than matching `json/v2`'s non-determinism — and it is
+the reason adopting odjson does not disturb golden files or a signed body.
 
 This is verified, not asserted: `internal/testfixture/v2parity` decodes the same
 documents into a generated type and an identical reflection-only type and

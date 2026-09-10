@@ -229,46 +229,47 @@ odjson, and both are worth reading before you do it.
 
 ### The JSON on the wire
 
-Each generated method follows the rules of the interface it implements, rather
-than imposing one set on both. Since Go 1.27 `encoding/json` is implemented on
-top of `encoding/json/v2`, and `json/v2` prefers `MarshalJSONTo` when a type
-offers both — so for a generated type, **an unchanged `encoding/json` call
-site lands in the right-hand column**:
+You do not edit a call site, but the bytes it produces move. Since Go 1.27
+`encoding/json` is implemented on top of `encoding/json/v2`, and `json/v2`
+prefers `MarshalJSONTo` when a type offers both — so for a generated type, an
+unchanged `json.Marshal` / `json.Unmarshal` gets `encoding/json/v2`'s
+semantics, except where `encoding/json`'s own options put v1's back.
 
-| | `MarshalJSON` / `UnmarshalJSON` | `MarshalJSONTo` / `UnmarshalJSONFrom` |
+This is what an ordinary `encoding/json` call site does before and after
+generating a codec, measured against the same type declared twice — once with
+a generated file, once without:
+
+| at an `encoding/json` call site | without odjson | with odjson |
 | --- | --- | --- |
-| nil slice / map / `[]byte` | `null` | `[]` / `{}` / `""` |
-| `omitempty` on `0` or `false` | omitted | kept |
-| HTML characters, U+2028/9 | escaped | not escaped |
-| **map member order** | **sorted by name** | **map iteration order** |
-| array length mismatch (decode) | padded or truncated | rejected |
-| case-insensitive member match (decode) | opt-in (`-case-insensitive`) | no |
-| `null` into a scalar, struct, `time.Time` or `,string` field (decode) | left untouched | zeroed |
+| nil slice / map | `null` | `[]` / `{}` |
+| nil `[]byte` | `null` | `""` |
+| `omitempty` on `0` or `false` | omitted | **kept** |
+| `null` into a scalar, struct, `time.Time` or `,string` field (decode) | left untouched | **zeroed** |
+| array length mismatch (decode) | padded or truncated | **rejected** |
+| member name in the wrong case (decode) | matched | **not matched** |
+| map member order | sorted by name | sorted by name — *unchanged* |
+| `<`, `>`, `&`, U+2028/9 | escaped | escaped — *unchanged* |
 
-You do not edit a call site, but the bytes it produces move. Three rows are
-worth singling out:
+The three decode rows are the ones to check first: input your service accepts
+today can start being **rejected**, or can start **zeroing** a field it used
+to leave alone. `-case-insensitive` does not restore the last of them here —
+it, and `-escape-html`, only reach the v1 `UnmarshalJSON` / `MarshalJSON`
+methods, which a `json/v2` call site never runs.
 
-- **Map member order is no longer sorted.** `encoding/json/v2` does not sort
-  map members, so neither does the generated `MarshalJSONTo`. If you compare
-  JSON output as strings in tests, sign a serialized body, or write golden
-  files, a struct containing a map stops being byte-stable. This is the row
-  most likely to break something.
-- **HTML characters stop being escaped** on that path. If you template JSON
-  into a page and were relying on `<`, `>`, `&` and U+2028/9 being escaped,
-  check it.
-- **A nil slice encodes as `[]`, not `null`.** Harmless for many consumers, a
-  contract break for some.
+The two rows people worry about most do **not** change. The generated encoder
+sorts map members the way `encoding/json` does, so a struct containing a map
+stays byte-stable: golden files, string-compared test output and a signature
+over a serialized body all keep working. And `encoding/json` applies its own
+HTML escaping over whatever a marshaler returns, so `<`, `>`, `&` and
+U+2028/9 stay escaped for v1 call sites. (A direct `json/v2.Marshal` does not
+escape them — that is `json/v2`'s rule, not something odjson introduces.)
 
-The left-hand column is what a `GOEXPERIMENT=nojsonv2` build sees, and what
-any library that only knows `json.Marshaler` gets — so the same generated type
-can serialize differently depending on how the *consuming* program is built.
-That matters most if you publish a library: the generated methods are exported
+The per-method rules behind this, including what a `GOEXPERIMENT=nojsonv2`
+build sees, are in
+[docs/internals.md](./docs/internals.md#which-semantics-a-generated-method-follows).
+It matters most if you publish a library: the generated methods are exported
 API on your types, your users inherit them, and removing the file later is a
 breaking change for them rather than a clean uninstall.
-
-The two options that look like they should help only reach the left-hand
-column: `-case-insensitive` affects `UnmarshalJSON`, and `-escape-html`
-affects `MarshalJSON`. Neither changes what a `json/v2` call site sees.
 
 > **Embedding.** A struct that embeds a generated type and does not get a
 > codec of its own inherits the embedded type's methods, and would then encode
@@ -299,8 +300,8 @@ speed:
 - **verified against one Go minor at a time** (currently 1.27), and gated on
   it;
 - **checked by type at init**, and **self-tested at init** by running the
-  direct path through `json/v2` and comparing its answers, including error
-  cases, with the public API's;
+  direct path through `json/v2` and comparing its answers, including the
+  rejection of trailing data, with the public API's;
 - **any failure disables it for the whole process**, and
   `odjsonrt.DirectEnabled` reports the outcome — assert it in a test if you
   want to be told;
