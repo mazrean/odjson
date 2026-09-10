@@ -282,13 +282,16 @@ Four workflows, all under `.github/workflows/`:
   `chore/direct-go1.N` and opens a **draft** PR, or files an issue when the
   verification fails. Both are deduplicated by listing what already exists —
   a closed PR and an open issue each stop the nightly run, so **closing the
-  issue is what re-arms it**. It borrows the `Release` environment for the
-  GitHub App's credentials; the App needs `pull requests: write` and
-  `issues: write` on top of the release's `contents: write`, and the App token
-  is not a convenience — a PR opened with `GITHUB_TOKEN` triggers no
-  `pull_request` workflows and would land with no checks. Its own evidence is
-  the run, not the PR's checks: `ci.yml` builds from `go.mod`, which still
-  names the old minor.
+  issue is what re-arms it**. Everything it touches is inside this repository,
+  so it uses the job's own `GITHUB_TOKEN` rather than borrowing release.yml's
+  GitHub App — that App exists to reach `homebrew-tap`, and nothing here leaves
+  odjson. The one repository setting it needs is *Settings > Actions > General
+  > "Allow GitHub Actions to create and approve pull requests"*. In exchange
+  the PR arrives with **no checks**, because nothing a `GITHUB_TOKEN` does
+  starts another workflow run; the evidence is the workflow run itself, which
+  is a superset of what `ci.yml` could have said, since `ci.yml` builds from
+  `go.mod` and would have tested the old minor. Do not reach for the App to
+  "fix" that — weigh it against a `ci.yml` matrix, which fixes the real gap.
 - `release.yml` — GoReleaser, on a `vX.Y.Z` tag.
 
 `bench.yml` is skipped for PRs from forks, whose token can neither push nor

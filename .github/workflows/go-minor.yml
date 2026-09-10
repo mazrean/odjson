@@ -14,13 +14,21 @@ name: Go minor watch
 # layout still matches, not that the reasoning behind it survived.
 #
 # What it needs from the repository:
-#   - The GitHub App behind the `Release` environment (APP_ID / APP_PRIVATE_KEY)
-#     must hold `contents: write`, `pull requests: write` and `issues: write`
-#     here. The default GITHUB_TOKEN would do all three, but a pull request it
-#     opens triggers no `pull_request` workflows, so the PR would land with no
-#     checks at all.
+#   - Settings > Actions > General > "Allow GitHub Actions to create and
+#     approve pull requests". Without it `gh pr create` fails; everything else
+#     here runs on the job's own GITHUB_TOKEN and stays inside this repository,
+#     so release.yml's GitHub App — which exists to reach homebrew-tap — is not
+#     borrowed.
 #   - Scheduled runs fire only from the default branch, and GitHub suspends
 #     them after 60 days without repository activity.
+#
+# The cost of that choice: nothing a GITHUB_TOKEN does triggers another
+# workflow, so this pull request arrives with no checks on it. That is a
+# smaller loss here than it looks — ci.yml builds from go.mod, which still
+# names the old minor, so its checks could not exercise the widened gate
+# anyway, and the run that opened the PR already ran a superset of them on the
+# new toolchain. A reviewer who wants the checks anyway can close and reopen
+# the pull request by hand.
 
 on:
   schedule:
@@ -48,30 +56,22 @@ jobs:
   verify:
     name: Verify the direct path on the newest Go
     runs-on: ubuntu-latest
-    # Borrowed from the release job, which is where the App's credentials are
-    # stored. Nothing is deployed here.
-    environment: Release
+    permissions:
+      contents: write # pushes the branch
+      pull-requests: write # opens the PR
+      issues: write # files the issue when the verification fails
     defaults:
       run:
         shell: bash
     env:
+      GH_TOKEN: ${{ github.token }}
       # The whole point is to test the toolchain setup-go installed, so the
       # `go` line in go.mod must never quietly pull a different one.
       GOTOOLCHAIN: local
     steps:
-      - name: generate a token
-        id: token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
-      # The token has to exist before the checkout: it is what the later
-      # `git push` authenticates with, and what makes the pull request come
-      # from the App instead of from a token whose PRs run no checks.
+      # persist-credentials is the default and is what the later `git push`
+      # authenticates with.
       - uses: actions/checkout@v5
-        with:
-          token: ${{ steps.token.outputs.token }}
 
       - name: pick the version to verify
         id: pick
@@ -100,7 +100,6 @@ jobs:
       - name: is there anything to do?
         id: state
         env:
-          GH_TOKEN: ${{ steps.token.outputs.token }}
           MINOR: ${{ steps.pick.outputs.minor }}
           BRANCH: ${{ steps.pick.outputs.branch }}
         run: |
@@ -193,8 +192,6 @@ jobs:
       - name: open the pull request
         if: steps.state.outputs.skip == '' && steps.verify.outcome == 'success'
         env:
-          GH_TOKEN: ${{ steps.token.outputs.token }}
-          APP_SLUG: ${{ steps.token.outputs.app-slug }}
           MINOR: ${{ steps.pick.outputs.minor }}
           PREV: ${{ steps.state.outputs.prev }}
           FULL: ${{ steps.pick.outputs.full }}
@@ -203,11 +200,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          # The numeric id is what links the commit to the App's bot account;
-          # without it the address still works, it just shows no avatar.
-          bot_id=$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id 2>/dev/null || true)
-          git config user.name "${APP_SLUG}[bot]"
-          git config user.email "${bot_id:+${bot_id}+}${APP_SLUG}[bot]@users.noreply.github.com"
+          # github-actions[bot]'s own identity; the numeric id is what links the
+          # commit to that account rather than to a nameless address.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git switch -c "$BRANCH"
           git add odjsonrt/direct.go
@@ -259,13 +255,17 @@ jobs:
           - [\`jsontext\` at \`go${FULL}\`](https://github.com/golang/go/tree/go${FULL}/src/encoding/json/jsontext)
           - [\`${PREV}.0...go${FULL}\`](https://github.com/golang/go/compare/${PREV}.0...go${FULL})
 
-          ## What this PR's own CI does *not* cover
+          ## Why this pull request has no checks
 
-          \`ci.yml\` uses \`go-version-file: go.mod\`, which still says
-          \`go ${PREV#go}\`, so nothing on this pull request exercises the widened
-          gate — the evidence above is the run linked at the top. Adding
-          \`${MINOR#go}\` to a matrix in \`ci.yml\` is the durable fix, and is a
-          maintainer's call rather than this workflow's.
+          It was opened with the workflow's own \`GITHUB_TOKEN\`, and nothing a
+          \`GITHUB_TOKEN\` does starts another workflow run. Little is lost:
+          \`ci.yml\` builds from \`go.mod\`, which still says \`go ${PREV#go}\`, so its
+          checks could not have exercised the widened gate anyway, and the run
+          linked at the top already ran a superset of them on Go ${FULL}. Close
+          and reopen this PR if you want them on it regardless.
+
+          Adding \`${MINOR#go}\` to a matrix in \`ci.yml\` is the durable fix, and
+          is a maintainer's call rather than this workflow's.
 
           Prose still naming a Go version, for whoever updates it:
 
@@ -285,7 +285,6 @@ jobs:
       - name: file an issue when the verification fails
         if: steps.state.outputs.skip == '' && steps.verify.outcome == 'failure'
         env:
-          GH_TOKEN: ${{ steps.token.outputs.token }}
           MINOR: ${{ steps.pick.outputs.minor }}
           FULL: ${{ steps.pick.outputs.full }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
