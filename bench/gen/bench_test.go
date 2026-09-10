@@ -87,7 +87,7 @@ func unmarshalV1(data []byte, v any) error {
 // NoValidateJSONMarshaler skips re-validating the bytes the generated encoder
 // returns, and NoValidateJSONSkip skips re-validating the members the
 // generated decoder ignores. CompactMarshaler is deliberately NOT set — it
-// sounds right for odjson's always-compact output, but measures 1.6x slower.
+// sounds right for odjson's always-compact output, but measures 1.7x slower.
 var sonicTrusting = sonic.Config{
 	NoValidateJSONMarshaler: true,
 	NoValidateJSONSkip:      true,

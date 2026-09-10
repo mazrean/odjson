@@ -130,8 +130,8 @@ cd bench && go test -bench . -count 5 ./ab/
 ```
 
 `ab` covers all four host libraries; the sonic and go-json rows are what settle
-whether odjson wins their small unmarshal (sonic's by 1.13x, go-json's by
-1.11x) and loses everything else on them (it does, by the floor).
+whether odjson wins their small unmarshal (sonic's by 1.15x, go-json's by
+1.12x) and loses everything else on them (it does, by the floor).
 
 ## `floor`
 

@@ -20,10 +20,10 @@ $ rm odjson_gen.go      # and this is the entire uninstall
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bench-dark.svg">
-  <img alt="Time per operation, lower is better. Marshal large: encoding/json/v2 392 µs, with odjson 111 µs, sonic 117 µs, go-json 237 µs. Marshal small: 1025 ns, with odjson 317 ns, sonic 308 ns, go-json 374 ns. Unmarshal large: 1072 µs, with odjson 506 µs, sonic 492 µs, go-json 655 µs. Unmarshal small: 1842 ns, with odjson 573 ns, sonic 977 ns, go-json 770 ns." src="./docs/assets/bench-light.svg" width="912">
+  <img alt="Time per operation, lower is better. Marshal large: encoding/json/v2 399 µs, with odjson 112 µs, sonic 114 µs, go-json 243 µs. Marshal small: 1060 ns, with odjson 319 ns, sonic 312 ns, go-json 421 ns. Unmarshal large: 1080 µs, with odjson 508 µs, sonic 513 µs, go-json 672 µs. Unmarshal small: 1864 ns, with odjson 562 ns, sonic 951 ns, go-json 794 ns." src="./docs/assets/bench-light.svg" width="912">
 </picture>
 
-**2.1×–3.5× on `encoding/json/v2`** across all four measurements — ahead of
+**2.1×–3.6× on `encoding/json/v2`** across all four measurements — ahead of
 [`goccy/go-json`](https://github.com/goccy/go-json) on every one, level with
 [`bytedance/sonic`](https://github.com/bytedance/sonic)'s JIT-compiled SIMD
 codec on three and 1.7× ahead on the small decode — while still being the
@@ -56,13 +56,14 @@ go test -bench . -benchmem ./...
   so they appear at their own speed only.
 - `sonic.Marshal`'s default configuration neither escapes HTML nor validates
   UTF-8, so its encode bars are not doing equal work; `sonic.ConfigStd`, which
-  does both, measures 126 µs and 374 ns.
+  does both, measures 126 µs and 367 ns.
 - The chart's figures come from two separate processes, which is fine in
   absolute terms but not for small differences between a generated row and its
   baseline. For those use `bench/ab`, which measures both sides in one
-  process: it puts every sonic row within 3% of the chart's, and sonic's own
-  `large` decode has drifted between 480 and 550 µs across runs.
-- `encoding/json` v1 gains too — 1.2×–1.5× on three of the four, and 5% behind
+  process: it puts three of sonic's four rows within 4% of the chart's and its
+  `small` encode 12% lower, and sonic's own `large` decode has drifted between
+  480 and 550 µs across runs.
+- `encoding/json` v1 gains too — 1.2×–1.6× on three of the four, and 4% behind
   on the `large` encode. Its rows are in
   [the measured tables](./docs/internals.md#the-measured-tables), left out of
   the chart to keep the `json/v2` story legible.
