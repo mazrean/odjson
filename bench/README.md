@@ -112,8 +112,10 @@ fails, the `gen` rows are not measuring what they claim to.
 To regenerate after changing the generator:
 
 ```sh
-cd bench/gen && go generate ./...
+cd bench && go generate ./...
 ```
+
+That covers `gen` and `shapes/gen`, which carry the same directive.
 
 ## `ab`
 

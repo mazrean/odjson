@@ -183,8 +183,9 @@ Within the root module:
 
 Every fixture's generated file is committed, and `internal/generate`'s tests
 regenerate each one and fail on any difference. Regenerate with
-`go generate ./...` from the repo root (and again from `bench/gen` — a separate
-module) whenever the generator changes.
+`go generate ./...` from the repo root (and again from `bench/` — a separate
+module, whose `gen` and `shapes/gen` packages both carry a directive) whenever
+the generator changes.
 - `docs/internals.md` — the measurement record and the implementation detail
   behind `README.md`'s summary: the public API ceiling, the direct path, what
   the decode side pays, the v1/v2 semantics table, and why sonic and go-json
@@ -231,7 +232,7 @@ introduce `-X`/`ldflags` version injection, and do not disable `-buildvcs`.
   way to clear them — but never on a generated file: `internal/generate`'s
   tests regenerate and diff, so a modernize finding inside an `odjson_gen.go`
   means the **emitter** in `internal/codegen` has to change, followed by
-  `go generate ./...` from the root and from `bench/gen`. The generated code
+  `go generate ./...` from the root and from `bench/`. The generated code
   may use anything the root module's `go` directive allows, because a consumer
   cannot import `odjsonrt` from a module with a lower one.
 - Run it from the repository root:
