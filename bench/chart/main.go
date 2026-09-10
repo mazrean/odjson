@@ -235,7 +235,7 @@ func table(footer string) []byte {
 	// The same sentence the panels carry, for the same reason: a bare "3.53×"
 	// does not say what it is against.
 	if i := slices.IndexFunc(panels[0].rows, func(r row) bool { return r.odjson }); i > 0 {
-		fmt.Fprintf(&b, "\n× is odjson against %s.\n", panels[0].rows[i-1].label)
+		fmt.Fprintf(&b, "\n× is odjson vs %s.\n", panels[0].rows[i-1].label)
 	}
 	fmt.Fprintf(&b, "\n%s\n", footer)
 	return b.Bytes()
