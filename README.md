@@ -1,5 +1,7 @@
 # odjson
 
+English | [日本語](./README.ja.md)
+
 [![CI](https://github.com/mazrean/odjson/actions/workflows/ci.yml/badge.svg)](https://github.com/mazrean/odjson/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/mazrean/odjson.svg)](https://pkg.go.dev/github.com/mazrean/odjson)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
