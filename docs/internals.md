@@ -326,6 +326,105 @@ ends in a bracket, so it is driven token by token and keeps its memory bounded;
 when a chunk does end in a bracket, `ReadValue` fetches the rest of that value,
 which is correct, only buffered rather than streamed.
 
+## What the other shapes say
+
+Everything above was tuned on `twitter` and `small`, so `bench/shapes` asks
+whether it generalises: the two fixtures, a compacted `twitter`, 21 synthetic
+documents that each change one thing the fixtures hold fixed, and
+nativejson-benchmark's `canada.json` and `citm_catalog.json`, gen against
+plain in one process. Measured 2026-09-11 on
+the same Ryzen 9 7950X, Go 1.27.1, `-count 6` for the two standard libraries,
+`-count 3` for sonic and go-json; the ratio is plain over gen, so 2× means the
+generated codec halves the time and anything under 1× means it is slower than
+reflection.
+
+| shape | v2 Marshal | v2 Unmarshal | v1 Marshal | v1 Unmarshal |
+| --- | --- | --- | --- | --- |
+| `twitter` (reference) | 3.61× | 2.11× | 0.96× | 1.24× |
+| `small` (reference) | 3.37× | 3.13× | 1.12× | 1.61× |
+| `twitter-compact` | 3.59× | 2.28× | 0.95× | 1.30× |
+| `page-3k` / `page-12k` / `page-100k` | 2.14× / 2.18× / 2.14× | 2.19× / 2.16× / 2.17× | 1.39× / 1.38× / 1.34× | 1.54× / 1.33× / 1.31× |
+| `array-items` (`[]Item`) | **0.84×** | 1.22× | 1.12× | 1.31× |
+| `array-pages` (`[]Page`) | **1.00×** | 1.24× | 1.33× | 1.32× |
+| `map-items` (`map[string]Item`) | **0.83×** | 1.17× | 1.11× | 1.26× |
+| `generic` (`any`) | 1.64× | 1.43× | 1.24× | 2.21× |
+| `text-ascii` | 2.11× | 1.77× | 0.93× | 0.95× |
+| `text-cjk` (as `twitter`) | 1.66× | 1.89× | **0.43×** | 1.07× |
+| `text-hangul` | 1.39× | 1.73× | **0.44×** | 1.10× |
+| `text-latin` | **0.77×** | **0.96×** | **0.46×** | 1.00× |
+| `text-cyrillic` | **0.81×** | **0.90×** | **0.45×** | 1.03× |
+| `text-emoji` | **0.94×** | 1.09× | **0.46×** | 1.00× |
+| `text-escaped` | 1.48× | 1.28× | **0.55×** | **0.82×** |
+| `unique-strings` | 2.06× | 1.54× | 1.00× | 1.00× |
+| `numbers` | 1.16× | 1.10× | **0.68×** | **0.87×** |
+| `floats` (synthetic GeoJSON) | 1.09× | 1.98× | **0.64×** | 1.33× |
+| `canada` | 1.12× | 1.32× | **0.67×** | 1.10× |
+| `dense` | 3.65× | 3.42× | 1.27× | 1.34× |
+| `sparse` | 8.29× | 2.39× | 2.70× | 1.45× |
+| `skip` | — | 1.68× | — | 1.38× |
+| `citm` | 3.57× | 3.01× | 1.14× | 1.26× |
+
+What holds: the ratios do not depend on document size (`page-3k` to
+`page-100k` are flat), on whitespace (`twitter-compact`, `page-12k-indented`),
+on strings repeating (`unique-strings`), on member density in either
+direction (`dense`, `sparse`), on unknown members (`skip`), or on the real
+corpora whose bytes are structure and integers (`citm`). The README's numbers
+are not a property of `twitter.json`.
+
+What does not hold, in order of how much of real traffic it touches:
+
+- **A generated type below the top level loses the encode win on json/v2.**
+  `[]Item` and `map[string]Item` encode 0.84× and 0.83× against reflection;
+  the same items behind a top-level object (`page-12k`) are 2.18×. The direct
+  path covers one top-level value; every element of a slice or map goes
+  through `MarshalJSONTo` on the public API, where `enc.WriteValue`
+  re-validates and reformats what the generated `odjsonAppend` produced. That
+  is the public API ceiling measured above, now seen from the other side: the
+  reformat costs more than reflection saves. The decode side still wins there
+  (1.17–1.24×), because a whole-value read plus the byte parser is cheaper than
+  reflection even after the decoder's own validation pass. `encoding/json` v1
+  never has the direct path and pays the reformat on every shape, which is
+  why its `[]Item` row (1.12×) is no worse than its top-level ones.
+- **Non-ASCII text outside the CJK three byte range is slower than
+  reflection.** The fused UTF-8 scan in `odjsonrt/utf8.go` settles only three
+  byte sequences with leads E1–EC and EE–EF on its own and hands everything
+  else to `utf8.DecodeRune`, one rune per call. Latin-1 and Cyrillic (two byte
+  sequences) encode 0.77× and 0.81× and decode 0.96× and 0.90×; emoji (four
+  byte) encodes 0.94×. CJK, the fixture's script, encodes 1.66× and Hangul
+  (leads EA–ED, of which ED is excluded) 1.39×. ASCII is 2.11×, so the loss
+  is specific to the sequences the fast path declines, not to non-ASCII as
+  such.
+- **Full precision floats are close to a draw on json/v2 and a loss on v1.**
+  `appendShortFloat` declines anything it cannot prove short and falls back to
+  `strconv`, which is what reflection calls too, so `canada` and the synthetic
+  `floats` encode at 1.09–1.12× and `numbers` at 1.16×. Under `encoding/json`
+  the reformat pass then makes them 0.64–0.68×.
+- **`encoding/json` v1 encode is a loss on any string-heavy document.** Every
+  `text-*` row is 0.43–0.55× there, CJK included, where the same document is a
+  win on json/v2. The reason is the same public API reformat: on `twitter`,
+  where structure, whitespace and skipped members dilute it, it costs 4%; on
+  a document that is all strings it costs 2×. The README's "1.2–1.6× on three of four"
+  for v1 is a property of the two fixtures' mix, not of v1 in general; its
+  decode rows hold (0.95–1.10× on text, 1.24–1.61× elsewhere).
+
+The first item is what to weigh before the next round of tuning: it is the
+most common API shape (a list endpoint decoded into `[]T`), the loss is on the
+default library, and it follows from the direct path's scope rather than from
+anything in the generated code. The second is a bounded change to one
+function. The third is the price of not running Ryu and is unlikely to move.
+
+sonic and go-json behave as the floor predicts on every shape: the generated
+codec is slower on all 25 encode rows (0.13–0.67× on sonic, 0.24–1.06× on
+go-json) and on most decode rows; the exceptions are the ones the README
+already names, `small` (1.16× / 1.03×), and two shapes of the same kind,
+`dense` (1.33× / 1.06×) and `sparse` (1.17× on sonic), where the document is
+mostly member names and the skip-and-validate pass they make before calling
+`UnmarshalJSON` is cheap relative to their own decode.
+
+A parallel audit the same day measured the same top-level-only scope from the
+other direction (`Marshal([]T)` of twitter 1.23× slower, `MarshalWrite` 1.62×
+slower, decode never regressing), so the two runs agree.
+
 ## Which semantics a generated method follows
 
 Each method follows the rules of the interface it implements, rather than
