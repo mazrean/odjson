@@ -5,7 +5,9 @@
 //   - the analyzer suite that "go vet" runs
 //     (golang.org/x/tools/go/analysis/suite/vet),
 //   - staticcheck's SA* checks (honnef.co/go/tools/staticcheck),
-//   - stylecheck's ST* checks (honnef.co/go/tools/stylecheck).
+//   - stylecheck's ST* checks (honnef.co/go/tools/stylecheck),
+//   - modernize, the suite "go fix" runs
+//     (golang.org/x/tools/go/analysis/passes/modernize).
 //
 // Analyzers that staticcheck marks as non-default (opt-in, e.g. ST1000
 // "at least one file in a package should have a package comment") are
@@ -22,6 +24,7 @@ package main
 import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/multichecker"
+	"golang.org/x/tools/go/analysis/passes/modernize"
 	"golang.org/x/tools/go/analysis/suite/vet"
 
 	"honnef.co/go/tools/analysis/lint"
@@ -30,10 +33,15 @@ import (
 )
 
 func main() {
-	analyzers := make([]*analysis.Analyzer, 0, len(vet.Suite)+len(staticcheck.Analyzers)+len(stylecheck.Analyzers))
+	analyzers := make([]*analysis.Analyzer, 0, len(vet.Suite)+len(modernize.Suite)+len(staticcheck.Analyzers)+len(stylecheck.Analyzers))
 
 	// go vet's analyzers, kept in sync with the toolchain by x/tools.
 	analyzers = append(analyzers, vet.Suite...)
+
+	// modernize's analyzers: the suite "go fix" runs, minus the rest of
+	// suite/fix, whose buildtag and hostport are already in vet.Suite and
+	// would make multichecker reject the duplicate names.
+	analyzers = append(analyzers, modernize.Suite...)
 
 	// staticcheck + stylecheck, minus the checks upstream disables by default.
 	analyzers = append(analyzers, defaultAnalyzers(staticcheck.Analyzers)...)

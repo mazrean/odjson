@@ -215,9 +215,20 @@ introduce `-X`/`ldflags` version injection, and do not disable `-buildvcs`.
 ## Linting
 
 - `tools/lint` is a single linter binary combining the `go vet` analyzer suite
-  (`golang.org/x/tools/go/analysis/suite/vet`) with `staticcheck` and
+  (`golang.org/x/tools/go/analysis/suite/vet`) with `modernize`
+  (`golang.org/x/tools/go/analysis/passes/modernize`), `staticcheck` and
   `stylecheck`, via `multichecker`. Analyzers that staticcheck marks
   non-default are skipped, matching upstream staticcheck defaults.
+- `modernize.Suite` is added directly, **not** `suite/fix.Suite`: the latter
+  also carries `buildtag` and `hostport`, which `vet.Suite` already has, and
+  `multichecker` rejects duplicate analyzer names. Its fixes are the ones
+  upstream considers unambiguously safe, so `go tool lint -fix` is the normal
+  way to clear them — but never on a generated file: `internal/generate`'s
+  tests regenerate and diff, so a modernize finding inside an `odjson_gen.go`
+  means the **emitter** in `internal/codegen` has to change, followed by
+  `go generate ./...` from the root and from `bench/gen`. The generated code
+  may use anything the root module's `go` directive allows, because a consumer
+  cannot import `odjsonrt` from a module with a lower one.
 - Run it from the repository root:
 
   ```sh
