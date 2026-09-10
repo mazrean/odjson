@@ -38,14 +38,15 @@ go test -bench . -benchmem ./...
 | Item | Value |
 | --- | --- |
 | CPU | AMD Ryzen 9 7950X |
-| OS | Linux |
+| OS | Linux (WSL2) |
 | Go | 1.27.1 |
 | Method | `bench/gen` and `bench/plain` each run 10 times; the median is quoted |
-| Variance | `benchstat` |
+| Variance | measured with [`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) |
 
 ### What is measured
 
 Four subjects: `encoding/json` v1, `encoding/json/v2`, `sonic` and `goccy/go-json`. The benchmark names are `BenchmarkMarshal/<library>/<input>` and `BenchmarkUnmarshal/<library>/<input>`.
+Both inputs are the same ones [`bytedance/sonic`](https://github.com/bytedance/sonic)'s own benchmarks use.
 
 | Input | Size | Go type | Content |
 | --- | ---: | --- | --- |
@@ -180,11 +181,11 @@ this performs JIT-grade optimisation at compile time and cuts the run-time overh
 
 - **Marshal**: appends struct fields straight to a byte slice
     - field names, quotes and separators are baked into the generated source as constants
-        - the approach is based on [`sapphi-red/json-constantiater`](https://github.com/sapphi-red/json-constantiater)
+    - the approach is based on [`sapphi-red/json-constantiater`](https://github.com/sapphi-red/json-constantiater)
 - **Unmarshal**: streams the input straight into the struct's fields
     - no reflection, no intermediate `map[string]any`, no run-time field name lookup
-        - member names are matched against the document's raw bytes, quotes included
-        - bools, integers and simple floats are decoded inline
+    - member names are matched against the document's raw bytes, quotes included
+    - bools, integers and simple floats are decoded inline
 
 ### Bolting onto the standard library
 
@@ -258,12 +259,14 @@ odjson's `MarshalJSON` / `UnmarshalJSON` behave exactly like `encoding/json`, an
 
 - the parity fixtures in `internal/testfixture/`
     - covering every field shape the generator can handle
-        - every numeric width, `[]byte` and `[N]byte`, pointers, slices, arrays, maps, `any`, `json.RawMessage`, `json.Number`, `time.Time`, embedding by value and by pointer, `omitempty`, `omitzero`, `,string`, `-`, unexported fields, self-referential and cross-package types, generics and other fallbacks
-        - compared against the standard library's encode and decode results, which must match exactly
+    - every numeric width, `[]byte` and `[N]byte`, pointers, slices, arrays, maps, `any`, `json.RawMessage`, `json.Number`, `time.Time`, embedding by value and by pointer, `omitempty`, `omitzero`, `,string`, `-`, unexported fields, self-referential and cross-package types, generics and other fallbacks
+    - compared against the standard library's encode and decode results, which must match exactly
 - **the [JSON Test Suite](https://seriot.ch/security/parsing_json.html)** (318 cases)
     - run against the runtime scanner and the generated decoders
-        - each case must produce the same value as the standard library
-- **`encoding/json`'s field promotion rules**, reimplemented on `go/types` and checked against `encoding/json` on a struct built to hit all three cases.
+    - each case must produce the same value as the standard library
+- **`encoding/json`'s field promotion rules**
+    - reimplemented on `go/types`
+    - checked against `encoding/json` on a struct built to hit all three cases
 
 Parity is measured against the toolchain named in `go.mod`. Since Go 1.27 `encoding/json` is implemented on top of `encoding/json/v2` in v1 compatibility mode, and a few escape forms differ from the classic v1 encoder. For the exact list, see the package documentation of [`odjsonrt`](https://pkg.go.dev/github.com/mazrean/odjson/odjsonrt).
 
