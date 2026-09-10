@@ -28,10 +28,14 @@ The benchmarks live in [`bench/`](./bench), a Go module of its own. It is kept s
 
 ### Commands
 
+The chart's figures come from the command below, with `benchstat` taking the median.
+
 ```sh
 cd bench
-go test -bench . -benchmem ./...
+go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(json-v2|go-json|sonic)/' -benchmem -count 10 ./gen/ ./plain/
 ```
+
+Run nothing else on the machine while measuring: a concurrent lint or test run produces ±44% outliers.
 
 ### Environment
 
@@ -65,12 +69,13 @@ The method and the assumptions behind it are written up in [bench/README.md](./b
 </details>
 
 > [!IMPORTANT]
-> odjson depends heavily on the internals of `encoding/json/v2` and `encoding/jsontext`. Deleting the generated file stops all of it immediately, but a future Go release may keep it from working, or cost it its speed.
+> odjson depends heavily on the internals of `encoding/json/v2` and `encoding/jsontext`. On any Go minor version it has not been verified against, the acceleration disables itself and the speed drops. Deleting the generated file also stops all of it immediately.
 
 ## Requirements
 
-Go 1.27.
-`encoding/json` benefits too, since 1.27 implements it on top of `encoding/json/v2` internally, but odjson is tuned to get the most out of `encoding/json/v2`, which is the recommended way to use it.
+Go 1.27 or newer. Generated files import `encoding/json/jsontext`, so they do not compile on 1.26 and older.
+
+`encoding/json` benefits too, since 1.27 implements it on top of `encoding/json/v2` internally, but odjson is tuned to get the most out of `encoding/json/v2`, which is the recommended way to use it. Through `encoding/json` three of the four measurements come out at 1.2×–1.6×, while the `large` encode is 4% slower: the coder flags `encoding/json` sets make the direct write into the internal buffer, described below, decline to run.
 
 ## Quick Start
 
@@ -203,7 +208,7 @@ The methods added to each type are these:
 Types that already implement `json.Marshaler`, `json.Unmarshaler`, `encoding.TextMarshaler` or `encoding.TextUnmarshaler` are left alone. Nothing about their behaviour changes, but they get nothing from odjson either.
 
 One more thing on the encode side: writing to `(encoding/jsontext).Encoder` through the ordinary route costs too much in validation of what was written to reach the speed above. odjson writes straight into the encoder's internal buffer, working from `(*encoding/jsontext).Encoder`'s memory layout.
-That is where a large part of the speed comes from, and also why a Go upgrade can stop it working: it depends on the standard library's internal layout. See [docs/internals.md](./docs/internals.md) for the details.
+That is where a large part of the speed comes from, and it depends on the standard library's internal layout. So the path is only enabled on Go minor versions it has been verified against; on any other it disables itself at start-up and falls back to the implementation that goes through the public API. That still compiles and still produces the same JSON — only the speed drops. See [docs/internals.md](./docs/internals.md) for the details.
 
 
 ### Other small optimisations
@@ -212,7 +217,7 @@ A number of smaller optimisations are what close the remaining gap to `github.co
 - buffer reuse through `sync.Pool`
 - a dedicated formatting algorithm for `float` values with few digits
 - word-at-a-time scanning
-- skipping non-ASCII runs when escaping strings
+- fusing UTF-8 validation into the string scan, removing the separate validation pass
 
 ## What adopting it changes
 

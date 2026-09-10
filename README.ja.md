@@ -28,10 +28,14 @@
 
 ### 再現コマンド
 
+グラフの数値は以下のコマンドで測定し、`benchstat` で中央値を取っています。
+
 ```sh
 cd bench
-go test -bench . -benchmem ./...
+go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(json-v2|go-json|sonic)/' -benchmem -count 10 ./gen/ ./plain/
 ```
+
+測定中は他のプロセスを動かさないでください。並行して lint やテストを回すと ±44% の外れ値が出ます。
 
 ### 測定環境
 
@@ -65,12 +69,13 @@ go test -bench . -benchmem ./...
 </details>
 
 > [!IMPORTANT]
-> odjson は `encoding/json/v2`/`encoding/jsontext` の内部実装に強く依存しています。このため、生成コードの削除のみで即座に使用を止めることができるものの、将来の Go バージョンでは正常に動作しない・速度の低下が起きる可能性があります。
+> odjson は `encoding/json/v2`/`encoding/jsontext` の内部実装に強く依存しています。このため、検証済みの Go マイナーバージョン以外では高速化が自動的に無効化され、速度が低下します。生成コードの削除のみで即座に使用を止めることもできます。
 
 ## 動作要件
 
-Go 1.27 で動作します。
-また、1.27 以降の `encoding/json` でも内部的に `encoding/json/v2` を使うため効果はありますが、`encoding/json/v2` で使用する場合に最大限効果を発揮するようにチューニングしており、`encoding/json/v2` を使うことを推奨します。
+Go 1.27 以降で動作します。生成コードが `encoding/json/jsontext` を import するため、1.26 以前ではコンパイルできません。
+
+また、1.27 以降の `encoding/json` でも内部的に `encoding/json/v2` を使うため効果はありますが、`encoding/json/v2` で使用する場合に最大限効果を発揮するようにチューニングしており、`encoding/json/v2` を使うことを推奨します。`encoding/json` 経由では 4 つの測定のうち 3 つで 1.2×〜1.6× となる一方、`large` のエンコードのみ 4% 遅くなります。これは `encoding/json` が設定するコーダのフラグにより、後述の内部バッファへの直接書き込みが行われなくなるためです。
 
 ## Quick Start
 
@@ -203,7 +208,7 @@ Go の struct は、JSON の形について必要な情報をコンパイル時�
 なお、すでに `json.Marshaler`、`json.Unmarshaler`、`encoding.TextMarshaler`、`encoding.TextUnmarshaler` を実装している型には変更を加えません。これにより挙動の変化をなくせる一方、このような型は odjson の恩恵を受けられません。
 
 また、エンコードの際に通常の経路からの `(encoding/jsontext).Encoder` への書き込みでは、書き込まれた値のバリデーションによるオーバーヘッドが大きく、十分な速度が得られませんでした。そのため、odjson では `(*encoding/jsontext).Encoder` のメモリ構造を基に内部バッファに直接書き込むことで速度を向上させています。
-これにより、大幅な速度向上を実現している一方、標準ライブラリの内部構造に依存しているため、Go のバージョンアップにより動作しなくなる可能性があります。詳細は [docs/internals.md](./docs/internals.md) を参照してください。
+これにより、大幅な速度向上を実現している一方、標準ライブラリの内部構造に依存しています。そのため、この経路は検証済みの Go マイナーバージョンでのみ有効になり、それ以外では起動時に自動的に無効化され、公開 API 経由の実装にフォールバックします。この場合もコンパイルは通り、出力される JSON も変わりませんが、速度は低下します。詳細は [docs/internals.md](./docs/internals.md) を参照してください。
 
 ### その他細かい最適化
 
@@ -211,7 +216,7 @@ Go の struct は、JSON の形について必要な情報をコンパイル時�
 - `sync.Pool` によるバッファ再利用
 - 桁数の少ない `float` に対する、専用文字列化アルゴリズムの使用
 - Word-at-a-time scanning
-- 文字列エスケープ時の非 ASCII 文字列読み飛ばし
+- UTF-8 検証の文字列スキャンへの融合による、検証パスの削減
 
 ## 導入による影響
 
