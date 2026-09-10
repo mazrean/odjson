@@ -75,10 +75,11 @@ tried and rejected, and why sonic and go-json cannot be sped up — is in
 
 </details>
 
-Two things to check before adopting it, both of them below: generating a codec
-[changes the JSON your existing call sites produce](#the-json-on-the-wire),
-and the speed above
-[depends on standard library internals](#it-depends-on-standard-library-internals).
+> [!IMPORTANT]
+> Two things to check before adopting it, both of them below: generating a codec
+> [changes the JSON your existing call sites produce](#the-json-on-the-wire),
+> and the speed above
+> [depends on standard library internals](#it-depends-on-standard-library-internals).
 
 ## Requirements
 
@@ -243,11 +244,12 @@ a generated file, once without:
 | map member order | sorted by name | sorted by name — *unchanged* |
 | `<`, `>`, `&`, U+2028/9 | escaped | escaped — *unchanged* |
 
-The three decode rows are the ones to check first: input your service accepts
-today can start being **rejected**, or can start **zeroing** a field it used
-to leave alone. `-case-insensitive` does not restore the last of them here —
-it, and `-escape-html`, only reach the v1 `UnmarshalJSON` / `MarshalJSON`
-methods, which a `json/v2` call site never runs.
+> [!WARNING]
+> The three decode rows are the ones to check first: input your service accepts
+> today can start being **rejected**, or can start **zeroing** a field it used
+> to leave alone. `-case-insensitive` does not restore the last of them here —
+> it, and `-escape-html`, only reach the v1 `UnmarshalJSON` / `MarshalJSON`
+> methods, which a `json/v2` call site never runs.
 
 The two rows people worry about most do **not** change. The generated encoder
 sorts map members the way `encoding/json` does, so a struct containing a map
@@ -264,6 +266,7 @@ It matters most if you publish a library: the generated methods are exported
 API on your types, your users inherit them, and removing the file later is a
 breaking change for them rather than a clean uninstall.
 
+> [!WARNING]
 > **Embedding.** A struct that embeds a generated type and does not get a
 > codec of its own inherits the embedded type's methods, and would then encode
 > as **only that embedded part** — silently dropping its own fields. Within a
@@ -303,16 +306,17 @@ speed:
   takes it for any nested value, any `io.Writer` / `io.Reader`, any option and
   every `encoding/json` call.
 
-**What this costs you on a new Go release.** When Go 1.28 ships, odjson does
-not trust a layout it has not verified: the direct path stays off until a
-release adds 1.28 support, and until then generated types run entirely on the
-public API path. Your code keeps compiling and keeps producing the same JSON —
-but the `json/v2` figures above are the direct path's, and without it the
-margin over the standard library narrows sharply, to the point where the
-encode side is no longer a win at all. Plan a version bump around a Go
-upgrade, or build with `-tags odjson_safe` if you would rather never depend on
-it. The measurements for both paths are in
-[docs/internals.md](./docs/internals.md#the-direct-path).
+> [!IMPORTANT]
+> **What this costs you on a new Go release.** When Go 1.28 ships, odjson does
+> not trust a layout it has not verified: the direct path stays off until a
+> release adds 1.28 support, and until then generated types run entirely on the
+> public API path. Your code keeps compiling and keeps producing the same JSON —
+> but the `json/v2` figures above are the direct path's, and without it the
+> margin over the standard library narrows sharply, to the point where the
+> encode side is no longer a win at all. Plan a version bump around a Go
+> upgrade, or build with `-tags odjson_safe` if you would rather never depend on
+> it. The measurements for both paths are in
+> [docs/internals.md](./docs/internals.md#the-direct-path).
 
 ## How it works
 
