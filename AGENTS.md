@@ -133,7 +133,8 @@ costs consumers nothing and saves every contributor from writing it by hand.
 `bench/go.work` (`use .`) exists because a root `go.work` makes every nested
 module directory it does not `use` fail with "directory prefix . does not
 contain modules listed in go.work"; its own one-line workspace is what keeps
-`cd bench && go test` working. `bench/` is kept out of the root workspace on
+`cd bench && go test` working. Both `go.work.sum` files are committed
+alongside their `go.work`, for the same reason `go.sum` is. `bench/` is kept out of the root workspace on
 purpose: in a workspace MVS runs over the union of every `use`d module, so
 `sonic`'s requirements would start choosing versions for root builds and
 tests.
@@ -316,8 +317,9 @@ go test -race ./...   # CI, and before anything that will be released
 ## Dependency injection
 
 If compile-time DI is needed, use [`mazrean/kessoku`](https://github.com/mazrean/kessoku)
-(added to the `tool` directive, invoked via `//go:generate go tool kessoku $GOFILE`).
-Do not introduce `google/wire`.
+(added to the `tool` directive in **`tools/go.mod`**, never the root one,
+invoked via `//go:generate go tool kessoku $GOFILE`). Do not introduce
+`google/wire`.
 
 ## Spec-driven development
 

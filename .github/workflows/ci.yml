@@ -25,7 +25,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: |
             **/go.sum
-            go.work.sum
+            **/go.work.sum
 
       - name: go build
         run: go build ./...
@@ -44,7 +44,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: |
             **/go.sum
-            go.work.sum
+            **/go.work.sum
 
       # The canonical linter for this repo: tools/lint (go vet's analyzers +
       # staticcheck + stylecheck). Not golangci-lint. It lives in the `tools`
@@ -69,7 +69,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: |
             **/go.sum
-            go.work.sum
+            **/go.work.sum
 
       - name: resolve the base revision
         id: base
@@ -151,7 +151,7 @@ jobs:
           go-version-file: bench/go.mod
           cache-dependency-path: |
             **/go.sum
-            go.work.sum
+            **/go.work.sum
 
       - name: go build
         run: go build ./...
