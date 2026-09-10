@@ -9,8 +9,8 @@ questions without re-running `bench/ab` and `bench/floor`.
 The ratios below come from `bench/ab`, which measures the generated codec, the
 reflection baseline and the interface floor in a single process — comparing
 them across processes moves the small differences by more than their size. The
-tables in the README are the absolute figures from `bench/gen` and
-`bench/plain`.
+measured tables below are the absolute figures from `bench/gen` and
+`bench/plain`, and the README's chart is drawn from them.
 
 ## The measured tables
 
@@ -74,8 +74,8 @@ does both, measures 123 µs and 359 ns.
 
 ## The public API ceiling
 
-The `json/v2` rows in the README's tables are what they are because of the
-direct path described below: under a plain `json.Marshal` / `json.Unmarshal` the generated method
+The `json/v2` rows in the tables above are what they are because of the direct
+path described below: under a plain `json.Marshal` / `json.Unmarshal` the generated method
 appends into, or parses out of, the coder's own buffer, the way `json/v2`'s
 reflection codec does, and nothing in `jsontext`'s public API runs at all.
 Everything that follows in this section is about the public API path, which
@@ -394,7 +394,7 @@ measures 315 µs against an encode of 198 µs and a floor of 105 µs; go-json's
 284 µs. The floor is real, and it is additive.
 
 So if you are on sonic or go-json, this is the honest summary: odjson has
-nothing to offer you but a small-document decode. What the README's tables say
+nothing to offer you but a small-document decode. What the README's chart says
 instead is that `encoding/json/v2` **with** odjson lands in the same
 neighbourhood as those libraries without them — which is the case for not
 taking on a third-party codec in the first place.
