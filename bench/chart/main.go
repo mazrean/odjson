@@ -8,15 +8,31 @@
 //	go run ./chart
 //
 // from the bench module root.
+//
+// The same renderer also draws a chart for numbers measured elsewhere — CI
+// runs it on what a GitHub-hosted runner just produced:
+//
+//	go run ./chart -input bench.txt -out out -footer '...'
+//
+// -input reads `go test -bench` output, takes the median per benchmark name
+// and overwrites the literals below. Those numbers are not the README's:
+// say where they came from in -footer, because the caption is the only place
+// the chart admits which machine it is describing.
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -27,6 +43,11 @@ type row struct {
 	indent   bool // drawn as a variant of the row above it
 	odjson   bool // the highlighted bar
 	emphasis bool // label in primary ink rather than secondary
+
+	// Where -input takes this row's number from: the bench sub-module
+	// (`plain` measures the libraries as they ship, `gen` measures them on
+	// odjson-generated types) and the codec label the benchmark uses.
+	module, codec string
 }
 
 // A panel is one benchmark: four libraries on a scale of their own.
@@ -36,43 +57,47 @@ type panel struct {
 	unit  string
 	ratio string // odjson against encoding/json/v2, as the README's tables state it
 	rows  []row
+
+	// Which benchmark -input reads for this panel, matching the names in
+	// `go test -bench` output: BenchmarkMarshal/<codec>/<payload>.
+	payload string
 }
 
 var panels = []panel{
 	{
-		title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "3.53",
+		title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "3.53", payload: "twitter",
 		rows: []row{
-			{label: "encoding/json/v2", value: 392},
-			{label: "+ odjson", value: 111, indent: true, odjson: true, emphasis: true},
-			{label: "sonic", value: 117},
-			{label: "go-json", value: 237},
+			{label: "encoding/json/v2", value: 392, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 111, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 117, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 237, module: "plain", codec: "go-json"},
 		},
 	},
 	{
-		title: "Marshal", sub: "small · 340 B", unit: "ns", ratio: "3.23",
+		title: "Marshal", sub: "small · 340 B", unit: "ns", ratio: "3.23", payload: "small",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1025},
-			{label: "+ odjson", value: 317, indent: true, odjson: true, emphasis: true},
-			{label: "sonic", value: 308},
-			{label: "go-json", value: 374},
+			{label: "encoding/json/v2", value: 1025, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 317, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 308, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 374, module: "plain", codec: "go-json"},
 		},
 	},
 	{
-		title: "Unmarshal", sub: "large · 616 KiB", unit: "µs", ratio: "2.12",
+		title: "Unmarshal", sub: "large · 616 KiB", unit: "µs", ratio: "2.12", payload: "twitter",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1072},
-			{label: "+ odjson", value: 506, indent: true, odjson: true, emphasis: true},
-			{label: "sonic", value: 492},
-			{label: "go-json", value: 655},
+			{label: "encoding/json/v2", value: 1072, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 506, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 492, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 655, module: "plain", codec: "go-json"},
 		},
 	},
 	{
-		title: "Unmarshal", sub: "small · 340 B", unit: "ns", ratio: "3.21",
+		title: "Unmarshal", sub: "small · 340 B", unit: "ns", ratio: "3.21", payload: "small",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1842},
-			{label: "+ odjson", value: 573, indent: true, odjson: true, emphasis: true},
-			{label: "sonic", value: 977},
-			{label: "go-json", value: 770},
+			{label: "encoding/json/v2", value: 1842, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 573, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 977, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 770, module: "plain", codec: "go-json"},
 		},
 	},
 }
@@ -126,24 +151,97 @@ const (
 	footerH = 30
 )
 
+// readmeFooter describes the machine the literals above were measured on. Any
+// other set of numbers needs its own caption, via -footer.
+const readmeFooter = "Medians of 10 runs · AMD Ryzen 9 7950X · Linux · Go 1.27.1 · bench/plain and bench/gen"
+
 func main() {
-	// Anchored on this file rather than the working directory, so running it
-	// from bench/chart writes the same place as running it from bench/.
-	_, self, _, ok := runtime.Caller(0)
-	if !ok {
-		fail(errors.New("cannot locate the source directory"))
+	input := flag.String("input", "", "`go test -bench` output to take the numbers from; the README's literals are used when empty")
+	out := flag.String("out", "", "directory to write bench-light.svg and bench-dark.svg into (default docs/assets)")
+	footer := flag.String("footer", readmeFooter, "the caption under the chart, naming where the numbers come from")
+	summary := flag.String("summary", "", "also write the same numbers to this file as a Markdown table")
+	flag.Parse()
+
+	if *input != "" {
+		f, err := os.Open(*input)
+		if err != nil {
+			fail(err)
+		}
+		defer f.Close()
+		measured, err := parse(f)
+		if err != nil {
+			fail(err)
+		}
+		if err := apply(measured); err != nil {
+			fail(err)
+		}
 	}
-	out := filepath.Join(filepath.Dir(self), "..", "..", "docs", "assets")
-	if _, err := os.Stat(out); err != nil {
+
+	dir := *out
+	if dir == "" {
+		// Anchored on this file rather than the working directory, so running
+		// it from bench/chart writes the same place as running it from bench/.
+		self, ok := sourceDir()
+		if !ok {
+			fail(errors.New("cannot locate the source directory"))
+		}
+		dir = filepath.Join(self, "..", "..", "docs", "assets")
+	}
+	if _, err := os.Stat(dir); err != nil {
 		fail(err)
 	}
 	for _, t := range themes {
-		name := filepath.Join(out, "bench-"+t.name+".svg")
-		if err := os.WriteFile(name, render(t), 0o644); err != nil {
+		name := filepath.Join(dir, "bench-"+t.name+".svg")
+		if err := os.WriteFile(name, render(t, *footer), 0o644); err != nil {
 			fail(err)
 		}
 		fmt.Println("wrote", name)
 	}
+
+	if *summary != "" {
+		if err := os.WriteFile(*summary, table(*footer), 0o644); err != nil {
+			fail(err)
+		}
+		fmt.Println("wrote", *summary)
+	}
+}
+
+// table restates the chart as Markdown. A PNG of the chart carries no alt
+// text, so wherever the image goes this goes with it.
+func table(footer string) []byte {
+	var b bytes.Buffer
+	b.WriteString("| Benchmark |")
+	for _, r := range panels[0].rows {
+		fmt.Fprintf(&b, " %s |", r.label)
+	}
+	b.WriteString("\n| --- |")
+	for range panels[0].rows {
+		b.WriteString(" ---: |")
+	}
+	b.WriteByte('\n')
+
+	for _, p := range panels {
+		fmt.Fprintf(&b, "| %s · %s |", p.title, p.sub)
+		for _, r := range p.rows {
+			if r.odjson {
+				fmt.Fprintf(&b, " **%s %s** (%s×) |", fmtVal(r.value), p.unit, p.ratio)
+				continue
+			}
+			fmt.Fprintf(&b, " %s %s |", fmtVal(r.value), p.unit)
+		}
+		b.WriteByte('\n')
+	}
+
+	fmt.Fprintf(&b, "\n%s\n", footer)
+	return b.Bytes()
+}
+
+func sourceDir() (string, bool) {
+	_, self, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", false
+	}
+	return filepath.Dir(self), true
 }
 
 func fail(err error) {
@@ -151,7 +249,7 @@ func fail(err error) {
 	os.Exit(1)
 }
 
-func render(t theme) []byte {
+func render(t theme, footer string) []byte {
 	panelH := titleH + rowH*len(panels[0].rows)
 	svgH := headerH + 2*panelH + panelGapY + footerH
 
@@ -174,8 +272,8 @@ text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,san
 		drawPanel(&b, t, p, x, y)
 	}
 
-	fmt.Fprintf(&b, `<text class="t2" x="%d" y="%d" font-size="11">Medians of 10 runs · AMD Ryzen 9 7950X · Linux · Go 1.27.1 · bench/plain and bench/gen</text>`,
-		padX, svgH-11)
+	fmt.Fprintf(&b, `<text class="t2" x="%d" y="%d" font-size="11">%s</text>`,
+		padX, svgH-11, esc(footer))
 	b.WriteString(`</svg>`)
 	b.WriteByte('\n')
 	return b.Bytes()
@@ -243,4 +341,117 @@ func altText() string {
 
 func esc(s string) string {
 	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;").Replace(s)
+}
+
+// A key identifies one measurement in `go test -bench` output: the bench
+// sub-module it was run in, plus the three parts of the benchmark's name.
+type key struct {
+	module, op, codec, payload string
+}
+
+// parse collects every ns/op in the input, keyed by measurement. A key can
+// hold several samples, because `-count N` repeats each benchmark.
+func parse(r io.Reader) (map[key][]float64, error) {
+	out := make(map[key][]float64)
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
+
+	module := ""
+	for sc.Scan() {
+		line := sc.Text()
+		// `go test` prints one of these per package, ahead of its results.
+		if rest, ok := strings.CutPrefix(line, "pkg:"); ok {
+			module = path.Base(strings.TrimSpace(rest))
+			continue
+		}
+		name, ns, ok := result(line)
+		if !ok {
+			continue
+		}
+		parts := strings.Split(name, "/")
+		if len(parts) != 3 {
+			continue
+		}
+		k := key{module, strings.TrimPrefix(parts[0], "Benchmark"), parts[1], parts[2]}
+		out[k] = append(out[k], ns)
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("read benchmark output: %w", err)
+	}
+	if len(out) == 0 {
+		return nil, errors.New("no benchmark results in the input")
+	}
+	return out, nil
+}
+
+// result pulls the name and the ns/op out of one testing.B result line,
+// dropping the -N parallelism suffix that testing appends to every name.
+func result(line string) (string, float64, bool) {
+	f := strings.Fields(line)
+	if len(f) < 4 || !strings.HasPrefix(f[0], "Benchmark") {
+		return "", 0, false
+	}
+	i := slices.Index(f, "ns/op")
+	if i < 2 {
+		return "", 0, false
+	}
+	ns, err := strconv.ParseFloat(f[i-1], 64)
+	if err != nil {
+		return "", 0, false
+	}
+
+	name := f[0]
+	if j := strings.LastIndex(name, "-"); j > 0 {
+		if _, err := strconv.Atoi(name[j+1:]); err == nil {
+			name = name[:j]
+		}
+	}
+	return name, ns, true
+}
+
+// apply overwrites the panels' literals with the measured medians and
+// recomputes each panel's ratio. It fails rather than drawing a partial
+// chart: a missing bar reads as a measurement, not as an absence.
+func apply(m map[key][]float64) error {
+	for i := range panels {
+		p := &panels[i]
+
+		ns := make([]float64, len(p.rows))
+		for j := range p.rows {
+			r := &p.rows[j]
+			v, ok := median(m[key{r.module, p.title, r.codec, p.payload}])
+			if !ok {
+				return fmt.Errorf("no Benchmark%s/%s/%s in bench/%s", p.title, r.codec, p.payload, r.module)
+			}
+			ns[j] = v
+			// The panels' scales are the README's: µs for twitter, ns for small.
+			if p.unit == "µs" {
+				v /= 1000
+			}
+			r.value = v
+		}
+
+		// The odjson row is drawn indented under the baseline it improves on,
+		// so the row above it is what the ratio is against.
+		odjson := slices.IndexFunc(p.rows, func(r row) bool { return r.odjson })
+		if odjson < 1 || !p.rows[odjson].indent {
+			return fmt.Errorf("panel %s/%s has no odjson row under a baseline", p.title, p.payload)
+		}
+		p.ratio = strconv.FormatFloat(ns[odjson-1]/ns[odjson], 'f', 2, 64)
+	}
+	return nil
+}
+
+// median is the middle sample, which is what the README quotes: a mean would
+// let one descheduled run on a shared CI machine move the bar.
+func median(v []float64) (float64, bool) {
+	if len(v) == 0 {
+		return 0, false
+	}
+	s := slices.Sorted(slices.Values(v))
+	n := len(s)
+	if n%2 == 1 {
+		return s[n/2], true
+	}
+	return (s[n/2-1] + s[n/2]) / 2, true
 }

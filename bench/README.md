@@ -183,3 +183,20 @@ go run ./chart
 
 Its numbers are literals that mirror the README's tables — the tables stay the
 source of truth, so re-measuring means editing both and regenerating.
+
+The same renderer will also draw a chart of numbers measured somewhere else:
+
+```sh
+go test -run '^$' -benchmem -count 5 -bench '/^(json-v2|sonic|go-json)$/' ./plain ./gen > bench.txt
+mkdir -p out
+go run ./chart -input bench.txt -out out -summary out/summary.md \
+  -footer 'Median of 5 runs · <where these came from>'
+```
+
+`-input` takes the median per benchmark name and overwrites the literals;
+`-summary` writes the same numbers as a Markdown table, for wherever the image
+goes (a PNG has no alt text). `-out` keeps it away from `docs/assets/`, which
+belongs to the README's figures alone. `.github/workflows/bench.yml` runs
+exactly this on every PR and comments the result — read those numbers as a
+shape, not as figures: a shared CI runner is far noisier than the machine the
+README quotes.

@@ -1,0 +1,160 @@
+name: Benchmark chart
+
+# Renders the README's chart from numbers this PR's head commit produces on a
+# GitHub-hosted runner, and posts it to the PR.
+#
+# Read the numbers as a shape, not as figures: a shared two-core runner is far
+# noisier than the machine README.md and docs/internals.md quote, and nothing
+# here is a substitute for re-measuring locally before restating a claim.
+
+on:
+  pull_request:
+    # A docs-only PR cannot move a benchmark, and a chart on one is noise.
+    paths:
+      - "**.go"
+      - "**/go.mod"
+      - "**/go.sum"
+      - ".github/workflows/bench.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Where the rendered charts live. Generated output: never merge from it.
+  IMAGE_BRANCH: bench-images
+
+jobs:
+  chart:
+    name: Measure and comment
+    # A PR from a fork gets a read-only token: it can neither publish the image
+    # nor comment, so there is nothing for this job to do.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # pushes the PNGs to IMAGE_BRANCH
+      pull-requests: write # posts the comment
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
+      SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: bench/go.mod
+          cache-dependency-path: "**/go.sum"
+
+      # rsvg-convert turns the chart into a PNG. GitHub serves SVG as
+      # text/plain, which <img> will not render, so the SVG the README uses
+      # cannot be the one the comment shows.
+      - name: install rsvg-convert
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends librsvg2-bin
+
+      # Only the three libraries the chart draws, which keeps the run to a few
+      # minutes. -count 5 is what the median is taken over.
+      - name: run the benchmarks
+        working-directory: bench
+        run: |
+          go test -run '^$' -benchmem -count 5 \
+            -bench '/^(json-v2|sonic|go-json)$/' \
+            ./plain ./gen | tee "$RUNNER_TEMP/bench.txt"
+
+      - name: render the chart
+        working-directory: bench
+        run: |
+          mkdir -p "$RUNNER_TEMP/chart"
+          go run ./chart \
+            -input "$RUNNER_TEMP/bench.txt" \
+            -out "$RUNNER_TEMP/chart" \
+            -summary "$RUNNER_TEMP/chart/summary.md" \
+            -footer "Median of 5 runs · GitHub-hosted runner (noisy, not the README's machine) · $(go env GOVERSION) · ${SHA:0:12}"
+          for theme in light dark; do
+            rsvg-convert --format=png --zoom=2 \
+              --output "$RUNNER_TEMP/chart/bench-$theme.png" \
+              "$RUNNER_TEMP/chart/bench-$theme.svg"
+          done
+
+      # A comment can only show an image it can fetch over HTTPS, and every
+      # other way in is closed here: GitHub strips data: URIs, a workflow
+      # artifact has no URL of its own, and `gh pr comment --attach` uploads
+      # only under a user token — the Actions token is server-to-server, which
+      # it rejects with "unsupported authentication type". So the PNGs go on an
+      # orphan branch of this repository, one directory per PR head commit.
+      - name: publish the chart
+        id: publish
+        run: |
+          dir="pr-${PR}/${SHA:0:12}"
+          work=$(mktemp -d)
+
+          # -b starts on the branch while it is still unborn, which is what
+          # makes the first push an orphan without a checkout --orphan dance.
+          git -C "$work" init -q -b "$IMAGE_BRANCH"
+          git -C "$work" remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git -C "$work" config user.name 'github-actions[bot]'
+          git -C "$work" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          # Concurrent PRs share the branch but never the same path, so a
+          # rejected push only means someone landed first: re-fetch and replay.
+          for attempt in 1 2 3; do
+            if git -C "$work" fetch -q origin "$IMAGE_BRANCH" 2>/dev/null; then
+              git -C "$work" checkout -q -B "$IMAGE_BRANCH" FETCH_HEAD
+            fi
+            mkdir -p "$work/$dir"
+            cp "$RUNNER_TEMP"/chart/bench-light.png "$RUNNER_TEMP"/chart/bench-dark.png "$work/$dir/"
+            git -C "$work" add -A "$dir"
+            git -C "$work" diff --quiet --cached ||
+              git -C "$work" commit -qm "bench: chart for #${PR} at ${SHA:0:12}"
+            if git -C "$work" push -q origin "$IMAGE_BRANCH"; then
+              echo "url=https://github.com/${GITHUB_REPOSITORY}/blob/${IMAGE_BRANCH}/${dir}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "push rejected (attempt ${attempt}); retrying"
+          done
+          echo "::error::could not push the chart to ${IMAGE_BRANCH}"
+          exit 1
+
+      # `blob/…?raw=true`, not raw.githubusercontent.com: raw is a cookie-less
+      # host, so while this repository is private it answers 404 without a
+      # signed token, and a token cannot go in a comment. github.com carries
+      # the reader's own session, and GitHub does not send its own domains
+      # through the camo image proxy.
+      #
+      # The summary table is not decoration: a PNG has no alt text worth
+      # reading, and the table is the only part of this comment that a screen
+      # reader, a search, or a diff can use.
+      - name: comment on the pull request
+        env:
+          URL: ${{ steps.publish.outputs.url }}
+        run: |
+          {
+            echo "## Benchmark chart"
+            echo
+            echo '<picture>'
+            echo "  <source media=\"(prefers-color-scheme: dark)\" srcset=\"${URL}/bench-dark.png?raw=true\">"
+            echo "  <img alt=\"Time per operation, lower is better; the numbers are in the table below.\" src=\"${URL}/bench-light.png?raw=true\" width=\"912\">"
+            echo '</picture>'
+            echo
+            cat "$RUNNER_TEMP/chart/summary.md"
+            echo
+            echo "<details><summary>Raw <code>go test -bench</code> output</summary>"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/bench.txt"
+            echo '```'
+            echo
+            echo "</details>"
+          } > "$RUNNER_TEMP/body.md"
+
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" \
+            --edit-last --create-if-none \
+            --body-file "$RUNNER_TEMP/body.md"

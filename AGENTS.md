@@ -158,6 +158,8 @@ Every fixture's generated file is committed, and `internal/generate`'s tests
 regenerate each one and fail on any difference. Regenerate with
 `go generate ./...` from the repo root (and again from `bench/gen` — a separate
 module) whenever the generator changes.
+- `tools/apicompat/` — the public-API gate, wired in through the `tool`
+  directive (see API compatibility).
 - `docs/internals.md` — the measurement record and the implementation detail
   behind `README.md`'s summary: the public API ceiling, the direct path, what
   the decode side pays, the v1/v2 semantics table, and why sonic and go-json
@@ -219,6 +221,82 @@ introduce `-X`/`ldflags` version injection, and do not disable `-buildvcs`.
   install`), and odjson is a CLI whose primary install path is `go install`.
 - `./...` from the root does not reach it (a nested module is excluded), so
   CI lints and vets `tools/lint` in its own step.
+
+## API compatibility
+
+- `tools/apicompat/` compares one package between two checkouts with
+  `golang.org/x/exp/apidiff` and exits non-zero on an **incompatible** change.
+  Compatible additions are never printed: a gate that reports them is a gate
+  people learn to ignore.
+
+  ```sh
+  go tool apicompat -base /path/to/base-checkout github.com/mazrean/odjson/odjsonrt
+  ```
+
+- **`odjsonrt` is the surface that matters.** Generated files import it, so an
+  incompatible change there breaks every tree that has already run the
+  generator — including trees whose owners will not regenerate before
+  upgrading. The root package is `package main` and has nothing to break.
+- It lives inside the root module, which costs `golang.org/x/exp` a place in
+  the root module graph. Unlike `tools/lint` it has not been split out yet.
+- CI (`.github/workflows/ci.yml`, the `apicompat` job) compares against the
+  PR's base commit — **not** against `<module>@latest`, which is what
+  `mazrean/kessoku` does and which odjson cannot do until it has a release
+  tag. Once tags exist, a push to `main` compares against the newest one; until
+  then that path emits a `::notice` and skips.
+- On a breaking change the job fails and writes the diff to its job summary.
+  It deliberately does **not** comment: `bench.yml` already comments as
+  `github-actions[bot]` and edits its own last comment, and a second bot
+  comment would become the one it edits. kessoku comments here because it is
+  the only bot on its PRs.
+
+## CI
+
+Three workflows, all under `.github/workflows/`:
+
+- `ci.yml` — build, test, lint, the `apicompat` gate, and a compile-only pass
+  over the `bench/` module.
+- `bench.yml` — runs `bench/plain` and `bench/gen` on the PR head, renders the
+  README's chart from those numbers (`go run ./chart -input …`), and comments
+  the image on the PR. **Those numbers are not the README's**: a shared
+  two-core runner is much noisier than the machine `README.md` and
+  `docs/internals.md` quote, so the chart's footer names the runner and the
+  comment carries the raw `go test` output. Never restate a CI figure as a
+  measured claim — re-run locally first.
+
+  The PNGs go on an orphan `bench-images` branch, one directory per PR head
+  commit, and the comment links them as
+  `github.com/<repo>/blob/bench-images/…?raw=true`. That branch is generated
+  output — never merge from it, and never add to it by hand.
+
+  Every other way in is closed, so do not "simplify" this back into one of
+  them:
+
+  - `raw.githubusercontent.com` is a cookie-less host. While odjson is
+    private it answers 404 without a signed token, and a token cannot go in a
+    comment. `github.com` carries the reader's own session instead, and GitHub
+    does not route its own domains through the camo image proxy — checked with
+    `POST /markdown`, which returns those `src` attributes unrewritten. The
+    `blob` form keeps working if odjson opens up.
+  - `gh pr comment --attach` uploads to GitHub's own attachment host, which
+    would need no branch at all, but only under a **user** token: the Actions
+    token is server-to-server and gh rejects it with `unsupported
+    authentication type`. It would also need a `gh` newer than the runner
+    image ships, and it rewrites `![alt](path)` and only that — an HTML `src=`
+    is left untouched, and so is a path carrying a `#gh-dark-mode-only`
+    fragment, so `<picture>` would cost a second pass. All three were tried.
+  - GitHub strips `data:` URIs, and a workflow artifact has no URL of its own.
+
+  PNG rather than the README's SVG, because GitHub serves SVG as `text/plain`,
+  which `<img>` will not render.
+
+  The comment itself is one `gh pr comment --edit-last --create-if-none`, so
+  there is no script to maintain — which is also why `apicompat` reports
+  through its job summary instead of commenting.
+- `release.yml` — GoReleaser, on a `vX.Y.Z` tag.
+
+`bench.yml` is skipped for PRs from forks, whose token can neither push nor
+comment.
 
 ## Testing
 
