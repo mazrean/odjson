@@ -297,12 +297,13 @@ Four workflows, all under `.github/workflows/`:
   there is no script to maintain — which is also why `apicompat` reports
   through its job summary instead of commenting.
 - `release.yml` — GoReleaser, on a `vX.Y.Z` tag.
-- `renovate.yml` — **self-hosted** Renovate, weekly plus `workflow_dispatch`.
-  There is no Mend-hosted app on this repository: the bot is this workflow, and
-  it runs under the same GitHub App as `release.yml` (which is why `APP_ID` /
-  `APP_PRIVATE_KEY` must also exist at the repository level, outside the
-  `Release` environment — a cron job must never wait on an environment
-  reviewer). See "Dependency updates".
+- `renovate.yml` — **self-hosted** Renovate, Saturday 00:00 JST (`0 15 * * 5`,
+  since GitHub reads cron in UTC) plus `workflow_dispatch`. There is no
+  Mend-hosted app on this repository: the bot is this workflow, running as a
+  GitHub App whose `APP_ID` / `APP_PRIVATE_KEY` live in a **`Renovatebot`**
+  environment. That environment must carry **no required reviewers and no wait
+  timer** — a scheduled run has nobody to approve it — which is also why it is
+  not `release.yml`'s `Release`. See "Dependency updates".
 
 `bench.yml` is skipped for PRs from forks, whose token can neither push nor
 comment.

@@ -7,10 +7,13 @@ name: Renovate
 #
 # One-time setup this workflow assumes:
 #
-#   * APP_ID (variable) and APP_PRIVATE_KEY (secret) exist at the
-#     **repository** level. release.yml scopes its own copies to the `Release`
-#     environment, which this job deliberately does not reuse — a cron run
-#     against an environment with required reviewers would sit waiting forever.
+#   * A `Renovatebot` environment holding APP_ID (variable) and
+#     APP_PRIVATE_KEY (secret) for the GitHub App this runs as. Its own
+#     environment rather than release.yml's `Release`, so that the two can be
+#     rotated and scoped apart — but for the same reason `Release` is not
+#     reused, **`Renovatebot` must have no required reviewers and no wait
+#     timer**: a scheduled run has nobody to approve it and would sit pending
+#     until it expired.
 #   * The GitHub App's installation grants `contents: write` (push branches),
 #     `pull-requests: write`, `issues: write` (the dependency dashboard) and
 #     `workflows: write` (Renovate edits the action pins under
@@ -18,8 +21,10 @@ name: Renovate
 
 on:
   schedule:
-    # Sunday 22:00 UTC — Monday 07:00 JST, matching renovate.json5's timezone.
-    - cron: "0 22 * * 0"
+    # GitHub reads cron in UTC. Friday 15:00 UTC is Saturday 00:00 in
+    # Asia/Tokyo, which is renovate.json5's timezone and what the dependency
+    # dashboard's timestamps will read in.
+    - cron: "0 15 * * 5"
   # No `push` trigger on the configuration: merging a change to it would then
   # be a live run, which takes the choice of when to first fire the bot away
   # from whoever merges. Dispatch it instead.
@@ -50,6 +55,9 @@ jobs:
   renovate:
     name: Renovate
     runs-on: ubuntu-latest
+    # Holds APP_ID (variable) and APP_PRIVATE_KEY (secret). See the note above
+    # on why it must not carry a protection rule.
+    environment: Renovatebot
     steps:
       - uses: actions/checkout@v5
 
