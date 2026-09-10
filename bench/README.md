@@ -169,3 +169,15 @@ only together with that section.
 
 See the root [README](../README.md#benchmarks) for the results table and what it
 means for how you should call odjson.
+
+## The chart in the root README
+
+`chart/` renders the root README's four tables as a pair of SVG small-multiple
+bar charts (light and dark), written to `docs/assets/`:
+
+```sh
+go run ./chart
+```
+
+Its numbers are literals that mirror the README's tables — the tables stay the
+source of truth, so re-measuring means editing both and regenerating.

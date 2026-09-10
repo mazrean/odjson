@@ -109,6 +109,14 @@ subject; `sonic` and `go-json` are the yardstick — odjson does not make *them*
 faster ([why](./docs/internals.md#the-two-third-party-libraries)), so they
 appear at their own speed only.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bench-dark.svg">
+  <img alt="Time per operation, lower is better. Marshal twitter: encoding/json/v2 390 µs, with odjson 110 µs, sonic 113 µs, go-json 238 µs. Marshal small: 1020 ns, with odjson 321 ns, sonic 307 ns, go-json 400 ns. Unmarshal twitter: 1090 µs, with odjson 535 µs, sonic 550 µs, go-json 646 µs. Unmarshal small: 1870 ns, with odjson 620 ns, sonic 1030 ns, go-json 760 ns." src="./docs/assets/bench-light.svg" width="912">
+</picture>
+
+The tables below are the numbers behind it, and they carry the `encoding/json`
+v1 rows the chart leaves out.
+
 | Marshal `twitter` | on its own | with odjson | change |
 | --- | --- | --- | --- |
 | **encoding/json/v2** | 390 µs | **110 µs** | **3.55× faster** |
