@@ -36,6 +36,7 @@ jobs:
           repositories: |
             odjson
             homebrew-tap
+            winget-pkgs
 
       - uses: goreleaser/goreleaser-action@v6
         with:
@@ -48,9 +49,9 @@ jobs:
           # Same App token: the installation covers
           # github.com/mazrean/homebrew-tap, so no separate PAT is needed.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
-          # Must stay a PAT, stored in the Release environment. GoReleaser
-          # pushes a branch to the github.com/mazrean/winget-pkgs fork and then
-          # opens a pull request on microsoft/winget-pkgs; an App installation
-          # token cannot do the second half, because the App is not installed
-          # there.
-          WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+          # Same App token again, for the push to the
+          # github.com/mazrean/winget-pkgs fork. Note that GoReleaser then
+          # opens the pull request on microsoft/winget-pkgs, where the App is
+          # not installed, so that half needs the fork to be a real fork and
+          # may still be refused.
+          WINGET_GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
