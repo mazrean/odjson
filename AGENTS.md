@@ -66,7 +66,7 @@ methods write into and read from the coder's own buffer through
 reflect-computed offsets and `unsafe`, because `jsontext`'s public API charges
 a floor (365us / 808ns for a marshaler that costs nothing) and a per-name
 duplicate check that put 1.3x out of reach (see "The direct path" and "What
-the decode side pays" in `README.md`). It is gated to the Go minor version it
+the decode side pays" in `docs/internals.md`). It is gated to the Go minor version it
 was verified against (1.27), checked by type at init, self-tested through
 json/v2 before use, and compiled out by `-tags odjson_safe`; every generated
 method keeps the public API path as its fallback. **On a new Go minor,
@@ -150,6 +150,11 @@ regenerate each one and fail on any difference. Regenerate with
 module) whenever the generator changes.
 - `tools/lint/` — the repo's linter binary, wired in through the `tool`
   directive (see Linting).
+- `docs/internals.md` — the measurement record and the implementation detail
+  behind `README.md`'s summary: the public API ceiling, the direct path, what
+  the decode side pays, the v1/v2 semantics table, and why sonic and go-json
+  cannot be sped up. `README.md` stays short and links here; anything measured
+  and rejected belongs in this file rather than being deleted.
 
 `bench/` is a separate module on purpose: benchmarking pulls in `sonic`,
 `goccy/go-json` and friends, and those must never become dependencies of the

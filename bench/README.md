@@ -164,8 +164,8 @@ parser winning on small ones, which is what `odjsonrt.WholeValue` now selects
 below 4 KiB, and the direct path in `odjsonrt/direct.go` now bypasses both
 for a top-level value under a plain `json.Marshal` / `json.Unmarshal`. Keep it
 as the record
-behind the root README's "what the drop-in path costs" section; delete it only
-together with that section.
+behind `docs/internals.md`'s "what the drop-in path costs" section; delete it
+only together with that section.
 
 See the root [README](../README.md#benchmarks) for the results table and what it
 means for how you should call odjson.
