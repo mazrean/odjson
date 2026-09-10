@@ -12,6 +12,66 @@ them across processes moves the small differences by more than their size. The
 tables in the README are the absolute figures from `bench/gen` and
 `bench/plain`.
 
+## The measured tables
+
+These are the absolute figures the README's chart is drawn from — `bench/gen`
+against `bench/plain`, medians of three runs on an AMD Ryzen 9 7950X, Linux,
+Go 1.27.1. `encoding/json` v1's rows are here rather than in the chart, which
+is about the `json/v2` story.
+
+
+| Marshal `twitter` | on its own | with odjson | change |
+| --- | --- | --- | --- |
+| **encoding/json/v2** | 390 µs | **110 µs** | **3.55× faster** |
+| **encoding/json** | 403 µs | 421 µs | 1.04× slower |
+| sonic | 113 µs | — | |
+| go-json | 238 µs | — | |
+
+| Marshal `small` | on its own | with odjson | change |
+| --- | --- | --- | --- |
+| **encoding/json/v2** | 1.02 µs | **321 ns** | **3.19× faster** |
+| **encoding/json** | 1.02 µs | 867 ns | 1.18× faster |
+| sonic | 307 ns | — | |
+| go-json | 400 ns | — | |
+
+| Unmarshal `twitter` | on its own | with odjson | change |
+| --- | --- | --- | --- |
+| **encoding/json/v2** | 1.09 ms | **535 µs** | **2.04× faster** |
+| **encoding/json** | 1.48 ms | 1.22 ms | 1.21× faster |
+| sonic | 550 µs | — | |
+| go-json | 646 µs | — | |
+
+| Unmarshal `small` | on its own | with odjson | change |
+| --- | --- | --- | --- |
+| **encoding/json/v2** | 1.87 µs | **620 ns** | **3.01× faster** |
+| **encoding/json** | 2.26 µs | 1.48 µs | 1.53× faster |
+| sonic | 1.03 µs | — | |
+| go-json | 760 ns | — | |
+
+`encoding/json/v2` gains on all four, and the generated file is the only thing
+that changed. `encoding/json` gains on three of the four; its `twitter` encode
+is 4% behind, and that loss is structural — v1 configures its coders with its
+own flags, which the direct path declines.
+
+Against the libraries people leave the standard library for, that puts
+`encoding/json/v2` + odjson:
+
+| | vs go-json | vs sonic |
+| --- | --- | --- |
+| Marshal `twitter` | **2.16× faster** (110 vs 238 µs) | level (110 vs 113 µs) |
+| Marshal `small` | **1.24× faster** (321 vs 400 ns) | 1.05× slower (321 vs 307 ns) |
+| Unmarshal `twitter` | **1.21× faster** (535 vs 646 µs) | level (535 vs 550 µs) |
+| Unmarshal `small` | **1.23× faster** (620 vs 760 ns) | **1.67× faster** (620 vs 1.03 µs) |
+
+`encoding/json/v2` gains on all four, and the generated file is the only thing
+that changed. `encoding/json` gains on three of the four; its `twitter` encode
+is 4% behind, and that loss is structural — v1 configures its coders with its
+own flags, which the direct path declines.
+
+`sonic.Marshal`'s default configuration neither escapes HTML nor validates
+UTF-8, so its encode rows are not doing equal work; `sonic.ConfigStd`, which
+does both, measures 123 µs and 359 ns.
+
 ## The public API ceiling
 
 The `json/v2` rows in the README's tables are what they are because of the

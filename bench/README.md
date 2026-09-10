@@ -167,8 +167,10 @@ as the record
 behind `docs/internals.md`'s "what the drop-in path costs" section; delete it
 only together with that section.
 
-See the root [README](../README.md#benchmarks) for the results table and what it
-means for how you should call odjson.
+See the root [README](../README.md) for the chart and what it means for how you
+should call odjson, and
+[`docs/internals.md`](../docs/internals.md#the-measured-tables) for the absolute
+figures it is drawn from.
 
 ## The chart in the root README
 
