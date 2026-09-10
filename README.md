@@ -413,7 +413,7 @@ exact list.
 ## Contributing
 
 See [AGENTS.md](./AGENTS.md) for the repository conventions (module layout,
-linting via `go tool lint ./...`, testing with `go test -race ./...`, and
+linting via `go tool lint ./... ./tools/...`, testing with `go test -race ./...`, and
 Conventional Commits).
 
 ## License

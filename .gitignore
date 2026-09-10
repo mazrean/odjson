@@ -7,8 +7,5 @@ apm_modules/
 /odjson
 /dist/
 
-# lint tool build output
-/tools/lint/lint
-
 # Go test binaries
 *.test

@@ -11,15 +11,12 @@
 // "at least one file in a package should have a package comment") are
 // skipped so that the default behaviour matches upstream staticcheck.
 //
-// It lives inside the root module rather than in a module of its own: a
-// nested module would need a `replace` directive in the root go.mod, and
-// `go install github.com/mazrean/odjson@latest` refuses to install a module
-// whose go.mod carries replace directives.
+// It lives in the github.com/mazrean/odjson/tools module rather than in the
+// root one, so that staticcheck and its dependencies stay out of the graph
+// that everyone importing odjsonrt downloads. The repository's go.work is
+// what still lets the root module's `tool` shorthand reach it:
 //
-// It is wired in through the Go 1.24+ `tool` directive and invoked from the
-// repository root as:
-//
-//	go tool lint ./...
+//	go tool lint ./... ./tools/...
 package main
 
 import (

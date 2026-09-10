@@ -12,10 +12,10 @@
 // be used as a gate. Compatible changes (additions) are never reported: they
 // are the normal case, and printing them makes the gate noisy.
 //
-// It lives inside the root module for the same reason tools/lint does: a
-// nested module would need a `replace` directive in the root go.mod, and
-// `go install github.com/mazrean/odjson@latest` refuses to install a module
-// whose go.mod carries one.
+// It lives in the github.com/mazrean/odjson/tools module rather than in the
+// root one, so that golang.org/x/exp stays out of the graph that everyone
+// importing odjsonrt downloads. The repository's go.work is what still lets
+// the root module's `tool` shorthand reach it.
 package main
 
 import (
