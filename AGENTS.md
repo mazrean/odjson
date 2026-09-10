@@ -71,8 +71,14 @@ the decode side pays" in `docs/internals.md`). It is gated to the Go minor versi
 was verified against (1.27), checked by type at init, self-tested through
 json/v2 before use, and compiled out by `-tags odjson_safe`; every generated
 method keeps the public API path as its fallback. **On a new Go minor,
-re-verify the layout against `jsontext`'s source and widen the gate in
-`calibrateDirect`; never widen it blind.** Anything parsed on the direct path
+re-verify the layout against `jsontext`'s source and add that minor to
+`verifiedGoMinors` in `odjsonrt/direct.go`; never widen it blind.**
+`.github/workflows/go-minor.yml` does the mechanical half of that nightly — it
+widens the list on a scratch checkout, runs the suite on the new toolchain, and
+opens the pull request only if `TestDirectEnabled` proves the direct path came
+up rather than falling back. What it cannot do is read the release's `jsontext`
+for a field that kept its shape and changed its meaning, so its PR is a draft
+and that read is the reviewer's. Anything parsed on the direct path
 goes through the `*Strict` runtime parsers, which must reject exactly what
 `jsontext` rejects (invalid UTF-8, unpaired surrogates, duplicate names at any
 depth); `internal/testfixture/v2parity` is the guard.
@@ -255,7 +261,7 @@ introduce `-X`/`ldflags` version injection, and do not disable `-buildvcs`.
 
 ## CI
 
-Three workflows, all under `.github/workflows/`:
+Four workflows, all under `.github/workflows/`:
 
 - `ci.yml` — build, test, lint, the `apicompat` gate, and a compile-only pass
   over the `bench/` module.
@@ -296,6 +302,22 @@ Three workflows, all under `.github/workflows/`:
   The comment itself is one `gh pr comment --edit-last --create-if-none`, so
   there is no script to maintain — which is also why `apicompat` reports
   through its job summary instead of commenting.
+- `go-minor.yml` — nightly (and on demand), watches `go.dev/dl/?mode=json` for
+  a new Go minor and proposes the widened direct-path gate. It is the only
+  workflow that writes to the repository outside a release: it pushes
+  `chore/direct-go1.N` and opens a **draft** PR, or files an issue when the
+  verification fails. Both are deduplicated by listing what already exists —
+  a closed PR and an open issue each stop the nightly run, so **closing the
+  issue is what re-arms it**. Everything it touches is inside this repository,
+  so it uses the job's own `GITHUB_TOKEN` rather than borrowing release.yml's
+  GitHub App — that App exists to reach `homebrew-tap`, and nothing here leaves
+  odjson. The one repository setting it needs is *Settings > Actions > General
+  > "Allow GitHub Actions to create and approve pull requests"*. In exchange
+  the PR arrives with **no checks**, because nothing a `GITHUB_TOKEN` does
+  starts another workflow run; the evidence is the workflow run itself, which
+  is a superset of what `ci.yml` could have said, since `ci.yml` builds from
+  `go.mod` and would have tested the old minor. Do not reach for the App to
+  "fix" that — weigh it against a `ci.yml` matrix, which fixes the real gap.
 - `release.yml` — GoReleaser, on a `vX.Y.Z` tag.
 
 `bench.yml` is skipped for PRs from forks, whose token can neither push nor
