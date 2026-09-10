@@ -151,6 +151,8 @@ regenerate each one and fail on any difference. Regenerate with
 module) whenever the generator changes.
 - `tools/lint/` — the repo's linter binary, wired in through the `tool`
   directive (see Linting).
+- `tools/apicompat/` — the public-API gate, also wired in through the `tool`
+  directive (see API compatibility).
 - `docs/internals.md` — the measurement record and the implementation detail
   behind `README.md`'s summary: the public API ceiling, the direct path, what
   the decode side pays, the v1/v2 semantics table, and why sonic and go-json
@@ -196,6 +198,34 @@ introduce `-X`/`ldflags` version injection, and do not disable `-buildvcs`.
   whose `go.mod` carries replace directives (`go help install`). odjson is a
   CLI whose primary install path is `go install`, so the replace cannot exist.
   The cost is that `staticcheck` appears in the root module graph.
+
+## API compatibility
+
+- `tools/apicompat/` compares one package between two checkouts with
+  `golang.org/x/exp/apidiff` and exits non-zero on an **incompatible** change.
+  Compatible additions are never printed: a gate that reports them is a gate
+  people learn to ignore.
+
+  ```sh
+  go tool apicompat -base /path/to/base-checkout github.com/mazrean/odjson/odjsonrt
+  ```
+
+- **`odjsonrt` is the surface that matters.** Generated files import it, so an
+  incompatible change there breaks every tree that has already run the
+  generator — including trees whose owners will not regenerate before
+  upgrading. The root package is `package main` and has nothing to break.
+- It lives inside the root module for the same reason `tools/lint` does; the
+  cost is that `golang.org/x/exp` appears in the root module graph.
+- CI (`.github/workflows/ci.yml`, the `apicompat` job) compares against the
+  PR's base commit — **not** against `<module>@latest`, which is what
+  `mazrean/kessoku` does and which odjson cannot do until it has a release
+  tag. Once tags exist, a push to `main` compares against the newest one; until
+  then that path emits a `::notice` and skips.
+- On a breaking change the job fails and writes the diff to its job summary.
+  It deliberately does **not** comment: `bench.yml` already comments as
+  `github-actions[bot]` and edits its own last comment, and a second bot
+  comment would become the one it edits. kessoku comments here because it is
+  the only bot on its PRs.
 
 ## Testing
 

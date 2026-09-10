@@ -48,6 +48,87 @@ jobs:
       - name: go tool lint
         run: go tool lint ./...
 
+  apicompat:
+    name: API compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The base revision is checked out as a second worktree, so its
+          # history has to be here.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: "**/go.sum"
+
+      - name: resolve the base revision
+        id: base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # On a PR the base is what it merges into. On a push it is the latest
+          # release tag — and until odjson has one there is nothing to compare
+          # against, which is a skip rather than a failure.
+          if [ -n "$BASE_SHA" ]; then
+            echo "ref=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          elif tag=$(git describe --tags --abbrev=0 2>/dev/null); then
+            echo "ref=$tag" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::no release tag to compare against; skipping the API compatibility check"
+          fi
+
+      - name: check out the base revision
+        if: steps.base.outputs.ref != ''
+        env:
+          REF: ${{ steps.base.outputs.ref }}
+        run: git worktree add "$RUNNER_TEMP/base" "$REF"
+
+      # odjsonrt is what every generated file imports, so an incompatible
+      # change there breaks trees that have already run the generator. The
+      # root package is `package main` and has no importers to break.
+      - name: go tool apicompat
+        if: steps.base.outputs.ref != ''
+        id: apicompat
+        run: |
+          set +e
+          out=$(go tool apicompat -base "$RUNNER_TEMP/base" github.com/mazrean/odjson/odjsonrt 2>&1)
+          status=$?
+          set -e
+
+          echo "$out"
+          case "$status" in
+            0) echo "no incompatible changes to odjsonrt" ;;
+            1) { echo "changes<<APICOMPAT_EOF"; echo "$out"; echo "APICOMPAT_EOF"; } >> "$GITHUB_OUTPUT" ;;
+            *) exit "$status" ;;
+          esac
+
+      # The report goes to the job summary rather than to a PR comment: the
+      # benchmark workflow already comments as github-actions[bot] and edits
+      # its own last comment, and a second bot comment would be the one it
+      # edits. The failing check is what surfaces this on the PR.
+      - name: fail on incompatible changes
+        if: steps.apicompat.outputs.changes != ''
+        env:
+          CHANGES: ${{ steps.apicompat.outputs.changes }}
+          BASE: ${{ steps.base.outputs.ref }}
+        run: |
+          {
+            echo "## ⚠️ Incompatible API changes in \`odjsonrt\`"
+            echo
+            echo "Against \`${BASE}\`. Generated code imports this package, so every tree"
+            echo "that has already run odjson is affected."
+            echo
+            echo '```'
+            echo "$CHANGES"
+            echo '```'
+            echo
+            echo "If the break is intended, say so in the PR description and plan the"
+            echo "major version bump; otherwise keep the old declaration and add the new one."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
   bench:
     name: Benchmarks module
     runs-on: ubuntu-latest
