@@ -1,0 +1,109 @@
+name: Renovate
+
+# Self-hosted Renovate. There is no Mend-hosted app installed on this
+# repository: the bot is this workflow, its repository-scoped configuration is
+# .github/renovate.json5, and the options that must be *global* are the
+# RENOVATE_* environment variables below.
+#
+# One-time setup this workflow assumes:
+#
+#   * APP_ID (variable) and APP_PRIVATE_KEY (secret) exist at the
+#     **repository** level. release.yml scopes its own copies to the `Release`
+#     environment, which this job deliberately does not reuse — a cron run
+#     against an environment with required reviewers would sit waiting forever.
+#   * The GitHub App's installation grants `contents: write` (push branches),
+#     `pull-requests: write`, `issues: write` (the dependency dashboard) and
+#     `workflows: write` (Renovate edits the action pins under
+#     .github/workflows/, and GitHub rejects those without it).
+
+on:
+  schedule:
+    # Sunday 22:00 UTC — Monday 07:00 JST, matching renovate.json5's timezone.
+    - cron: "0 22 * * 0"
+  # Merging a change to the configuration runs it straight away, so a mistake
+  # in it surfaces now rather than at the next cron fire.
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/renovate.json5"
+      - ".github/workflows/renovate.yml"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Resolve everything but create no branches, PRs or issues"
+        type: boolean
+        default: false
+      log-level:
+        description: "Renovate log level"
+        type: choice
+        default: info
+        options:
+          - info
+          - debug
+
+permissions:
+  contents: read
+
+# Two Renovate runs over one repository race each other for the same branches.
+# Never cancel one midway: it can leave a branch pushed with no PR opened.
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    name: Renovate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Generate a token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          repositories: odjson
+
+      # An App *installation* token cannot call `GET /user`, so Renovate has no
+      # way to discover the account its commits should be attributed to. Told
+      # neither, it commits as whoever the token resolves to and its own
+      # "rebase this PR" checkbox stops recognising its commits. The bot user's
+      # numeric id is what makes the noreply address route.
+      - name: Resolve the app's git identity
+        id: identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          user="${SLUG}[bot]"
+          id=$(gh api "/users/${user}" --jq .id)
+          echo "user=${user}" >> "$GITHUB_OUTPUT"
+          echo "email=${id}+${user}@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+
+      # Pinned exactly: renovatebot/github-action publishes no floating major
+      # tag, and Renovate keeps this line up to date itself.
+      - uses: renovatebot/github-action@v46.2.6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+        env:
+          LOG_LEVEL: ${{ inputs.log-level || 'info' }}
+
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_USERNAME: ${{ steps.identity.outputs.user }}
+          RENOVATE_GIT_AUTHOR: "${{ steps.identity.outputs.user }} <${{ steps.identity.outputs.email }}>"
+
+          # The configuration is already in the repository, so there is nothing
+          # to onboard. Without this, a cron fire opens a "Configure Renovate"
+          # PR proposing the renovate.json this repository does not want.
+          RENOVATE_ONBOARDING: "false"
+
+          RENOVATE_DRY_RUN: ${{ inputs.dry-run && 'full' || 'null' }}
+
+          # postUpgradeTasks are refused unless the command matches an entry
+          # here, and this list can only be set globally — which is why the
+          # commands are in renovate.json5 but their allowlist is not. It is
+          # anchored at both ends so it authorises those four go invocations
+          # and nothing that merely starts with them.
+          RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS: '["^go (work sync|mod tidy|-C (tools|bench) (mod tidy|work sync))$"]'

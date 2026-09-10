@@ -1,0 +1,93 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+
+  // Renovate runs self-hosted from .github/workflows/renovate.yml, so the
+  // options that have to be *global* (the repository list, onboarding, the
+  // post-upgrade command allowlist) live there in `RENOVATE_*` environment
+  // variables. Everything repository-scoped is here.
+  extends: ["config:recommended"],
+
+  timezone: "Asia/Tokyo",
+
+  // Three Go modules — `.`, `tools/` and `bench/` — joined by two workspaces:
+  // `go.work` (`.` + `./tools`) at the root and `bench/go.work` (`use .`).
+  // Renovate has no go.work support: it neither reads the file nor writes
+  // `go.work.sum` (renovatebot/renovate#23359, #37653). What that costs, and
+  // what pays it back, is on the rules below.
+  //
+  // `gomodTidy` runs `go mod tidy` in each updated module. Verified against
+  // this tree at go1.27.1: tidy is idempotent in all three modules with the
+  // workspace active, and `cd bench && go mod tidy` is unmoved by a change to
+  // the root module, so `gomodTidyAll` is not needed.
+  postUpdateOptions: ["gomodTidy"],
+
+  packageRules: [
+    {
+      // bench/go.mod carries `replace github.com/mazrean/odjson => ../`, so
+      // its requirement is the placeholder v0.0.0-00010101000000-000000000000
+      // and the replace is what resolves it. Once odjson has a v0.1.0 tag,
+      // Renovate would otherwise open a PR bumping a version nothing reads.
+      //
+      // Note this is *not* handled with `postUpdateOptions: ["gomodMassage"]`,
+      // which comments the replace out before running `go`: without it,
+      // bench's `go get` has to fetch that placeholder version from the proxy,
+      // where it does not exist.
+      matchManagers: ["gomod"],
+      matchFileNames: ["bench/go.mod"],
+      matchDepNames: ["github.com/mazrean/odjson"],
+      enabled: false,
+    },
+    {
+      // Renovate updates go.mod and go.sum and stops there, leaving both
+      // go.work.sum files behind. That does not break CI — the go command
+      // writes the entries it needs on the next build, even under the default
+      // -mod=readonly — but the committed files drift from what the workspace
+      // actually resolves. `go work sync` is their canonical maintainer.
+      //
+      // `go work sync` also writes the workspace-selected version back into
+      // each `use`d module's go.mod. That is wanted, not tolerated: in a
+      // workspace MVS runs over the union of `.` and `./tools`, so a bump that
+      // lands in tools/go.mod alone already changes what the root module
+      // builds against, and sync is what makes the root go.mod say so.
+      // Verified that it only ever *raises* a requirement, so it cannot revert
+      // the bump Renovate just made; the tidies after it fill in the go.sum
+      // entries a raise needs. The whole sequence is a no-op on a clean tree.
+      //
+      // Scoped to `gomod` on purpose. Renovate's container installs Go only
+      // when the gomod manager asks for it, so an unscoped task would run `go`
+      // on, say, a GitHub Actions pin bump and fail the branch.
+      matchManagers: ["gomod"],
+      postUpgradeTasks: {
+        commands: [
+          "go work sync",
+          "go mod tidy",
+          "go -C tools mod tidy",
+          "go -C bench work sync",
+        ],
+        fileFilters: ["**/go.work.sum", "**/go.mod", "**/go.sum"],
+        executionMode: "branch",
+      },
+    },
+    {
+      // AGENTS.md: odjsonrt's direct path is gated to the Go minor it was
+      // verified against (1.27), and "never widen it blind". A silent
+      // `go = "1.28"` here would put every contributor on a toolchain where
+      // the direct path switches itself off, with nothing to notice it by. So
+      // the bump waits for a tick on the dependency dashboard, and whoever
+      // ticks it re-verifies `calibrateDirect` against jsontext's source.
+      //
+      // The `go` directive inside each go.mod is left alone by Renovate's own
+      // default, which is what we want for a second reason: go.work's `go
+      // 1.27` has to stay >= every module it uses, and Renovate cannot edit
+      // go.work.
+      // `matchDepNames`, not `matchPackageNames`: the mise manager resolves
+      // `go` to the packageName `golang/go` on the github-tags datasource, so
+      // matching on the package name would need that spelling and matching on
+      // "go" would quietly never fire.
+      matchManagers: ["mise"],
+      matchDepNames: ["go"],
+      matchUpdateTypes: ["minor", "major"],
+      dependencyDashboardApproval: true,
+    },
+  ],
+}
