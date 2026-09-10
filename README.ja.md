@@ -6,63 +6,80 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/mazrean/odjson.svg)](https://pkg.go.dev/github.com/mazrean/odjson)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-**odjson**（*overdrive JSON*）は、`encoding/json/v2` を **外側から** JIT コンパイル型のサードパーティコーデック並みに速くする CLI コードジェネレータだ。差し替えるのではなく、後付けする。標準ライブラリはそのまま使い、呼び出し側は一箇所も書き換えない。生成されたファイルを 1 つ消せば、すべて元に戻る。
-
+**odjson**（*overdrive JSON*）は、`encoding/json/v2` をコード編集なしで [`bytedance/sonic`](https://github.com/bytedance/sonic) 相当まで高速化する CLI コードジェネレータです。
+標準の `encoding/json/v2` をそのまま使い行っている JSON エンコード/デコードが、以下のコメントを追加し、`go generate` するだけで 2.1×〜3.6× 高速化します。
 ```go
 //go:generate go tool odjson -type User
 ```
 
-```sh
-$ go generate ./...     # odjson_gen.go を書き出す
-$ rm odjson_gen.go      # アンインストールはこれだけ
-```
+また、生成ファイル(`odjson_gen.go`)を削除するだけで、簡単に元の `encoding/json/v2` をそのまま使う形に戻せます。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bench-dark.svg">
   <img alt="1 操作あたりの時間、低いほど速い。Marshal large: encoding/json/v2 399 µs, odjson あり 112 µs, sonic 114 µs, go-json 243 µs。Marshal small: 1060 ns, odjson あり 319 ns, sonic 312 ns, go-json 421 ns。Unmarshal large: 1080 µs, odjson あり 508 µs, sonic 513 µs, go-json 672 µs。Unmarshal small: 1864 ns, odjson あり 562 ns, sonic 951 ns, go-json 794 ns。" src="./docs/assets/bench-light.svg" width="912">
 </picture>
 
-**`encoding/json/v2` に対して 2.1×〜3.6×**。4 つの測定すべてでそうなる。[`goccy/go-json`](https://github.com/goccy/go-json) にはすべての測定で先行し、[`bytedance/sonic`](https://github.com/bytedance/sonic) の JIT コンパイルされた SIMD コーデックとは 3 つで互角、small のデコードでは 1.7× 先行する。それでいて中身は標準ライブラリのままで、ビルドにサードパーティのコーデックは入らない。ただしモジュールは 1 つ増える。生成ファイルがランタイムサポートパッケージ `github.com/mazrean/odjson/odjsonrt` を import するためだ（[動作要件](#動作要件)を参照）。
-
-ペイロードは sonic 自身のフィクスチャで、名前も sonic のものに従っている。`large` は 616 KiB あり、深くネストしていて `interface{}` フィールドが多い（sonic の `twitter.json`。[`bench/`](./bench) と [docs/internals.md](./docs/internals.md) では今も `twitter` と呼んでいる）。`small` は 340 B で完全に型付けされており、呼び出しごとのオーバーヘッドを見るためのものだ。ベースラインのバーと odjson のバーの違いは、生成ファイルの有無だけになっている。
+ベンチマーク上で、エンコード/デコードともに **`encoding/json/v2` に対して 2.1×〜3.6×** の速度向上を確認しています。また、[`goccy/go-json`](https://github.com/goccy/go-json) をいずれのベンチマークでも上回り、アセンブリを用いて JIT コンパイルや SIMD を用いる [`bytedance/sonic`](https://github.com/bytedance/sonic) とほぼ同等の実行時間でエンコード/デコードできます。
 
 <details>
-<summary>数値の読み方と再現方法</summary>
+<summary>ベンチマーク環境と再現方法</summary>
 
-ベンチマークは [`bench/`](./bench) モジュールにある。`sonic` や `goccy/go-json` といった比較対象のライブラリが `github.com/mazrean/odjson` の依存に入らないよう、独立したモジュールに分けてある。
+ベンチマークは [`bench/`](./bench) という独立した Go モジュールにある。`sonic` や `goccy/go-json` などの依存が `github.com/mazrean/odjson` の `go.mod` に入らないよう、分離している。
+
+### 再現コマンド
 
 ```sh
 cd bench
 go test -bench . -benchmem ./...
 ```
 
-- 主役は 2 つの標準ライブラリで、`sonic` と `go-json` は比較対象にすぎない。odjson はこの 2 つを速くしないので（[理由と測定値](./docs/internals.md#the-two-third-party-libraries)）、それぞれ自前の速度で並んでいるだけだ。
-- `sonic.Marshal` のデフォルト設定は HTML エスケープも UTF-8 検証も行わないため、エンコードのバーは同じ仕事をしていない。両方を行う `sonic.ConfigStd` は 126 µs と 367 ns だった。
-- チャートの数値は別々の 2 プロセスから取っている。絶対値としては問題ないが、生成ありの行とベースラインのわずかな差を見るには向かない。その用途には両側を 1 プロセスで測る `bench/ab` を使う。sonic の 4 行のうち 3 行はチャートの 4% 以内に収まり、`small` のエンコードは 12% 低く出る。sonic 自身の `large` デコードは、実行ごとに 480〜550 µs のあいだで揺れている。
-- `encoding/json` v1 も速くなる。4 つのうち 3 つで 1.2×〜1.6×、`large` のエンコードだけは 4% 遅い。この行は[測定結果の表](./docs/internals.md#the-measured-tables)に載せてあり、`json/v2` の話を読みやすく保つためチャートからは外した。
+### 測定環境
 
-重要なのは odjson がすべての行で勝つことではない。中身は標準ライブラリのままで、サードパーティのコーデックは入らず、呼び出し側も変わらず、戻すにはファイルを 1 つ消せばいい。時間がどこで使われているか、何を試して却下したか、なぜ sonic と go-json は速くできないのか。内訳はすべて [docs/internals.md](./docs/internals.md) にある。
+| 項目 | 内容 |
+| --- | --- |
+| CPU | AMD Ryzen 9 7950X |
+| OS | Linux(WSL2) |
+| Go | 1.27.1 |
+| 実行方法 | `bench/gen` と `bench/plain` をそれぞれ 10 回実行し、中央値を採用 |
+| ばらつきの確認 | [`benchstat`](golang.org/x/perf/cmd/benchstat) で実施 |
+
+### 測定対象
+
+対象は `encoding/json` v1、`encoding/json/v2`、`sonic`、`goccy/go-json` の 4 つ。ベンチマーク名は `BenchmarkMarshal/<ライブラリ>/<入力>` と `BenchmarkUnmarshal/<ライブラリ>/<入力>` の形式になっている。
+
+| 入力 | サイズ | 対象の Go 型 | 内容 |
+| --- | ---: | --- | --- |
+| `large` | 約 616 KiB | `TwitterStruct` | `twitter.json` |
+| `small` | 約 340 B | `Book` | 小さな JSON |
+
+### 測定条件
+
+- `Unmarshal` は各反復で新しいゼロ値へ読み込む。
+- `Marshal` はあらかじめデコードした値を使う。
+- 各ケースはタイマーを開始する前に 1 回ウォームアップする。
+- グラフの値は別々のプロセスで測定する。生成コードとリフレクションの差を同一プロセスで比較する場合は [`bench/ab`](./bench/ab) を使う。
+
+より詳しい測定方法と実装上の前提は [bench/README.md](./bench/README.md) と [docs/internals.md](./docs/internals.md) にまとめている。
 
 </details>
 
 > [!IMPORTANT]
-> 採用前に確認すべき点が 2 つある。どちらも下に書いてある。コーデックを生成すると[既存の呼び出し側が出力する JSON が変わる](#出力される-json-が変わる)こと、そして上記の速度が[標準ライブラリの内部実装に依存している](#標準ライブラリの内部実装に依存している)ことだ。
+> odjson は `encoding/json/v2`/`encoding/jsontext` の内部実装に強く依存しています。 このため、生成コードの削除のみで即座に仕様を止めることができるものの、将来の Go バージョンでは正常に動作しない・速度の低下が起きる可能性があります。
 
 ## 動作要件
 
-- **Go 1.27 以降**。odjson は `encoding/json/v2` 向けのコードを生成する。これは Go 1.27 で標準ライブラリに入り、デフォルトで有効になった。生成ファイルは `encoding/json/jsontext` を import するため、Go 1.26 以前ではコンパイルできない。1.27 以降は `encoding/json` 自体が `encoding/json/v2` の上に実装されている。そのため v1 の呼び出し側を書き換えなくても生成された v2 のメソッドが使われるし、[出力される JSON が変わる](#出力される-json-が変わる)のも同じ理由による。
-- **モジュールが 1 つ増える**。生成ファイルはランタイムサポートパッケージ `github.com/mazrean/odjson/odjsonrt` を import する。CLI と同じモジュールに入っているので、`go get -tool` が一緒に追加する。サードパーティの JSON コーデックは関わらない。
-- **追加のビルド手順はない**。`odjson_gen.go` はビルドタグのない普通の Go コードで、`// Code generated by odjson. DO NOT EDIT.` ヘッダを持ち、リポジトリにコミットする。ツールを入れていない開発者も普通にビルドでき、odjson が必要になるのは再生成するときだけだ。
+Go 1.27 で動作します。
+また、1.27 以降の `encoding/json` でも内部的に `encoding/json/v2` を使うため効果はありますが、`encoding/json/v2` で使用する場合に最大限効果を発揮するようにチューニングしており、`encoding/json/v2` を使うことを推奨します。
 
-## クイックスタート
+## Quick Start
 
-ジェネレータはプロジェクトのツールとして入れる。こうすれば開発者も CI も同じバージョンで生成する。
+まず、以下コマンドで odjson をインストールします。
 
 ```sh
 go get -tool github.com/mazrean/odjson@latest
 ```
 
-速くしたい struct の隣に `go:generate` 行を置く。
+そして、`//go:generate` コメントを追加します。
 
 ```go
 package model
@@ -76,15 +93,13 @@ type User struct {
 }
 ```
 
-あとは実行するだけだ。
+この状態で以下の `go generate` を実行すると、`odjson_gen.go` ファイルが生成されます。
 
 ```sh
 go generate ./...
 ```
 
-odjson はソースの隣に `odjson_gen.go` を書き出す。中身は各型のコーデックで、ビルドタグの要らない普通の Go コードなので、そのままコミットしてよい。
-
-統合作業はこれで終わりだ。呼び出し側は元のままでいい。
+後は、`encoding/json/v2` を使えば、大幅に高速に JSON エンコード/デコードが可能になります。
 
 ```go
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -98,21 +113,19 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-外すときは `odjson_gen.go` を削除してビルドし直す。
-
 ## インストール
 
-推奨は `go get -tool` だ。ジェネレータをモジュールに固定でき、生成ファイルが import するランタイムパッケージ（`github.com/mazrean/odjson/odjsonrt`）は同じモジュールに含まれているので、追加で入れるものはない。
-
+`go get -tool`でのインストールを推奨します。これにより、生成コード中で使用される `github.com/mazrean/odjson/odjsonrt` も含めた `go.mod` でのバージョン管理が可能になります。
 ```sh
 go get -tool github.com/mazrean/odjson@latest
 go tool odjson -h
 ```
 
+また、その他各種パッケージ管理ツールでのインストールも可能です。
 <details>
 <summary>単体バイナリ、Homebrew、Linux パッケージ</summary>
 
-### 単体バイナリとして
+### バイナリ
 
 ```sh
 go install github.com/mazrean/odjson@latest
@@ -124,9 +137,7 @@ go install github.com/mazrean/odjson@latest
 brew install --cask mazrean/tap/odjson
 ```
 
-### Linux パッケージ
-
-リリースアセットには `amd64` と `arm64` 向けの `.deb`、`.rpm`、`.apk` が含まれている。ホスト済みの apt/yum/apk リポジトリは用意していないので、アセットをダウンロードして直接インストールする。
+### Linux パッケージ（Debian / Ubuntu / RHEL / Fedora / openSUSE / Alpine）
 
 ```sh
 # Debian / Ubuntu
@@ -139,8 +150,6 @@ sudo rpm -i odjson_<version>_linux_amd64.rpm
 # Alpine
 apk add --allow-untrusted odjson_<version>_linux_amd64.apk
 ```
-
-linux/darwin/windows × amd64/arm64 のビルド済みアーカイブ（`tar.gz`、Windows は `zip`）は、`checksums.txt` とともにすべての[リリース](https://github.com/mazrean/odjson/releases)に添付されている。
 
 </details>
 
@@ -161,17 +170,59 @@ odjson [flags] [packages]
 | `-case-insensitive` | `false`          | `UnmarshalJSON` で、`encoding/json` v1 と同じく大文字小文字を無視したメンバ一致にフォールバックする。デフォルトは無効で、`encoding/json/v2` に合わせてある。 |
 | `-version`          |                  | バージョンを表示して終了する。                                                                                   |
 
-## 導入すると何が変わるか
+## 仕組み
 
-生成ファイルをコミットすると、変わることが 2 つある。どちらも odjson が隠しているわけではないが、導入前に読んでおいたほうがいい。
+### コード生成による型ごとの専用 Marshal/Unmarshal コード生成
+Go の struct は、JSON の形について必要な情報をコンパイル時にすべて持っています。`encoding/json/v2` 含む既存 JSON ライブラリはこれらを実行時に取り出し、JSON エンコード/デコードを行っています。
+これに対し、odjson は struct 定義を事前に読み、型ごとの専用コードを書き出すことで大幅に高速な JSON エンコード/デコードを実現します。
+具体的には、以下のようにすることで、リフレクションや中間の map[string]any を使わずに JSON エンコード/デコードを行います。
+これにより、JIT 相当の最適化をコンパイル時に行うことができ、実行時のオーバーヘッドを大幅に削減します。
 
-### 出力される JSON が変わる
+- **Marshal**: struct のフィールドをバイトスライスに直接 append
+    - フィールド名、クォート、区切り文字は定数として生成ソースに埋め込む
+		- [`sapphi-red/json-constantiater`](https://github.com/sapphi-red/json-constantiater) を基にした手法
+- **Unmarshal**: 入力を struct のフィールドへ直接流し込む
+    - reflection・中間の `map[string]any`・実行時のフィールド名ルックアップが全て不要
+		- メンバ名はクォートごとドキュメントの生バイトと突き合わせる
+		- bool、整数、単純な float はその場でデコードする
 
-呼び出し側は書き換えないが、そこから出てくるバイト列は変わる。Go 1.27 以降、`encoding/json` は `encoding/json/v2` の上に実装されており、`json/v2` は型が両方のメソッドを持つ場合に `MarshalJSONTo` を優先する。したがって生成済みの型では、書き換えていない `json.Marshal` / `json.Unmarshal` が `encoding/json/v2` のセマンティクスで動く。`encoding/json` 自身のオプションが v1 の挙動を戻す箇所だけが例外だ。
+### 標準ライブラリに後付けする
 
-同じ型を 2 回宣言し、片方には生成ファイルを置き、もう片方には置かずに測った結果が次の表になる。普通の `encoding/json` 呼び出し側から見た前後の違いだ。
+加えて、これらの専用コードを　`(T).MarshalJSONTo` / `(*T).UnmarshalJSONFrom` の標準ライブラリのインターフェースに準拠させることで、標準ライブラリを使用するコードを変更することなく、odjson の恩恵を受けることができます。
+`encoding/json/v2` によりこれらのストリーム処理などによるオーバーヘッドの小さいインターフェースが提供されたことで、初めてこのような実装が可能となりました。
+これにより、**標準ライブラリの信頼性**を生かしつつ、**github.com/bytedance/sonic 相当の速度**も得ることができます。
 
-| `encoding/json` の呼び出し側での挙動 | odjson なし | odjson あり |
+具体的には、以下のメソッドを各方に対し追加します。
+
+| シンボル                                        | インターフェース                                            |
+| ---------------------------------------------- | ---------------------------------------------------------- |
+| `(T).MarshalJSONTo` / `(*T).UnmarshalJSONFrom` | [`encoding/json/v2`](https://pkg.go.dev/encoding/json/v2) のストリーミングインターフェース。Go 1.27 で `json.Marshal` が到達する先であり、速さが出るのもここだ。 |
+| `(T).MarshalJSON` / `(*T).UnmarshalJSON`       | [`encoding/json`](https://pkg.go.dev/encoding/json) v1 のインターフェース。v1 のルールに従う。 |
+
+なお、すでに `json.Marshaler`、`json.Unmarshaler`、`encoding.TextMarshaler`、`encoding.TextUnmarshaler` を実装している型には変更を加えません。これにより挙動の変化をなくせる一方、このような型は odjson の恩恵を受けられません。
+
+また、エンコードの際に通常の経路からの `(encoding/jsontext).Encoder` への書き込みでは、書き込まれた値のバリデーションによるオーバーヘッドが大きく、十分な速度が得られませんでした。そのため、odjson では `(*encoding/jsontext).Encoder` のメモリ構造を基に内部バッファに直接書き込むことで速度を向上させています。
+これにより、大幅な速度向上を実現している一方、標準ライブラリの内部構造に依存しているため、Go のバージョンアップにより動作しなくなる可能性があります。詳細は [docs/internals.md](./docs/internals.md) を参照してください。
+
+
+### その他細かい最適化
+
+その他にも、以下のような細かい最適化を行うことで、`github.com/bytedance/sonic` 相当の速度にまで到達しています。
+- `sync.Pool` によるバッファ再利用
+- 桁数の少ない `float` に対する、専用文字列化アルゴリズムの使用
+- Word-at-a-time scanning
+- 文字列エスケープ時の非 ASCII 文字列読み飛ばし
+
+## 導入による影響
+
+odjson 導入では、基本的に挙動が変わることはありませんが、一部のケースで以下で説明するような挙動の変化が起きる可能性があります。
+
+### `encoding/json` の挙動の変化。
+
+Go 1.27 以降、`encoding/json` は `encoding/json/v2` の上に実装されており、`json/v2` は型が両方のメソッドを持つ場合に `MarshalJSONTo` を優先されます。odjson が `encoding/json/v2` 向けに生成したエンコーダ/デコーダが使用され、一部で挙動の変化が起きます。
+
+具体的に起きる変化は以下の通りです。
+| 状況 | odjson なし | odjson あり |
 | --- | --- | --- |
 | nil の slice / map | `null` | `[]` / `{}` |
 | nil の `[]byte` | `null` | `""` |
@@ -182,73 +233,39 @@ odjson [flags] [packages]
 | map のメンバ順 | 名前順 | 名前順（*変化なし*） |
 | `<`、`>`、`&`、U+2028/9 | エスケープされる | エスケープされる（*変化なし*） |
 
-> [!WARNING]
-> まず確認すべきはデコードの 3 行だ。これまで受け付けていた入力が **拒否される** ようになったり、触っていなかったフィールドが **ゼロ値になる** 場合がある。最後の行は `-case-insensitive` では戻らない。このフラグも `-escape-html` も v1 の `UnmarshalJSON` / `MarshalJSON` にしか効かず、`json/v2` の呼び出し側はそれらを通らないからだ。
+### Embedding 時の挙動の変化
 
-一番心配されやすい 2 行は **変わらない**。生成されたエンコーダは `encoding/json` と同じく map のメンバを名前順に並べるので、map を含む struct でもバイト列は安定したままだ。ゴールデンファイル、文字列比較によるテスト、シリアライズしたボディへの署名は、どれもそのまま動く。また `encoding/json` はマーシャラの戻り値に自前の HTML エスケープをかけるため、v1 の呼び出し側では `<`、`>`、`&`、U+2028/9 はエスケープされたままになる（`json/v2.Marshal` を直接呼ぶとエスケープされないが、これは `json/v2` のルールであって odjson が持ち込んだ挙動ではない）。
+以下のように、構造体の Embedding が行われている場合、odjson による高速化対象構造体 `A` に追加された `(T).MarshalJSONTo` / `(*T).UnmarshalJSONFrom` メソッドが `B` にも引き継がれます。
+この結果、Bに対しても A の JSON エンコード/デコード処理が使用されてしまい、`FieldB`が JSON のフィールドとして認識されなくなってしまいます。
+```go
+// A odjson による高速化対象
+type A struct {
+		FieldA string `json:"field_a"`
+}
 
-背後にあるメソッドごとのルールは、`GOEXPERIMENT=nojsonv2` ビルドでの挙動も含めて [docs/internals.md](./docs/internals.md#which-semantics-a-generated-method-follows) にまとめてある。特に効いてくるのはライブラリを公開する場合だ。生成されたメソッドは型のエクスポートされた API であり、利用者もそれを継承する。そのため後からファイルを消すのは、利用者から見ればきれいなアンインストールではなく破壊的変更になる。
+// B A の埋め込まれた構造体
+type B struct {
+	A
+	FieldB string `json:field_b"`
+}
+```
 
-> [!WARNING]
-> **埋め込みに注意**。生成済みの型を埋め込みながら自身のコーデックを持たない struct は、埋め込んだ型のメソッドを継承してしまい、**埋め込み部分だけ** をエンコードする。自分のフィールドは黙って落ちる。同じパッケージ内であればデフォルト設定がこれを防ぐ。エクスポートされた struct すべてと、`-recursive` が到達する型すべてが対象になるからだ。問題になるのは `-type` で対象を絞った場合と、**別のモジュールが生成済みの型を埋め込んでいて** そちら側で odjson を実行していない場合になる。後者は手元では検知できない。エクスポートした型は、それを埋め込む側にもコーデックが必要になる。
+現状、このような場合には B も odjson による高速化対象とする必要があります。
 
-### 標準ライブラリの内部実装に依存している
+## JSON エンコード/デコードの信頼性
 
-上の `json/v2` の速度は、生成コードだけで出しているわけではない。標準ライブラリの公開 API の外側に踏み込む **直接パス**（`odjsonrt/direct.go`）が効いている。バッファ付きでオプションのない素の `json.Marshal` / `json.Unmarshal` のトップレベルの値については、`jsontext` の公開 API を通さず、`reflect` で求めたフィールドオフセットと `unsafe` を使って `encoding/json/v2` のコーダ自身のバッファに直接読み書きする。`json/v2` 自身のコーデックは同じ状態に internal な export 経由で到達しているが、リンカが他のモジュールにそれを許さない。そのうえ公開 API は固定費とメンバごとの重複名チェックを課すため、この数値には届かない。
+odjson では `MarshalJSON` / `UnmarshalJSON` は `encoding/json`、`MarshalJSONTo` / `UnmarshalJSONFrom` は `encoding/json/v2` と完全に同じ挙動をすることを以下のテストスイート・フィクスチャで確認しています
 
-**これは互換性保証の対象外である、非公開の標準ライブラリのレイアウトへの依存だ。** 失敗しても速度を失うだけで済むよう、次のように制限してある。
-
-- **一度に 1 つの Go マイナーバージョンでのみ検証**し（現在は 1.27）、そのバージョンでのみ有効にする
-- **init で型を検査**し、さらに **init で自己テスト**する。直接パスを `json/v2` 経由で走らせ、末尾の余分なデータを拒否するかどうかも含めて、公開 API と結果を突き合わせる
-- **どこかで失敗すればプロセス全体で無効化**し、結果は `odjsonrt.DirectEnabled` が返す。必要ならテストでアサートできる
-- **`-tags odjson_safe` でコンパイル対象から丸ごと外れる**
-- **生成されたメソッドはすべて公開 API のパスをフォールバックとして持つ**。ネストした値、`io.Writer` / `io.Reader`、オプション付きの呼び出し、そして `encoding/json` からの呼び出しは、すべてそちらを通る
-
-> [!IMPORTANT]
-> **新しい Go リリースで払うコスト**。Go 1.28 が出ても、odjson は検証していないレイアウトを信用しない。直接パスは 1.28 に対応したリリースが出るまで無効のままで、それまで生成済みの型は完全に公開 API のパスで動く。コードはコンパイルできるし、出力される JSON も変わらない。ただし上の `json/v2` の数値は直接パスのものなので、それがなければ標準ライブラリとの差は大きく縮まる。エンコード側にいたっては優位がなくなる。Go のアップグレードに合わせて odjson のバージョンも上げる計画にしておくか、そもそも依存したくなければ `-tags odjson_safe` でビルドするとよい。リリースを監視し、新しいバージョンでもレイアウトが通ることを確認したうえでプルリクエストを開く nightly のワークフローがあるので、待つのはレビューとタグ付けだけで、調査からやり直すことにはならない。両方のパスの測定値は [docs/internals.md](./docs/internals.md#the-direct-path) にある。
-
-## 仕組み
-
-Go の struct は、JSON の形について必要な情報をコンパイル時にすべて持っている。ランタイムのライブラリはそれを捨て、呼び出しのたびにリフレクションで調べ直す。odjson は struct 定義を事前に読み、型ごとにリフレクションのない専用コードを書き出す。
-
-### 標準ライブラリに後付けする
-
-odjson は `encoding/json/v2` を置き換えない。型 `T` ごとに、標準のマーシャリングインターフェース 4 つと、その背後で使う非公開のコーデックだけを出力する。
-
-| シンボル                                        | インターフェース                                            |
-| ---------------------------------------------- | ---------------------------------------------------------- |
-| `(T).MarshalJSONTo` / `(*T).UnmarshalJSONFrom` | [`encoding/json/v2`](https://pkg.go.dev/encoding/json/v2) のストリーミングインターフェース。Go 1.27 で `json.Marshal` が到達する先であり、速さが出るのもここだ。 |
-| `(T).MarshalJSON` / `(*T).UnmarshalJSON`       | [`encoding/json`](https://pkg.go.dev/encoding/json) v1 のインターフェース。v1 のルールに従う。 |
-
-生成される API はこれですべてだ。呼び出すべき odjson のシンボルはなく、ラッパー型も設定オブジェクトもない。プログラム中のどこにも odjson は現れない。すでに書いてある `json.Marshal(v)` と `json.Unmarshal(b, &v)` が、そのまま生成コードにディスパッチする。
-
-ここから 2 つの結果が導かれる。これが odjson の要点だ。
-
-- **標準ライブラリを使い続けられる**。オプションもエラー型もストリーミングデコーダも、その型に触れる他のコードも、すべてそのまま動く。odjson は標準ライブラリが元から探していた 2 つのメソッドを用意するだけだからだ。
-- **いつでも外せる**。`rm odjson_gen.go` してビルドし直せば、パッケージは素のリフレクションに戻る。巻き戻す移行作業も、解きほぐす API もない。だから導入を試すのも、将来の標準ライブラリが差を埋めたときに捨てるのも安く済む（[導入すると何が変わるか](#出力される-json-が変わる)に注意点が 1 つだけある。型を公開している場合、生成されたメソッドは利用者が継承するエクスポート API なので、ファイルの削除は破壊的変更になる）。
-
-### 生成されたコードがすること
-
-- **Marshal**: 生成コードは struct のフィールドをバイトスライスに直接 append する。フィールド名、クォート、区切り文字は定数として生成ソースに埋め込まれている（[`sapphi-red/json-constantiater`](https://github.com/sapphi-red/json-constantiater) と同じ発想だ）。
-- **Unmarshal**: 生成コードはその struct 専用のパーサになる。入力を struct のフィールドへ直接流し込むので、リフレクションも中間の `map[string]any` も実行時のフィールド名ルックアップも要らない。メンバ名はクォートごとドキュメントの生バイトと突き合わせ、bool、整数、単純な float はその場でデコードする。高速パスで判断できないものは、推測せず汎用パーサに渡す。
-- **どのデコーダを使うか**は値ごとに実行時に決まる。適用できる場合は直接パス、小さい値には値全体を読むバイトパーサ、大きい値には `jsontext.Decoder` をトークン単位で駆動するパスを使う。最後のものが、ストリーミングデコード時のメモリ使用量を抑えている。
-
-すでに `json.Marshaler`、`json.Unmarshaler`、`encoding.TextMarshaler`、`encoding.TextUnmarshaler` を実装している型には手を出さない。衝突するメソッドを生成せず、既存のメソッドを呼ぶ。
-
-## 正しさ
-
-odjson の契約はインターフェースごとに 2 つに分かれる。`MarshalJSON` / `UnmarshalJSON` は同じ型に対する `encoding/json` v1 と完全に同じ挙動をし、`MarshalJSONTo` / `UnmarshalJSONFrom` は `encoding/json/v2` と完全に同じ挙動をする。どちらも主張ではなくフィクスチャで担保している。
-
-- **パリティフィクスチャ**を `internal/testfixture/` に置き、ジェネレータが扱えるフィールド形状をすべてカバーしている。あらゆる数値幅、`[]byte` と `[N]byte`、ポインタ、slice、配列、map、`any`、`json.RawMessage`、`json.Number`、`time.Time`、値およびポインタによる埋め込み、`omitempty`、`omitzero`、`,string`、`-`、非公開フィールド、自己参照型やパッケージをまたぐ型、ジェネリクス、その他のフォールバックを、標準ライブラリと **バイト単位で** 比較する。生成されたメソッドこそ `encoding/json` が呼ぶものになったため、リファレンス側は odjson を実行していない同一宣言の双子型として同じ値を読む。こうすればリフレクションが期待どおりの結果を返す。v2 側は `internal/testfixture/v2parity` が同じことを行う。
-- **[JSON Test Suite](https://seriot.ch/projects/parsing_json.html)**（318 ケース）を、ランタイムのスキャナと生成されたデコーダの両方に対して走らせる。各ケースには、標準ライブラリが受け付けるものだけを受け付け、同じ値を返すことを要求している。
+- `internal/testfixture/` のパリティフィクスチャ
+    - ジェネレータが扱えるフィールド形状をすべてカバー
+		    - あらゆる数値幅、`[]byte` と `[N]byte`、ポインタ、slice、配列、map、`any`、`json.RawMessage`、`json.Number`、`time.Time`、値およびポインタによる埋め込み、`omitempty`、`omitzero`、`,string`、`-`、非公開フィールド、自己参照型やパッケージをまたぐ型、ジェネリクス、その他のフォールバックをカバー
+		- 標準ライブラリのエンコード/デコード結果と比較し、すべて同一となることを確認
+- **[JSON Test Suite](https://seriot.ch/security/parsing_json.html)**（318 ケース）
+    - ランタイムスキャナ/生成デコーダに対して実行
+		- 標準ライブラリと同じ値を返すことを確認
 - **`encoding/json` のフィールド昇格ルール**を `go/types` の上に再実装し、3 つのケースすべてに当たるよう組み立てた struct で `encoding/json` と突き合わせている。
-- **生成された出力はコミットし、差分をチェックする**。フィクスチャの出力を変えるジェネレータの変更は、ビルドを落とす。
 
-パリティは `go.mod` のツールチェインに対して測っている。Go 1.27 以降、`encoding/json` は v1 互換モードで `encoding/json/v2` の上に実装されており、いくつかのエスケープ形式は従来の v1 エンコーダと異なる。正確な一覧は [`odjsonrt`](https://pkg.go.dev/github.com/mazrean/odjson/odjsonrt) のパッケージドキュメントを参照してほしい。
-
-## コントリビュート
-
-リポジトリの規約（モジュール構成、`go tool lint ./... ./tools/...` によるリント、`go test -race ./...` でのテスト、Conventional Commits）は [AGENTS.md](./AGENTS.md) にまとめてある。
+パリティは `go.mod` に記載のツールチェインに対して実行しています。Go 1.27 以降、`encoding/json` は v1 互換モードで `encoding/json/v2` の上に実装されており、いくつかのエスケープ形式は従来の v1 エンコーダと異なります。正確な一覧は [`odjsonrt`](https://pkg.go.dev/github.com/mazrean/odjson/odjsonrt) のパッケージドキュメントを参照。
 
 ## ライセンス
 
