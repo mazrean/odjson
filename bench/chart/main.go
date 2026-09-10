@@ -342,11 +342,13 @@ func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
 		fmt.Fprintf(b, `<text class="mono %s" x="%d" y="%d" font-size="11">%s</text>`,
 			ink, valX, top+barH-5, val)
 
-		// Same baseline as the time it follows, and no t1/t2 class, because a
-		// stylesheet fill beats a presentation attribute.
+		// Centred on the bar like every other row label — which is what the
+		// -5 above is, at 11px — rather than sharing their baseline, which at
+		// 16px would ride high. No t1/t2 class, because a stylesheet fill
+		// beats a presentation attribute.
 		if r.odjson && !ratioInHeader {
 			fmt.Fprintf(b, `<text x="%d" y="%d" font-size="16" font-weight="700" fill="%s">%s</text>`,
-				ratioX, top+barH-5, t.accent, ratio)
+				ratioX, top+barH/2+capH(16), t.accent, ratio)
 		}
 	}
 }
@@ -355,6 +357,13 @@ func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
 // Nothing is drawn narrower than its two rounded corners.
 func barW(v, hi float64) int {
 	return max(int(float64(barsW)*v/hi+0.5), 2*radius)
+}
+
+// capH is half the cap height of the sans face at the given size: the drop
+// from a vertical centre to the baseline that sits text on it. At 11px it is
+// 4, so barH/2+capH(11) is the barH-5 the row labels already use.
+func capH(size int) int {
+	return (size*36 + 50) / 100
 }
 
 // textW estimates the width of bold sans text at the given size, in user
