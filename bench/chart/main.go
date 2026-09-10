@@ -40,39 +40,39 @@ type panel struct {
 
 var panels = []panel{
 	{
-		title: "Marshal", sub: "twitter · 616 KiB", unit: "µs", ratio: "3.55",
+		title: "Marshal", sub: "twitter · 616 KiB", unit: "µs", ratio: "3.53",
 		rows: []row{
-			{label: "encoding/json/v2", value: 390},
-			{label: "+ odjson", value: 110, indent: true, odjson: true, emphasis: true},
-			{label: "sonic", value: 113},
-			{label: "go-json", value: 238},
+			{label: "encoding/json/v2", value: 392},
+			{label: "+ odjson", value: 111, indent: true, odjson: true, emphasis: true},
+			{label: "sonic", value: 117},
+			{label: "go-json", value: 237},
 		},
 	},
 	{
-		title: "Marshal", sub: "small · 340 B", unit: "ns", ratio: "3.19",
+		title: "Marshal", sub: "small · 340 B", unit: "ns", ratio: "3.23",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1020},
-			{label: "+ odjson", value: 321, indent: true, odjson: true, emphasis: true},
-			{label: "sonic", value: 307},
-			{label: "go-json", value: 400},
+			{label: "encoding/json/v2", value: 1025},
+			{label: "+ odjson", value: 317, indent: true, odjson: true, emphasis: true},
+			{label: "sonic", value: 308},
+			{label: "go-json", value: 374},
 		},
 	},
 	{
-		title: "Unmarshal", sub: "twitter · 616 KiB", unit: "µs", ratio: "2.04",
+		title: "Unmarshal", sub: "twitter · 616 KiB", unit: "µs", ratio: "2.12",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1090},
-			{label: "+ odjson", value: 535, indent: true, odjson: true, emphasis: true},
-			{label: "sonic", value: 550},
-			{label: "go-json", value: 646},
+			{label: "encoding/json/v2", value: 1072},
+			{label: "+ odjson", value: 506, indent: true, odjson: true, emphasis: true},
+			{label: "sonic", value: 492},
+			{label: "go-json", value: 655},
 		},
 	},
 	{
-		title: "Unmarshal", sub: "small · 340 B", unit: "ns", ratio: "3.01",
+		title: "Unmarshal", sub: "small · 340 B", unit: "ns", ratio: "3.21",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1870},
-			{label: "+ odjson", value: 620, indent: true, odjson: true, emphasis: true},
-			{label: "sonic", value: 1030},
-			{label: "go-json", value: 760},
+			{label: "encoding/json/v2", value: 1842},
+			{label: "+ odjson", value: 573, indent: true, odjson: true, emphasis: true},
+			{label: "sonic", value: 977},
+			{label: "go-json", value: 770},
 		},
 	},
 }
@@ -174,7 +174,7 @@ text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,san
 		drawPanel(&b, t, p, x, y)
 	}
 
-	fmt.Fprintf(&b, `<text class="t2" x="%d" y="%d" font-size="11">Medians of 3 runs · AMD Ryzen 9 7950X · Linux · Go 1.27.1 · bench/plain and bench/gen</text>`,
+	fmt.Fprintf(&b, `<text class="t2" x="%d" y="%d" font-size="11">Medians of 10 runs · AMD Ryzen 9 7950X · Linux · Go 1.27.1 · bench/plain and bench/gen</text>`,
 		padX, svgH-11)
 	b.WriteString(`</svg>`)
 	b.WriteByte('\n')
