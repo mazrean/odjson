@@ -71,7 +71,7 @@ jobs:
     steps:
       # persist-credentials is the default and is what the later `git push`
       # authenticates with.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: pick the version to verify
         id: pick
