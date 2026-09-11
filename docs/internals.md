@@ -223,35 +223,68 @@ by 1.3 for encoding, and a duplicate-name check on every member for decoding.
 
 `odjsonrt/direct.go` reaches the same state without the export. At init it
 looks the coder's fields up by name through `reflect`, checks their types,
-and learns the state machine's values around a single top-level value by
-observing a probe run through the public API inside real `json.Marshal` and
-`json.Unmarshal` calls. The generated methods then ask `BeginDirectEncode` /
-`BeginDirectDecode` whether the situation is the one that was learned:
+and learns the option flags of a plain `json.Marshal` / `json.Unmarshal`, from
+`encoding/json/v2` and from `encoding/json`, by observing a probe run through
+the public API inside the real calls: at the top level, as an array element
+and as an object member value, checking each time that the state machine's
+entry reads as `jsontext`'s source says (object bit, namespace bits, a count
+that the value raises by exactly one). The generated methods then ask
+`BeginDirectEncodeMode` / `BeginDirectDecodeAt` whether the situation is one
+of the learned ones:
 
-- a **top-level** value (`StackDepth() == 0`, state machine at its initial
-  entry), so no delimiter and no name stack is involved;
 - a **buffered** coder (`json.Marshal` to bytes, `json.Unmarshal` from
   bytes), so nothing has to be flushed or fetched;
-- the coder's option flags **equal to a plain call's**, so no indentation,
-  escaping or legacy semantics have to be reproduced.
+- the coder's option flags **equal to one of the two plain calls'**, so no
+  indentation or non-default semantics have to be reproduced — and, since
+  `json/v2` applies a `,string` or `format` tag to a member's value through
+  those same flags, such a member falls back on its own;
+- a **value position**: not where an object member name is due, and not a
+  namespace `jsontext` has marked invalid.
 
-When all three hold, `MarshalJSONTo` appends the value straight into the
-encoder's buffer under `ModeV2` (json/v2's own escaping, invalid UTF-8
-rejected) and `UnmarshalJSONFrom` parses the decoder's unread input with the
-byte oriented `odjsonParseV2`, which validates everything `jsontext` would
-have: grammar, UTF-8, unpaired surrogates and duplicate names at every depth.
-Then the coder is advanced past the value. In every other situation — a
-nested value, an `io.Writer` / `io.Reader`, any option, `encoding/json` — the
-methods take the public API path documented below, unchanged.
+Depth is not a condition. Under those flags `jsontext`'s rule for one value is
+the same everywhere: a `:` before it after a name, a `,` after an earlier
+element or member, one more on the innermost entry's count afterwards, and
+nothing else in the coder changes. So `BeginDirectEncodeMode` hands back the
+buffer with that delimiter already appended, and `BeginDirectDecodeAt` hands
+back the unread input with the offset of the value's first byte — past the
+delimiter the decoder's own `PeekKind` consumed when the caller peeked (slice
+elements), or past the one it consumes itself otherwise (map values, struct
+fields), declining when what it finds is not the delimiter the state calls
+for, so that the public path reports the error. A top-level `[]T`,
+`map[string]T` or struct holding generated types therefore runs every element
+on the direct path; before this the path covered the top-level value only,
+and `bench/shapes` measured the loss (`array-items` 0.84×, see below).
+
+When the conditions hold, `MarshalJSONTo` appends the value straight into the
+encoder's buffer — under `ModeV2` (json/v2's own escaping, invalid UTF-8
+rejected) for a `json/v2` call, under `ModeV2HTML` for an `encoding/json`
+one, which is what that call's reformat made of the public path's `ModeStream`
+bytes: `<`, `>`, `&`, U+2028 and U+2029 escaped, everything else, an invalid
+byte included, as it was, with json/v2's container and omitempty semantics
+throughout, since `MarshalJSONTo` has always followed those under either
+library. `UnmarshalJSONFrom` parses the decoder's unread input with the byte
+oriented `odjsonParseV2`, which validates everything `jsontext` would have:
+grammar, UTF-8, unpaired surrogates and duplicate names at every depth. Then
+the coder is advanced past the value. `encoding/json`'s decode stays on the
+public path: its flags allow invalid UTF-8 and duplicate names, which the
+strict parsers refuse, and `TestLenientOptionsReachTheFallback` holds it
+there. In every other situation — an `io.Writer` / `io.Reader`, any option —
+the methods take the public API path documented below, unchanged.
 
 It is guarded three times over: the layout lookup and type checks at init, a
 gate on the Go minor version it was verified against (1.27; a newer toolchain
 gets the public API path until the layout is re-verified), and a self test at
-init that runs the direct path through `json/v2` and compares its answers with
-the public API's, including rejection of trailing data. Any failure disables
-it for the process; `odjsonrt.DirectEnabled` reports the outcome, and building
-with `-tags odjson_safe` compiles it out. The generated code carries the
-public API path in every case, so disabling costs speed and nothing else.
+init that runs the direct path through `json/v2` and `encoding/json`, at the
+top level and nested in a slice, a map and a struct, and compares its answers
+with the public API's, including the refusal of trailing data, truncated and
+malformed nested input, and `encoding/json`'s escaping of HTML, U+2028 and
+invalid UTF-8. Any failure disables it for the process and names the check
+that failed; `odjsonrt.DirectEnabled` reports the outcome, and building with
+`-tags odjson_safe` compiles it out. The generated code carries the public API
+path in every case, so disabling costs speed and nothing else. The
+`BeginDirectEncode` / `BeginDirectDecode` pair that generated code before the
+nested path called is kept, top-level only as before, so an older generated
+file keeps working against a newer `odjsonrt`.
 
 What it is worth (`bench/ab`, medians of 5): `json/v2` goes from
 0.86× / 0.97× / 1.02× / 1.45× to **3.42× / 3.42× / 2.02× / 3.09×** on

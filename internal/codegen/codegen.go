@@ -258,22 +258,24 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 		receiver(s, true), "MarshalJSONTo",
 		signature([]*ast.Field{field("enc", ptr(sel(id("jsontext"), "Encoder")))}, id("error")),
 		func(b *block) {
-			buf := id("buf")
+			buf, n, m := id("buf"), id("n"), id("m")
 			g.comment(b,
-				"// A top-level value under a plain json.Marshal is appended straight",
-				"// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what",
-				"// qualifies. Nothing downstream looks at those bytes, so ModeV2 does",
-				"// json/v2's own escaping and rejects invalid UTF-8 itself.")
+				"// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,",
+				"// the value is appended straight into the encoder's buffer at any",
+				"// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and",
+				"// for the mode, which does that call's escaping itself since nothing",
+				"// downstream looks at the bytes.")
 			g.ifStmt(b,
-				assignN(token.DEFINE, []ast.Expr{buf, id("ok")}, callRT("BeginDirectEncode", enc)),
+				assignN(token.DEFINE, []ast.Expr{buf, m, id("ok")}, callRT("BeginDirectEncodeMode", enc)),
 				id("ok"),
 				func(b *block) {
+					g.emit(b, define(n, call(id("len"), buf)))
 					g.emit(b, assignN(token.DEFINE, []ast.Expr{buf, errV},
-						call(sel(v, "odjsonAppend"), buf, rt("ModeV2"))))
+						call(sel(v, "odjsonAppend"), buf, m)))
 					g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
 						g.emit(b, ret(errV))
 					})
-					g.emit(b, expr(call(sel(size, "Record"), buf)))
+					g.emit(b, expr(call(sel(size, "Record"), slice(buf, n, nil))))
 					g.emit(b, expr(callRT("EndDirectEncode", enc, buf)))
 					g.emit(b, ret(nilV))
 				})
@@ -306,22 +308,22 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 			g.emit(b, define(sc, callRT("GetStringCache")))
 			g.emit(b, varDecl("err", id("error")))
 			g.comment(b,
-				"// A top-level value under a plain json.Unmarshal is parsed straight",
-				"// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what",
-				"// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects",
-				"// what jsontext would have.")
+				"// Under a plain json.Unmarshal the value is parsed straight out of",
+				"// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt",
+				"// for what qualifies. Nobody has validated those bytes, so",
+				"// odjsonParseV2 rejects what jsontext would have.")
 			s := g.ifStmt(b,
-				assignN(token.DEFINE, []ast.Expr{data, id("ok")}, callRT("BeginDirectDecode", decV)),
+				assignN(token.DEFINE, []ast.Expr{data, p, id("ok")}, callRT("BeginDirectDecodeAt", decV)),
 				id("ok"),
 				func(b *block) {
 					end := id("end")
 					g.emit(b, varDecl("end", id("int")))
 					g.ifStmt(b,
 						assignN(token.ASSIGN, []ast.Expr{end, errV},
-							call(sel(v, "odjsonParseV2"), data, num(0), sc, id("true"))),
+							call(sel(v, "odjsonParseV2"), data, p, sc, id("true"))),
 						bin(errV, token.EQL, nilV),
 						func(b *block) {
-							g.emit(b, expr(callRT("EndDirectDecode", decV, end)))
+							g.emit(b, expr(callRT("EndDirectDecodeAt", decV, p, end)))
 						})
 				})
 			g.elseBlock(s, func(b *block) {

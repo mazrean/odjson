@@ -62,16 +62,21 @@ that decoder has to keep the parity fixtures green, and any new fast path must
 decline rather than guess: `internal/testfixture`'s scalar cases cover the
 spellings the raw match cannot see.
 
-The json/v2 numbers rest on `odjsonrt/direct.go`, **the direct path**: for a
-top-level value under a plain `json.Marshal` / `json.Unmarshal` the generated
-methods write into and read from the coder's own buffer through
-reflect-computed offsets and `unsafe`, because `jsontext`'s public API charges
-a floor (357us / 799ns for a marshaler that costs nothing) and a per-name
-duplicate check that put 1.3x out of reach (see "The direct path" and "What
-the decode side pays" in `docs/internals.md`). It is gated to the Go minor version it
-was verified against (1.27), checked by type at init, self-tested through
-json/v2 before use, and compiled out by `-tags odjson_safe`; every generated
-method keeps the public API path as its fallback. **On a new Go minor,
+The json/v2 numbers rest on `odjsonrt/direct.go`, **the direct path**: under
+a plain `json.Marshal` / `json.Unmarshal`, from `encoding/json/v2` or
+`encoding/json`, the generated methods write into and read from the coder's
+own buffer through reflect-computed offsets and `unsafe`, at any depth (a
+top-level value, an element of a slice or map, a struct field), because
+`jsontext`'s public API charges a floor (357us / 799ns for a marshaler that
+costs nothing) and a per-name duplicate check that put 1.3x out of reach (see
+"The direct path" and "What the decode side pays" in `docs/internals.md`).
+Under `encoding/json`'s flags the encoder writes `odjsonrt.ModeV2HTML`, which
+is byte for byte what that call's reformat made of the public path's output;
+its decode stays on the public path, because those flags allow what the
+strict parsers refuse. It is gated to the Go minor version it was verified
+against (1.27), checked by type at init, self-tested through json/v2 and
+encoding/json before use, and compiled out by `-tags odjson_safe`; every
+generated method keeps the public API path as its fallback. **On a new Go minor,
 re-verify the layout against `jsontext`'s source and add that minor to
 `verifiedGoMinors` in `odjsonrt/direct.go`; never widen it blind.**
 `.github/workflows/go-minor.yml` does the mechanical half of that nightly — it
