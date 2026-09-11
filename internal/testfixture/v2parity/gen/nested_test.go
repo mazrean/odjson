@@ -4,6 +4,7 @@ import (
 	"bytes"
 	jsonv1 "encoding/json"
 	jsonv2 "encoding/json/v2"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -229,6 +230,107 @@ func TestNestedErrorsMatchReflection(t *testing.T) {
 		errP = jsonv2.Unmarshal([]byte(doc), &pm)
 		if (errG != nil) != (errP != nil) {
 			t.Errorf("map %s: odjson %v, reflection %v", doc, errG, errP)
+		}
+	}
+}
+
+// TestNestedErrorOffsetsAreTheDocuments requires the offset in an error the
+// generated parser reports at a nested position to count from the start of
+// the document, as it does at the top level, not from the start of the
+// value. json/v2 wraps the error with the value's own position, so the
+// offset inside it is the only place the parser's byte position survives.
+func TestNestedErrorOffsetsAreTheDocuments(t *testing.T) {
+	if !odjsonrt.DirectEnabled() {
+		t.Skip("direct path disabled")
+	}
+	offset := func(t *testing.T, err error) int64 {
+		t.Helper()
+		var te *odjsonrt.TypeError
+		var se *odjsonrt.SyntaxError
+		switch {
+		case errors.As(err, &te):
+			return te.Offset
+		case errors.As(err, &se):
+			return se.Offset
+		}
+		t.Fatalf("not an odjsonrt error: %v", err)
+		return 0
+	}
+	for _, bad := range []string{`{"int":"x"}`, `{"int":1,"int":2}`, `{"int":1,}`, `{"string":"\ud800"}`} {
+		var top gen.Zoo
+		want := offset(t, jsonv2.Unmarshal([]byte(bad), &top))
+		for _, prefix := range []string{`[{"int":1},`, `[ {"int":1} , `, `[{"int":1},{"int":2},`} {
+			var gs []gen.Zoo
+			err := jsonv2.Unmarshal([]byte(prefix+bad+`]`), &gs)
+			if got := offset(t, err); got != want+int64(len(prefix)) {
+				t.Errorf("%s%s]: offset %d, want %d (%v)", prefix, bad, got, want+int64(len(prefix)), err)
+			}
+		}
+		for _, prefix := range []string{`{"a":{"int":1},"b":`, `{ "a" : {"int":1} , "b" : `} {
+			var gm map[string]gen.Zoo
+			err := jsonv2.Unmarshal([]byte(prefix+bad+`}`), &gm)
+			if got := offset(t, err); got != want+int64(len(prefix)) {
+				t.Errorf("%s%s}: offset %d, want %d (%v)", prefix, bad, got, want+int64(len(prefix)), err)
+			}
+		}
+		var w nest[gen.Zoo]
+		prefix := `{"v":{"int":1},"p":`
+		err := jsonv2.Unmarshal([]byte(prefix+bad+`}`), &w)
+		if got := offset(t, err); got != want+int64(len(prefix)) {
+			t.Errorf("%s%s}: offset %d, want %d (%v)", prefix, bad, got, want+int64(len(prefix)), err)
+		}
+	}
+}
+
+// omitNest holds the two struct shapes that encode as {}, under omitempty.
+// json/v2 drops such a member after encoding it, by unwriting the buffer;
+// after a direct write that is the generated codec's bytes it unwrites.
+type omitNest[U, M any] struct {
+	U U   `json:"u,omitempty"`
+	M M   `json:"m,omitempty"`
+	N int `json:"n"`
+}
+
+// TestOmitEmptyUnwritesADirectWrite requires the member a generated codec
+// wrote on the direct path to be dropped by omitempty exactly as reflection
+// drops it: json/v2 unwrites an empty object, encoding/json never omits a
+// struct, and both entry points have to agree with the reflection twin.
+func TestOmitEmptyUnwritesADirectWrite(t *testing.T) {
+	if !odjsonrt.DirectEnabled() {
+		t.Skip("direct path disabled")
+	}
+	type G = omitNest[gen.Unit, gen.Memberless]
+	type P = omitNest[plain.Unit, plain.Memberless]
+	g, p := G{N: 1}, P{N: 1}
+	for _, c := range []struct {
+		gen, plain any
+		want       string
+	}{
+		{g, p, `{"n":1}`},
+		{[]G{g, g}, []P{p, p}, `[{"n":1},{"n":1}]`},
+		{map[string]G{"k": g}, map[string]P{"k": p}, `{"k":{"n":1}}`},
+	} {
+		gv2, err := jsonv2.Marshal(c.gen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var w bytes.Buffer
+		if err := jsonv2.MarshalWrite(&w, c.gen); err != nil {
+			t.Fatal(err)
+		}
+		if string(gv2) != c.want || w.String() != c.want {
+			t.Errorf("%T: Marshal %s, MarshalWrite %s, want %s", c.gen, gv2, w.String(), c.want)
+		}
+		gv1, err := jsonv1.Marshal(c.gen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pv1, err := jsonv1.Marshal(c.plain)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(gv1, pv1) || !strings.Contains(string(gv1), `"u":{},"m":{}`) {
+			t.Errorf("%T: encoding/json %s, reflection %s", c.gen, gv1, pv1)
 		}
 	}
 }

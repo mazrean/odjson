@@ -259,7 +259,7 @@ the same everywhere: a `:` before it after a name, a `,` after an earlier
 element or member, one more on the innermost entry's count afterwards, and
 nothing else in the coder changes. So `BeginDirectEncodeMode` hands back the
 buffer with that delimiter already appended, and `BeginDirectDecodeAt` hands
-back the unread input with the offset of the value's first byte — past the
+back the input with the offset of the value's first byte — past the
 delimiter the decoder's own `PeekKind` consumed when the caller peeked (slice
 elements), or past the one it consumes itself otherwise (map values, struct
 fields), declining when what it finds is not the delimiter the state calls

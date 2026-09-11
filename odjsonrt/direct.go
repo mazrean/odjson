@@ -508,35 +508,43 @@ func EndDirectEncode(enc *jsontext.Encoder, buf []byte) {
 }
 
 // BeginDirectDecodeAt reports whether the next value can be parsed straight
-// out of dec's buffer. It returns the unread input and the offset in it at
-// which the value starts, past any whitespace and the delimiter before it.
-// It says yes at any depth, for a value that is not an object member name,
-// on a buffered decoder that json.Unmarshal created with no options, and
-// only when the delimiter is the one the state machine expects: anything
-// else is left to the public path, which reports it. The caller parses one
-// value from that offset and reports its end to [EndDirectDecodeAt]. The
-// bytes have not been validated by anyone: the caller must reject what
-// jsontext would have, invalid UTF-8 and duplicate names included.
+// out of dec's buffer. It returns the whole input and the offset in it at
+// which the value starts, past any whitespace and the delimiter before it,
+// so that an offset in any error the caller reports is the document's. It
+// says yes at any depth, for a value that is not an object member name, on
+// a buffered decoder that json.Unmarshal created with no options, and only
+// when the delimiter is the one the state machine expects: anything else is
+// left to the public path, which reports it. The caller parses one value
+// from that offset and reports its end to [EndDirectDecodeAt]. The bytes
+// have not been validated by anyone: the caller must reject what jsontext
+// would have, invalid UTF-8 and duplicate names included.
 func BeginDirectDecodeAt(dec *jsontext.Decoder) ([]byte, int, bool) {
+	buf, _, pos, ok := beginDirectDecode(dec)
+	return buf, pos, ok
+}
+
+// beginDirectDecode is the check behind [BeginDirectDecodeAt]; it also
+// returns the end of the previous value, where the unread input begins.
+func beginDirectDecode(dec *jsontext.Decoder) (buf []byte, base, pos int, ok bool) {
 	if !direct.ok {
-		return nil, 0, false
+		return nil, 0, 0, false
 	}
 	p := unsafe.Pointer(dec)
 	if *flagsAt(p, direct.decFlags) != direct.decDefaultFlags || *ifaceAt(p, direct.decRd) != nil {
-		return nil, 0, false
+		return nil, 0, 0, false
 	}
 	e := *u64At(p, direct.decLast)
 	depth := dec.StackDepth()
 	if needName(e) || e&stateInvalidNS != 0 || depth >= directMaxStackDepth {
-		return nil, 0, false
+		return nil, 0, 0, false
 	}
-	buf := *bytesAt(p, direct.decBuf)
-	base := *intAt(p, direct.decPrevEnd)
-	pos := *intAt(p, direct.decPeekPos)
+	buf = *bytesAt(p, direct.decBuf)
+	base = *intAt(p, direct.decPrevEnd)
+	pos = *intAt(p, direct.decPeekPos)
 	switch {
 	case pos < 0:
 		// A cached peek error: the public path reports it.
-		return nil, 0, false
+		return nil, 0, 0, false
 	case pos > 0:
 		// The caller peeked, so the decoder has already consumed the
 		// whitespace and the delimiter and checked the latter.
@@ -557,15 +565,15 @@ func BeginDirectDecodeAt(dec *jsontext.Decoder) ([]byte, int, bool) {
 			want = ','
 		}
 		if delim != want {
-			return nil, 0, false
+			return nil, 0, 0, false
 		}
 	}
 	// The value has to start here; a closing bracket, or nothing, is the
 	// public path's to report.
 	if pos >= len(buf) || buf[pos] == '}' || buf[pos] == ']' {
-		return nil, 0, false
+		return nil, 0, 0, false
 	}
-	return buf[base:], pos - base, true
+	return buf, base, pos, true
 }
 
 // BeginDirectDecode is [BeginDirectDecodeAt] restricted to a top-level value,
@@ -575,8 +583,11 @@ func BeginDirectDecode(dec *jsontext.Decoder) ([]byte, bool) {
 	if dec.StackDepth() != 0 {
 		return nil, false
 	}
-	data, _, ok := BeginDirectDecodeAt(dec)
-	return data, ok
+	buf, base, _, ok := beginDirectDecode(dec)
+	if !ok {
+		return nil, false
+	}
+	return buf[base:], true
 }
 
 // EndDirectDecodeAt advances dec past the value a [BeginDirectDecodeAt]
@@ -584,17 +595,17 @@ func BeginDirectDecode(dec *jsontext.Decoder) ([]byte, bool) {
 // the returned input.
 func EndDirectDecodeAt(dec *jsontext.Decoder, start, end int) {
 	p := unsafe.Pointer(dec)
-	base := *intAt(p, direct.decPrevEnd)
-	*intAt(p, direct.decPrevStart) = base + start
-	*intAt(p, direct.decPrevEnd) = base + end
+	*intAt(p, direct.decPrevStart) = start
+	*intAt(p, direct.decPrevEnd) = end
 	*intAt(p, direct.decPeekPos) = 0
 	*u64At(p, direct.decLast)++
 }
 
 // EndDirectDecode is [EndDirectDecodeAt] for a [BeginDirectDecode] caller,
-// whose value started at the beginning of the returned input.
+// whose offsets count from the beginning of the input that call returned.
 func EndDirectDecode(dec *jsontext.Decoder, end int) {
-	EndDirectDecodeAt(dec, 0, end)
+	base := *intAt(unsafe.Pointer(dec), direct.decPrevEnd)
+	EndDirectDecodeAt(dec, base, base+end)
 }
 
 // DirectEnabled reports whether the direct path is active in this binary.
