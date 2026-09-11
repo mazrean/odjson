@@ -277,6 +277,13 @@ func appendStringChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
 				}
 				continue
 			}
+			// A lone four byte sequence (an emoji among ASCII) likewise: F0
+			// needs a second byte of 90-BF, F4 one of 80-8F, F1-F3 any.
+			if b-0xF0 < 5 && i+3 < len(src) && src[i+1]&0xC0 == 0x80 && src[i+2]&0xC0 == 0x80 && src[i+3]&0xC0 == 0x80 &&
+				(b != 0xF0 || src[i+1] >= 0x90) && (b != 0xF4 || src[i+1] < 0x90) {
+				i += 4
+				continue
+			}
 			if i = skipNonASCII(src, i); i < 0 {
 				return dst[:mark], ErrInvalidUTF8
 			}
@@ -331,6 +338,13 @@ func appendQuotedV2HTML(dst []byte, src []byte) []byte {
 					}
 					i += 8
 				}
+				continue
+			}
+			// A lone four byte sequence (an emoji among ASCII) likewise: F0
+			// needs a second byte of 90-BF, F4 one of 80-8F, F1-F3 any.
+			if b-0xF0 < 5 && i+3 < len(src) && src[i+1]&0xC0 == 0x80 && src[i+2]&0xC0 == 0x80 && src[i+3]&0xC0 == 0x80 &&
+				(b != 0xF0 || src[i+1] >= 0x90) && (b != 0xF4 || src[i+1] < 0x90) {
+				i += 4
 				continue
 			}
 			j := skipNonASCII(src, i)
