@@ -5,7 +5,7 @@ go 1.27
 replace github.com/mazrean/odjson => ../
 
 require (
-	github.com/bytedance/sonic v1.15.3
+	github.com/bytedance/sonic v1.15.4
 	github.com/goccy/go-json v0.10.6
 	github.com/mazrean/odjson v0.0.0-00010101000000-000000000000
 )
