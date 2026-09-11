@@ -70,7 +70,7 @@ func TestSkipNonASCIIMatchesUTF8Valid(t *testing.T) {
 	// the boundary leads and the word paths are decided by exactly those
 	// two bytes.
 	for lead := 0x80; lead < 0x100; lead++ {
-		for second := 0; second < 0x100; second++ {
+		for second := range 0x100 {
 			seq := []byte{byte(lead), byte(second), 0x80, 0x80}
 			for _, pad := range []string{"", "a", "日", "ab", "abc", "日本", "éé", "😀", "abcdefg"} {
 				full := pad + string(seq)
