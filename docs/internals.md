@@ -48,9 +48,20 @@ rather than in the chart, which is about the `json/v2` story.
 | go-json | 794 ns | — | |
 
 `encoding/json/v2` gains on all four, and the generated file is the only thing
-that changed. `encoding/json` gains on three of the four; its `twitter` encode
-is 4% behind, and that loss is structural — v1 configures its coders with its
-own flags, which the direct path declines.
+that changed. The `encoding/json` rows above predate the direct path learning
+that library's flag word (see "The direct path"); re-measured the same way
+on 2026-09-11 (`bench/gen` and `bench/plain`, `-count 10`), `encoding/json`
+with odjson reads **126.8 µs / 322.7 ns / 1.237 ms / 1.484 µs** against
+404.8 µs / 1.019 µs / 1.481 ms / 2.273 µs on its own — **3.19× / 3.16× /
+1.20× / 1.53× faster** — so it gains on all four, its encodes on the direct
+path and its decodes through the public API path (see "What the decode side
+pays"). `encoding/json/v2` in that run was 111.8 µs / 290.4 ns / 545 µs /
+625 ns, within the drift of the table for the encodes and 7–11% behind it for
+the decodes; the same `bench/gen` binary built at the previous commit read
+537 µs / 598 ns that day, and `bench/ab` in one process read 499 µs / 575 ns
+for the new code, so most of that is the day and the binary rather than the
+change, with about 3% on the `small` decode attributable to the wider entry
+check. The README's tables and chart still show the earlier run.
 
 Against the libraries people leave the standard library for, that puts
 `encoding/json/v2` + odjson:
@@ -134,13 +145,15 @@ guard on that equivalence.
 
 **`encoding/json` gains too.** On Go 1.27 `encoding/json` is implemented on top
 of `encoding/json/v2`, so it picks up the generated `MarshalJSONTo` /
-`UnmarshalJSONFrom` — and with those tuned for the streaming contract (see
-below) an unchanged `json.Marshal` / `json.Unmarshal` call site is
-**1.2×–1.6× faster** on three of the four measurements, and 4% behind on the
-fourth. `encoding/json` configures its coders with its own flags (HTML
-escaping, legacy error reporting), which the direct path declines, so those
-rows measure the public API path — which is the whole of the difference
-between the two standard library columns above.
+`UnmarshalJSONFrom`. Its `Marshal` carries its own flag word (HTML escaping,
+legacy error reporting, and so on), which the direct path used to decline, so
+an unchanged `json.Marshal` call site was 4% behind reflection on `twitter`
+while `json.Unmarshal` was 1.2×–1.6× ahead; the path now recognises that word
+and writes `ModeV2HTML` (see "The direct path"), and the encode rows read
+**3.1×–3.4×**. The decode rows still measure the public API path, because
+`encoding/json`'s flags allow what the strict parsers refuse, and that is the
+whole of the remaining difference between the two standard library columns
+above.
 
 **sonic and odjson are level on `twitter`, and how.** That payload is
 dominated by `interface{}` fields, which no amount of code generation can turn
@@ -287,9 +300,12 @@ nested path called is kept, top-level only as before, so an older generated
 file keeps working against a newer `odjsonrt`.
 
 What it is worth (`bench/ab`, medians of 5): `json/v2` goes from
-0.86× / 0.97× / 1.02× / 1.45× to **3.42× / 3.42× / 2.02× / 3.09×** on
+0.86× / 0.97× / 1.02× / 1.45× to **3.52× / 3.61× / 2.05× / 3.24×** on
 Marshal `twitter` / Marshal `small` / Unmarshal `twitter` / Unmarshal `small`,
-with one allocation per encode.
+with one allocation per encode; `encoding/json`, whose encode never had the
+path before it learned that library's flag word, goes from
+0.96× / 1.12× on the two marshals to **3.11× / 3.37×**, while its unmarshals
+stay on the public path at 1.20× / 1.57×.
 
 ## What the decode side pays, and what was removed
 
@@ -365,103 +381,112 @@ Everything above was tuned on `twitter` and `small`, so `bench/shapes` asks
 whether it generalises: the two fixtures, a compacted `twitter`, 21 synthetic
 documents that each change one thing the fixtures hold fixed, and
 nativejson-benchmark's `canada.json` and `citm_catalog.json`, gen against
-plain in one process. Measured 2026-09-11 on
-the same Ryzen 9 7950X, Go 1.27.1, `-count 6` for the two standard libraries,
-`-count 3` for sonic and go-json; the ratio is plain over gen, so 2× means the
-generated codec halves the time and anything under 1× means it is slower than
-reflection. Every row is within ±3% by `benchstat` except the `small` json/v2
-encode (±8%), `dense` and `citm` (±4%) and the `canada` plain decode (±6%),
-so a ratio between 0.94× and 1.06× is read as level below; the bold rows are
-the ones outside that band on the wrong side.
+plain in one process. The first run, on 2026-09-11 against the tree as it was
+(569737b), found three places where it did not; the fixes that followed are
+described after the table, and the table is the run after them, the same day
+on the same Ryzen 9 7950X, Go 1.27.1, `-count 6` for the two standard
+libraries and `-count 3` for sonic and go-json. The ratio is plain over gen,
+so 2× means the generated codec halves the time and anything under 1× means
+it is slower than reflection; the figure in brackets is the first run's,
+where the two differ by more than the spread. Every row is within ±2% by
+`benchstat` except `dense` and `citm` (±4%) and the `canada` plain decode
+(±7%), so a ratio between 0.95× and 1.05× is read as level.
 
 | shape | v2 Marshal | v2 Unmarshal | v1 Marshal | v1 Unmarshal |
 | --- | --- | --- | --- | --- |
-| `twitter` (reference) | 3.61× | 2.11× | 0.96× | 1.24× |
-| `small` (reference) | 3.37× | 3.13× | 1.12× | 1.61× |
-| `twitter-compact` | 3.59× | 2.28× | 0.95× | 1.30× |
-| `page-3k` / `page-12k` / `page-100k` | 2.14× / 2.18× / 2.14× | 2.19× / 2.16× / 2.17× | 1.39× / 1.38× / 1.34× | 1.54× / 1.33× / 1.31× |
-| `array-items` (`[]Item`) | **0.84×** | 1.22× | 1.12× | 1.31× |
-| `array-pages` (`[]Page`) | 1.00× | 1.24× | 1.33× | 1.32× |
-| `map-items` (`map[string]Item`) | **0.83×** | 1.17× | 1.11× | 1.26× |
-| `generic` (`any`) | 1.64× | 1.43× | 1.24× | 2.21× |
-| `text-ascii` | 2.11× | 1.77× | 0.93× | 0.95× |
-| `text-cjk` (as `twitter`) | 1.66× | 1.89× | **0.43×** | 1.07× |
-| `text-hangul` | 1.39× | 1.73× | **0.44×** | 1.10× |
-| `text-latin` | **0.77×** | 0.96× | **0.46×** | 1.00× |
-| `text-cyrillic` | **0.81×** | **0.90×** | **0.45×** | 1.03× |
-| `text-emoji` | 0.94× | 1.09× | **0.46×** | 1.00× |
-| `text-escaped` | 1.48× | 1.28× | **0.55×** | **0.82×** |
-| `unique-strings` | 2.06× | 1.54× | 1.00× | 1.00× |
-| `numbers` | 1.16× | 1.10× | **0.68×** | **0.87×** |
-| `floats` (synthetic GeoJSON) | 1.09× | 1.98× | **0.64×** | 1.33× |
-| `canada` | 1.12× | 1.32× | **0.67×** | 1.10× |
-| `dense` | 3.65× | 3.42× | 1.27× | 1.34× |
-| `sparse` | 8.29× | 2.39× | 2.70× | 1.45× |
-| `skip` | — | 1.68× | — | 1.38× |
-| `citm` | 3.57× | 3.01× | 1.14× | 1.26× |
+| `twitter` (reference) | 3.76× | 2.13× | 3.23× (0.96×) | 1.27× |
+| `small` (reference) | 3.56× | 3.30× | 3.36× (1.12×) | 1.61× |
+| `twitter-compact` | 3.76× | 2.30× | 3.22× (0.95×) | 1.30× |
+| `page-3k` / `page-12k` / `page-100k` | 2.28× / 2.34× / 2.31× | 2.28× / 2.22× / 2.21× | 2.39× / 2.44× / 2.41× (1.39× / 1.38× / 1.34×) | 1.57× / 1.35× / 1.32× |
+| `array-items` (`[]Item`) | 2.10× (0.84×) | 2.11× (1.22×) | 2.21× (1.12×) | 1.32× |
+| `array-pages` (`[]Page`) | 2.31× (1.00×) | 2.16× (1.24×) | 2.42× (1.33×) | 1.34× |
+| `map-items` (`map[string]Item`) | 1.87× (0.83×) | 1.84× (1.17×) | 1.90× (1.11×) | 1.26× |
+| `generic` (`any`) | 1.67× | 1.44× | 2.14× (1.24×) | 2.24× |
+| `text-ascii` | 2.23× | 1.79× | 1.41× (0.93×) | 0.94× |
+| `text-cjk` (as `twitter`) | 1.71× | 1.93× | 1.25× (0.43×) | 1.05× |
+| `text-hangul` | 1.48× | 1.76× | 1.09× (0.44×) | 1.02× |
+| `text-latin` | 1.32× (0.77×) | 1.47× (0.96×) | 1.08× (0.46×) | 1.00× |
+| `text-cyrillic` | 2.16× (0.81×) | 2.19× (0.90×) | 1.69× (0.45×) | 1.03× |
+| `text-emoji` | 1.17× (0.94×) | 1.10× | 0.99× (0.46×) | 0.98× |
+| `text-escaped` | 1.46× | 1.25× | 1.09× (0.55×) | **0.82×** |
+| `unique-strings` | 2.08× | 1.53× | 1.51× (1.00×) | 1.04× |
+| `numbers` | 1.14× | 1.09× | 1.15× (0.68×) | **0.87×** |
+| `floats` (synthetic GeoJSON) | 1.07× | 1.96× | 1.07× (0.64×) | 1.32× |
+| `canada` | 1.01× (1.12×) | 1.31× | 1.02× (0.67×) | 1.07× |
+| `dense` | 4.33× (3.65×) | 3.28× | 4.31× (1.27×) | 1.39× |
+| `sparse` | 8.51× | 2.39× | 7.21× (2.70×) | 1.47× |
+| `skip` | — | 1.53× (1.68×) | — | 1.37× |
+| `citm` | 3.81× | 3.01× | 3.76× (1.14×) | 1.22× |
 
-What holds: the ratios do not depend on document size (`page-3k` to
-`page-100k` are flat), on whitespace (`twitter-compact`, `page-12k-indented`),
-on strings repeating (`unique-strings`), on member density in either
-direction (`dense`, `sparse`), on unknown members (`skip`), or on the real
-corpora whose bytes are structure and integers (`citm`). The README's numbers
-are not a property of `twitter.json`.
+(`text-emoji` and `text-latin` in the v2 encode column, and `small`, were
+measured again after the last of the fixes at `-count 4`: 1.17×, 1.32× and
+272 ns; the rest of the column is the `-count 6` run.)
 
-What does not hold, in order of how much of real traffic it touches:
+What held from the start: the ratios do not depend on document size
+(`page-3k` to `page-100k` are flat), on whitespace (`twitter-compact`,
+`page-12k-indented`), on strings repeating (`unique-strings`), on member
+density in either direction (`dense`, `sparse`), on unknown members (`skip`),
+or on the real corpus whose bytes are structure and integers (`citm`). The
+README's numbers were never a property of `twitter.json`.
 
-- **A generated type below the top level loses the encode win on json/v2.**
-  `[]Item` and `map[string]Item` encode 0.84× and 0.83× against reflection;
-  the same items behind a top-level object (`page-12k`) are 2.18×. The direct
-  path covers one top-level value; every element of a slice or map goes
-  through `MarshalJSONTo` on the public API, where `enc.WriteValue`
-  re-validates and reformats what the generated `odjsonAppend` produced. That
-  is the public API ceiling measured above, now seen from the other side: the
-  reformat costs more than reflection saves. The decode side still wins there
-  (1.17–1.24×), because a whole-value read plus the byte parser is cheaper than
-  reflection even after the decoder's own validation pass. `encoding/json` v1
-  never has the direct path and pays the reformat at the top level too, so
-  its drop from `page-12k` to `[]Item` is small (1.38× to 1.12×) where json/v2's
-  is the whole win (2.18× to 0.84×).
-- **Non-ASCII text outside the CJK three byte range is slower than
-  reflection.** The fused UTF-8 scan in `odjsonrt/utf8.go` settles only three
-  byte sequences with leads E1–EC and EE–EF on its own and hands everything
-  else to `utf8.DecodeRune`, one rune per call. Latin-1 and Cyrillic (two byte
-  sequences) encode 0.77× and 0.81× and decode 0.96× and 0.90×; emoji (four
-  byte) is level both ways (0.94× and 1.09×). CJK, the fixture's script, encodes 1.66× and Hangul
-  (leads EA–ED, of which ED is excluded) 1.39×. ASCII is 2.11×, so the loss
-  is specific to the sequences the fast path declines, not to non-ASCII as
-  such.
-- **Full precision floats are close to a draw on json/v2 and a loss on v1.**
-  `appendShortFloat` declines anything it cannot prove short and falls back to
-  `strconv`, which is what reflection calls too, so `canada` and the synthetic
-  `floats` encode at 1.09–1.12× and `numbers` at 1.16×. Under `encoding/json`
-  the reformat pass then makes them 0.64–0.68×.
-- **`encoding/json` v1 encode is a loss on any string-heavy document.** Every
-  `text-*` row is 0.43–0.55× there, CJK included, where the same document is a
-  win on json/v2. The reason is the same public API reformat: on `twitter`,
-  where structure, whitespace and skipped members dilute it, it costs 4%; on
-  a document that is all strings it costs 2×. The README's "1.2–1.6× on three of four"
-  for v1 is a property of the two fixtures' mix, not of v1 in general; its
-  decode rows hold (0.95–1.10× on text, 1.24–1.61× elsewhere).
+What did not hold, and what was done about it:
 
-The first item is what to weigh before the next round of tuning: it is the
-most common API shape (a list endpoint decoded into `[]T`), the loss is on the
-default library, and it follows from the direct path's scope rather than from
-anything in the generated code. The second is a bounded change to one
-function. The third is the price of not running Ryu and is unlikely to move.
+- **A generated type below the top level lost the encode win on json/v2.**
+  `[]Item` and `map[string]Item` encoded at 0.84× and 0.83× against
+  reflection while the same items behind a top-level object were 2.18×,
+  because the direct path covered one top-level value and every element of
+  a slice or map went through `MarshalJSONTo` on the public API, whose
+  `WriteValue` re-validates and reformats what `odjsonAppend` produced — the
+  public API ceiling measured above, seen from the other side. The direct
+  path now takes a value at any depth (see "The direct path"): `[]Item` reads
+  2.10× / 2.11×, `map[string]Item` 1.87× / 1.84×, and `[]Page` 2.31× / 2.16×.
+  The map rows sit below the slice rows because json/v2's reflection writes
+  a map's members through its own fast path and the map keys are still its
+  work either way.
+- **`encoding/json` encode was a loss on any string heavy document.** Every
+  `text-*` row was 0.43–0.55× and `twitter` 0.96×: `encoding/json`'s
+  `Marshal` calls the same `MarshalJSONTo`, but with its own flag word, which
+  the direct path declined, so every v1 encode paid the reformat. The path
+  now recognises that word and writes `ModeV2HTML`, which is what the
+  reformat made of the public path's bytes. `twitter` reads 3.23×, `small`
+  3.36×, the `text-*` rows 0.99–1.69×, and every v1 encode row is now at or
+  above 1×. v1 *decode* stays on the public path — its flags allow invalid
+  UTF-8 and duplicate names, which the strict parsers refuse — so those rows
+  are unchanged, `text-escaped` (0.82×) and `numbers` (0.87×) among them.
+- **Non-ASCII text outside the CJK three byte range was slower than
+  reflection.** The fused UTF-8 scan in `odjsonrt/utf8.go` settled only
+  three byte sequences with leads E1–EC and EE–EF on its own and handed
+  everything else to `utf8.DecodeRune` one rune per call: Latin-1 and
+  Cyrillic encoded at 0.77× and 0.81×, emoji at 0.94×. It now settles every
+  sequence length, four two byte or two four byte sequences per word, a
+  word of accented Latin text is taken whole (`swarLatin`), and a lone two
+  or four byte sequence among ASCII is settled in place. Cyrillic reads
+  2.16× / 2.19×, Latin 1.32× / 1.47×, emoji 1.17× / 1.10×; Latin stays below
+  ASCII (2.23×) because an accent every few bytes still ends each word scan
+  early.
+- **Full precision floats are level.** `canada` and the synthetic `floats`
+  encode at 1.01–1.07× on both libraries, `numbers` at 1.14×: the short
+  decimal path declines them and both sides then run `strconv`'s shortest
+  formatting, which is the whole cost. That is the price of not running Ryu
+  and it will not move; what did move is the short path itself, which now
+  proves a candidate by one division instead of a two-word argument and
+  accepts every short decimal rather than 93% of them (see `ftoa.go`), which
+  is where `small`'s encode went from 290 to 272 ns.
 
 sonic and go-json behave as the floor predicts on every shape: the generated
-codec is slower on all 25 encode rows on sonic (0.13–0.67×) and on 24 of 25
-on go-json (0.24–0.82×, with `generic` level at 1.06×), and on most decode
-rows; the exceptions are the ones the README
-already names, `small` (1.16× / 1.03×), and two shapes of the same kind,
-`dense` (1.33× / 1.06×) and `sparse` (1.17× on sonic), where the document is
-mostly member names and the skip-and-validate pass they make before calling
-`UnmarshalJSON` is cheap relative to their own decode.
+codec is slower on all 25 encode rows on sonic (0.13–0.63×) and on 24 of 25
+on go-json (0.23–0.81×, with `generic` level at 1.07×), and on most decode
+rows; the exceptions are the ones the README already names, `small`
+(1.13× / 1.07×), and shapes of the same kind, `dense` (1.32× / 1.01×) and
+`sparse` (1.16× on sonic), where the document is mostly member names and the
+skip-and-validate pass they make before calling `UnmarshalJSON` is cheap
+relative to their own decode.
 
 A parallel audit the same day measured the same top-level-only scope from the
 other direction (`Marshal([]T)` of twitter 1.23× slower, `MarshalWrite` 1.62×
-slower, decode never regressing), so the two runs agree.
+slower, decode never regressing), so the two runs agreed on the diagnosis;
+`MarshalWrite` and every other `io.Writer` / `io.Reader` entry point remain on
+the public path by design.
 
 ## Which semantics a generated method follows
 
@@ -596,18 +621,20 @@ which is fine for the absolute figures but not for the small differences
 between a generated row and its baseline: those are of the same order as the
 drift between two runs, and their sign moves with `GOMAXPROCS`. For that
 comparison use `bench/ab`, which measures both sides in a single process. Its
-verdict on this run: odjson wins every marshal and unmarshal row on
-`encoding/json/v2` (3.42× / 3.42× / 2.02× / 3.09×), every `encoding/json` row
-except the `twitter` marshal, and the `small` unmarshal rows on sonic (1.15×)
-and go-json (1.12×); it loses the `twitter` rows on both of those and their
-`small` marshals. Against sonic's own path it is 1.03× slower on the `twitter`
-marshal, 1.04× slower on the `small` marshal, 1.02× faster on the `twitter`
-unmarshal and 1.62× faster on the `small` unmarshal.
+verdict on this run (`-count 5`, after the changes described under "What the
+other shapes say"): odjson wins every marshal and unmarshal row on
+`encoding/json/v2` (3.52× / 3.61× / 2.05× / 3.24×) and on `encoding/json`
+(3.11× / 3.37× / 1.20× / 1.57×), and the `small` unmarshal rows on sonic
+(1.16×) and go-json (1.06×); it loses the `twitter` rows on both of those and
+their `small` marshals. Against sonic's own path it is 1.02× slower on the
+`twitter` marshal, level on the `small` marshal (286 vs 285 ns), 1.02× slower
+on the `twitter` unmarshal and 1.67× faster on the `small` unmarshal.
 
-With the direct path compiled out (`-tags odjson_safe`), the same process puts
-`encoding/json/v2` at **0.86× / 0.97× / 1.02× / 1.45×** — the decode side
-still wins, the encode side does not. That is what a Go minor odjson has not
-verified yet costs, until a release widens the gate.
+With the direct path compiled out (`-tags odjson_safe`), the same process put
+`encoding/json/v2` at **0.86× / 0.97× / 1.02× / 1.45×** in the run before the
+path was widened — the decode side still wins, the encode side does not. That
+is what a Go minor odjson has not verified yet costs, until a release widens
+the gate.
 
 Compare your own with
 [`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) rather than

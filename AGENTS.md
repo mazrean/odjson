@@ -25,12 +25,13 @@ using the standard library, and take it off whenever you like" is the product,
 and a second entry point contradicts it.
 
 **Positioning** (measured, see `bench/`): the target is `encoding/json/v2`
-(2.1-3.6x faster on all four measurements) and `encoding/json` (1.2-1.6x on
-three of four; the twitter encode is 4% behind because v1's coder flags make
-the direct path decline). `github.com/bytedance/sonic` and
+(2.1-3.6x faster on all four measurements) and `encoding/json` (3.1-3.4x on
+the two encodes, since the direct path learned v1's coder flags, and 1.2-1.6x
+on the two decodes, which stay on the public API path because v1's flags
+allow what the strict parsers refuse). `github.com/bytedance/sonic` and
 `github.com/goccy/go-json` honour the v1 interfaces too and the generated code
 is correct under them, but odjson does **not** make them faster: it wins only
-their small unmarshal rows (sonic's by 1.15x and go-json's by 1.12x in
+their small unmarshal rows (sonic's by 1.16x and go-json's by 1.06x in
 `bench/ab`), and `bench/floor` proves why the rest cannot be won rather than
 asserting it: with a
 `MarshalJSON` that costs nothing, sonic still spends 106us on the twitter
@@ -47,7 +48,7 @@ all four (the narrowest 1.32x, shared by the small encode and the large
 decode) and is level with sonic on three of the four (within 2% in the quoted
 run and 5% across runs, in either direction; `bench/ab` in one process reads
 1.03x slower / 1.04x slower / 1.02x faster) and 1.7x ahead on the small decode
-(1.62x in `bench/ab`). Re-measure before restating any of it.
+(1.67x in `bench/ab`). Re-measure before restating any of it.
 
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,
