@@ -178,7 +178,11 @@ func TestV1MarshalMatchesEncoder(t *testing.T) {
 		}
 	}
 	// Invalid UTF-8 cannot come in through a decode; set it directly.
-	for _, s := range []string{"a\xffb", "\xe2\x80", "\u2028\xff\u2029", "<\xff>", "日本\xed\xa0\x80語"} {
+	// The last two put the bad byte at the end of a long run, which is what
+	// encoding/json lets through most often, once with a line separator in
+	// the run that still has to be escaped.
+	long := strings.Repeat("日本語の文字列", 1000)
+	for _, s := range []string{"a\xffb", "\xe2\x80", "\u2028\xff\u2029", "<\xff>", "日本\xed\xa0\x80語", long + "\xff", long + "\u2028" + long + "\xe2\x80"} {
 		z := gen.Zoo{String: s, Strings: []string{s}, StrMap: map[string]string{s: s}, Any: s}
 		for _, val := range []any{z, []gen.Zoo{z}, nest[gen.Zoo]{V: z}} {
 			direct, err := jsonv1.Marshal(val)

@@ -352,16 +352,17 @@ func appendQuotedV2HTML(dst []byte, src []byte) []byte {
 				// Not UTF-8 somewhere in this run. The reformat decodes
 				// rune by rune, so a line separator before the bad byte
 				// is still escaped, and the bad byte itself stays in the
-				// pending copy.
-				r, size := utf8.DecodeRune(src[i:])
-				if r == 0x2028 || r == 0x2029 {
-					dst = append(dst, src[start:i]...)
-					dst = append(dst, '\\', 'u', '2', '0', '2', hexDigits[r&0xF])
+				// pending copy. The rest of the run is settled here, not
+				// by scanning it again from the next rune on.
+				for i < len(src) && src[i] >= utf8.RuneSelf {
+					r, size := utf8.DecodeRune(src[i:])
+					if r == 0x2028 || r == 0x2029 {
+						dst = append(dst, src[start:i]...)
+						dst = append(dst, '\\', 'u', '2', '0', '2', hexDigits[r&0xF])
+						start = i + size
+					}
 					i += size
-					start = i
-					continue
 				}
-				i += size
 				continue
 			}
 			for k := i; k+2 < j; {
