@@ -114,6 +114,23 @@ func TestAppendShortFloatCoverage(t *testing.T) {
 			t.Errorf("%v accepted as %q", v, out)
 		}
 	}
+	// Random short decimals of up to sixteen significant digits all take
+	// the path: the division proves every one of them. (The earlier guess,
+	// which needed the product to land exactly on an integer, missed 7%.)
+	r := rand.New(rand.NewPCG(7, 8))
+	declined := 0
+	for range 1000000 {
+		f := 1 + r.IntN(maxShortFrac)
+		n := 1 + r.Int64N(int64(pow10u[16-f]))
+		if v := float64(n) / pow10[f]; v*pow10[f] < 1e15 {
+			if _, ok := appendShortFloat(nil, v); !ok {
+				declined++
+			}
+		}
+	}
+	if declined > 0 {
+		t.Errorf("%d of 1000000 short decimals declined", declined)
+	}
 }
 
 func BenchmarkAppendFloatShort(b *testing.B) {
