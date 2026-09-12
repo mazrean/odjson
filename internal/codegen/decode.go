@@ -186,7 +186,7 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 								g.emit(b, ret(kp, callRT("ErrDuplicateName", data, kp, key)))
 							})
 						})
-						g.emit(b, assign(unknown, call(id("append"), unknown, key)))
+						g.emit(b, assign(unknown, callRT("AddUnknownName", cacheExpr(c), unknown, key)))
 					})
 					g.emit(b, c.skipSpace())
 					g.emit(b, assignN(token.ASSIGN, []ast.Expr{p, errV}, callRT("SkipValueV2", data, p, strict)))

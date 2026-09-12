@@ -7,23 +7,35 @@ func TestUnknownNames(t *testing.T) {
 	if names != nil || mark != 0 {
 		t.Fatalf("nil cache: got %v, %d", names, mark)
 	}
-	EndUnknownNames(nil, append(names, []byte("a")), mark)
+	names = AddUnknownName(nil, names, []byte("a"))
+	if len(names) != 1 {
+		t.Fatalf("nil cache append: got %d names", len(names))
+	}
+	EndUnknownNames(nil, names, mark)
 
 	c := new(StringCache)
-	outer, om := UnknownNames(c)
-	outer = append(outer, []byte("x"), []byte("y"))
-	// A nested object starts after the outer one's names.
-	inner, im := UnknownNames(c)
-	if im != 0 {
-		// The outer object has not handed its list back yet, so the
-		// nested one sees an empty cache list: that is the contract, and
-		// the outer names stay in the outer decoder's own slice.
-		t.Fatalf("nested mark: got %d, want 0", im)
+	// Warm the scratch, as a pooled cache would be: room for names in a
+	// backing array that a later decode's objects will share.
+	warm, wm := UnknownNames(c)
+	for _, n := range []string{"a", "b", "c", "d"} {
+		warm = AddUnknownName(c, warm, []byte(n))
 	}
-	inner = append(inner, []byte("z"))
+	EndUnknownNames(c, warm, wm)
+
+	outer, om := UnknownNames(c)
+	outer = AddUnknownName(c, outer, []byte("x"))
+	outer = AddUnknownName(c, outer, []byte("y"))
+	// A nested object's names start after the outer one's, which the
+	// outer published as it added them; without that the nested object
+	// would write over "x" in the shared backing array.
+	inner, im := UnknownNames(c)
+	if im != 2 {
+		t.Fatalf("nested mark: got %d, want 2", im)
+	}
+	inner = AddUnknownName(c, inner, []byte("z"))
 	EndUnknownNames(c, inner, im)
-	if len(*c.names) != 0 {
-		t.Fatalf("after inner: %d names kept", len(*c.names))
+	if len(*c.names) != 2 || string(outer[0]) != "x" || string(outer[1]) != "y" {
+		t.Fatalf("after inner: list %q, outer %q", *c.names, outer)
 	}
 	EndUnknownNames(c, outer, om)
 	if len(*c.names) != 0 || cap(*c.names) == 0 {

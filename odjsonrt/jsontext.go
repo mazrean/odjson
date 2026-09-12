@@ -124,6 +124,19 @@ func UnknownNames(c *StringCache) (names [][]byte, mark int) {
 	return *c.names, len(*c.names)
 }
 
+// AddUnknownName appends name to the list an object took from
+// [UnknownNames] and publishes the result through c, so that an object
+// nested in a later member starts its own names after this one, in the same
+// backing array, rather than over it. Only a member the struct does not
+// know reaches this, so the store is off the path every member takes.
+func AddUnknownName(c *StringCache, names [][]byte, name []byte) [][]byte {
+	names = append(names, name)
+	if c != nil {
+		*c.names = names
+	}
+	return names
+}
+
 // EndUnknownNames gives the list back once the object is closed, with this
 // object's names dropped. Only a decoder that returns normally calls it; a
 // failed decode leaves its names for [PutStringCache] to clear.

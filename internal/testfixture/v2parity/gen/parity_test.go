@@ -315,6 +315,34 @@ func TestDuplicateNamesRejectedLikeJSONV2(t *testing.T) {
 	}
 }
 
+// TestUnknownNamesSurviveNestedObjects guards the strict decoders' shared
+// list of unknown member names (odjsonrt.UnknownNames): an object's names
+// must still be there for its duplicate check after a nested struct member
+// has added and dropped names of its own in the same list. Each document is
+// decoded several times, because the list lives in the pooled string cache
+// and only a warm one, with spare capacity from an earlier decode, hands the
+// nested object the same backing array.
+func TestUnknownNamesSurviveNestedObjects(t *testing.T) {
+	for _, doc := range []string{
+		`{"u":1,"nested":{"q":2},"u":1}`,
+		`{"u":1,"nested":{"q":2,"q":3}}`,
+		`{"u":1,"nested":{"z":2},"v":1}`,
+		`{"u":1,"nested":{"q":2},"v":1,"nested_ptr":{"r":3},"u":2}`,
+		`{"u":1,"nesteds":[{"q":2},{"q":3}],"u":1}`,
+		`{"u":1,"nested":{"q":2,"q":2},"u":1}`,
+	} {
+		for i := range 4 {
+			var g gen.Zoo
+			var p plain.Zoo
+			errGot := jsonv2.Unmarshal([]byte(doc), &g)
+			errWant := jsonv2.Unmarshal([]byte(doc), &p)
+			if (errGot != nil) != (errWant != nil) {
+				t.Errorf("%s, decode %d: json/v2=%v odjson=%v", doc, i+1, errWant, errGot)
+			}
+		}
+	}
+}
+
 // TestMemberlessMatchesJSONV2 covers the two struct shapes with nothing to
 // match: every member a document carries is unknown, so the decoder never
 // looks at a name. Documents on both sides of odjsonrt.WholeValue's threshold
