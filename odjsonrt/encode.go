@@ -236,10 +236,11 @@ func AppendFloat(dst []byte, v float64, bits int) ([]byte, error) {
 		}
 	}
 	if format == 'f' && bits == 64 {
-		// A short decimal is printed without Ryu; see ftoa.go.
-		if out, ok := appendShortFloat(dst, v); ok {
+		// Fixed notation is written here; see ftoa.go.
+		if out, ok := appendShortFloat(dst, v < 0, abs); ok {
 			return out, nil
 		}
+		return appendFloat64Fixed(dst, v), nil
 	}
 	dst = strconv.AppendFloat(dst, v, format, -1, bits)
 	if format == 'e' {
