@@ -773,6 +773,63 @@ allocation the target type dictates, the string scan, and a whitespace skip
 that is already a handful of instructions per run. Each remaining candidate
 is under the layout floor, which is why this round stopped here.
 
+### The third decode round
+
+The round after that started from the same profile and found the lever
+the previous two had walked past: **bounds tests**. Every word loop in the
+scanners read its word as `binary.LittleEndian.Uint64(data[i:])`, which
+is two tests per word, the slice against the capacity and then, inside
+`encoding/binary`, the sub-slice's length against eight, though the loop
+bound had settled both; and every `p < len(data) && data[p]` kept a test
+on the index, because the compiler cannot see that `p` is not negative.
+The generated decoders had the same shape in every position test. Neither
+is visible in a profile, which charges them to the line that carries
+them. Each change was measured on its own against the one before it with
+a micro-benchmark over the twitter document (`odjsonrt/scan_bench_test.go`:
+the strict skip of the 73 `retweeted_status` values, the whitespace runs,
+`scanStringStrict` over every string, `skipNonASCII` over every run), and
+the stack as a whole with the pooled procedure below. What stayed, in
+the order it was built:
+
+| change | measured on its own |
+| --- | --- |
+| **long member names compared in sixteen byte pieces** (`internal/codegen`): the compiler expands a compare against a constant into word loads only up to sixteen bytes, and `User` has twenty names past that, each a call to `memequal` | the `User` decoder's `memequal` calls 34 → 16 |
+| `true`, `false` and `null` as **one word compare** (`isTrue`, `isFalse`, `isNull`) instead of `hasLiteral`'s byte loop, which read 1.8% flat on twitter | — |
+| the **colon after a parsed name settled inline** (`AfterName`) in `strictKey`, `ParseKey`, `ParseKeyStrict` and `scanKey`, where the one space after it reached `skipSpaceSlow` on every member | strict skip 124.4 → 122.9 µs |
+| the any decoder's **duplicate check folded into the map insert**: whether the map grew says whether the name was new, so a member costs one map operation instead of a lookup at the name and an insert at the value; the frame keeps the name's offset for the error | — |
+| **word loads through a sub-slice of exact extent** (`load64`, `load32`): one bounds test per word instead of two | strict skip 122.9 → 114.1 µs, whitespace runs 73.7 → 62.6 µs, `scanStringStrict` 121.3 → 110.3 µs |
+| **indices tested against the length unsigned** (`uint(p) < uint(len(data))`) throughout the runtime, and the same emitted by the generator: one compare settles the test and the index | runtime bounds tests 120 → 80, `bench/gen`'s generated file 1106 → 514; whitespace runs 62.6 → 58.7 µs, `scanStringStrict` 110.3 → 108.3 |
+| a **short plain string settled on its first word** (`shortString`): when the lowest lane the stop mask reports holds the closing quote, nothing the scan cares about stood before it, so a body of up to seven plain bytes costs no call. It takes the word rather than loading it, because with the load inside it costs 100 against the inliner's 80. A **member name of up to fifteen bytes settled on two words** (`shortName`) the same way: 26% of twitter's names end in the first word and 43% in the second | strict skip 113.2 → 108.0 µs, then 107.3 → 104.0 |
+| `skipSpaceSlow` takes the **indent path first**, the one-space test at its top having lost every caller to `AfterName`, and tests the byte the run ended on with one compare before the table loop | whitespace runs (those that still reach it) 41.9 → 40.4 µs |
+| a **run of CJK text taken word by word** in `skipNonASCII`, without going back through the other scripts' patterns every six bytes | non-ASCII runs 19.1 → 16.5 µs |
+| `EndUnknownNames` **skipped for an object that added no unknown name**, which is most of them | — |
+
+What did not:
+
+| candidate | result |
+| --- | --- |
+| **selecting the byte a whitespace run ended on from the words already loaded**, branch-free, so the test that it starts a token does not wait on a load through the index and a table lookup | whitespace runs 73.7 → 82.4 µs (+11%): the variable shift and the select sit on the dependent chain, where the loads were overlapped by the core |
+| **reading the scan words in place through `unsafe`**, which removes the one remaining test | the same as the sub-slice on every micro-benchmark; not kept, so the loads stay portable |
+| `shortString` on the **string values the strict skip meets** | strict skip +1.4%: 45% of twitter's string values are longer than fifteen bytes, and those pay for the test |
+| `skipStringStrict`'s body spelled into `SkipValueStrict`, one call less per skipped string | strict skip level |
+
+The stack against `main`, pooled over four `-randlayout` builds a side and
+five interleaved runs (n=20), in two separate batches: `json/v2` twitter
+decode **490 → 447 µs (-8.8%)** after the first seven changes and
+**491 → 432 µs (-12.0%)** with all of them, `json/v2` small decode
+**634 → 608 ns (-4.2%)** and **631 → 602 ns (-4.7%)**, all at p=0.000.
+The `encoding/json` decodes read -5.0% / -4.9% in the first batch and
+level / -1.6% in the second, against a floor, from the marshal rows the
+stack cannot touch, of +2.6% and -2.3%: the v1 rows sit inside it, the
+json/v2 rows well above. In one process, the json/v2 twitter decode went
+474 → 418 µs and the small one 594 → 539 ns.
+
+What is left is what was left before, minus the tests: the strict skip
+is 0.39 ns per byte skipped, the whitespace skip 2.5 ns per indent run,
+and of the 2,468 allocations a twitter decode makes, 900 are the string
+boxes, maps, slices and slice headers the `any` fields dictate, which
+only an interface built by hand could remove.
+
 ## Measurement notes
 
 All figures on this page were re-measured together on an AMD Ryzen 9 7950X,
