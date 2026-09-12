@@ -821,7 +821,11 @@ decode **490 → 447 µs (-8.8%)** after the first seven changes and
 The `encoding/json` decodes read -5.0% / -4.9% in the first batch and
 level / -1.6% in the second, against a floor, from the marshal rows the
 stack cannot touch, of +2.6% and -2.3%: the v1 rows sit inside it, the
-json/v2 rows well above. On single builds, unpooled, the json/v2 twitter decode
+json/v2 rows well above. The v1 rows are two thirds `encoding/json`'s own
+validation pass, which hides what happens behind it: the generated
+`UnmarshalJSON` called directly, base against stack over two layouts and
+five interleaved runs, reads twitter **434 → 380 µs (-12.5%)** and small
+**420 → 401 ns (-4.6%)**, both at p=0.000. On single builds, unpooled, the json/v2 twitter decode
 went 474 → 418 µs and the small one 594 → 539 ns.
 
 What is left is what was left before, minus the tests: the strict skip
