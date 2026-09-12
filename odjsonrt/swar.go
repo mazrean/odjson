@@ -33,13 +33,18 @@ func swarHasControl(w uint64) uint64 { return (w - swarLo*0x20) &^ w & swarHi }
 // swarStringStop reports which lanes of w end a JSON string literal's run of
 // ordinary characters: a quote, a backslash or a control byte.
 //
-// The three tests are fused rather than composed from the helpers above: each
-// helper masks with swarHi on its own, and folding that into a single mask at
-// the end removes three ANDs from the hottest loop in the decoder.
+// The control and quote tests share one subtraction: XORing a lane with 0x02
+// maps '"' (0x22) onto 0x20 and leaves 0x00-0x1F inside 0x00-0x1F, so a lane
+// is below 0x21 afterwards exactly when it held a control byte or a quote;
+// 0x20 and 0x21 land on 0x22 and 0x23 and stay clear. The backslash test is
+// the usual equality, and the two borrow masks (&^w) and the lane mask are
+// applied once to the OR of both, since every constant involved is below
+// 0x80. That is seven operations where the composed form costs eleven, in
+// the hottest loop of the decoder and the encoder alike.
 func swarStringStop(w uint64) uint64 {
-	q := w ^ (swarLo * '"')
-	e := w ^ (swarLo * '\\')
-	return ((w-swarLo*0x20)&^w | (q-swarLo)&^q | (e-swarLo)&^e) & swarHi
+	cq := (w ^ (swarLo * 0x02)) - swarLo*0x21
+	e := (w ^ (swarLo * '\\')) - swarLo
+	return (cq | e) &^ w & swarHi
 }
 
 // swarLatin reports whether every non-ASCII byte of w belongs to a complete
