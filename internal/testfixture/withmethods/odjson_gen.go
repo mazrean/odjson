@@ -490,6 +490,9 @@ func (v *Person) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	return dst, nil
 }
 
+// odjsonCapPersonTags remembers how long v.Tags has been, to allocate it once.
+var odjsonCapPersonTags odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -624,7 +627,7 @@ func (v *Person) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 					p++
 				} else {
 					if cap(s34) == 0 {
-						s34 = make([]string, 0, 4)
+						s34 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapPersonTags))
 					}
 					for {
 						var e35 string
@@ -654,6 +657,7 @@ func (v *Person) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapPersonTags.Record(len(s34))
 				}
 				if s34 == nil {
 					s34 = []string{}
@@ -846,7 +850,7 @@ func (v *Person) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 					p++
 				} else {
 					if cap(s55) == 0 {
-						s55 = make([]string, 0, 4)
+						s55 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapPersonTags))
 					}
 					for {
 						var e56 string
@@ -877,6 +881,7 @@ func (v *Person) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapPersonTags.Record(len(s55))
 				}
 				if s55 == nil {
 					s55 = []string{}
@@ -1067,7 +1072,7 @@ func (v *Person) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 					vp72++
 				} else {
 					if cap(s75) == 0 {
-						s75 = make([]string, 0, 4)
+						s75 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapPersonTags))
 					}
 					for {
 						var e76 string
@@ -1098,6 +1103,7 @@ func (v *Person) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 						}
 						return odjsonrt.ErrSyntax(val71, vp72, "after array element")
 					}
+					odjsonCapPersonTags.Record(len(s75))
 				}
 				if s75 == nil {
 					s75 = []string{}

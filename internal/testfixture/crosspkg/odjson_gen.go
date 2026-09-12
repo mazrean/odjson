@@ -103,6 +103,12 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	return dst, nil
 }
 
+// odjsonCapHolderList remembers how long v.List has been, to allocate it once.
+var odjsonCapHolderList odjsonrt.CapHint
+
+// odjsonCapHolderDeep remembers how long v.Deep has been, to allocate it once.
+var odjsonCapHolderDeep odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -219,7 +225,7 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 					p++
 				} else {
 					if cap(s11) == 0 {
-						s11 = make([]other.Thing, 0, 4)
+						s11 = make([]other.Thing, 0, odjsonrt.CapFor[other.Thing](&odjsonCapHolderList))
 					}
 					for {
 						var e12 other.Thing
@@ -242,6 +248,7 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapHolderList.Record(len(s11))
 				}
 				if s11 == nil {
 					s11 = []other.Thing{}
@@ -310,7 +317,7 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 					p++
 				} else {
 					if cap(s20) == 0 {
-						s20 = make([]*other.Wrapper, 0, 4)
+						s20 = make([]*other.Wrapper, 0, odjsonrt.CapFor[*other.Wrapper](&odjsonCapHolderDeep))
 					}
 					for {
 						var e21 *other.Wrapper
@@ -342,6 +349,7 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapHolderDeep.Record(len(s20))
 				}
 				if s20 == nil {
 					s20 = []*other.Wrapper{}
@@ -508,7 +516,7 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 					p++
 				} else {
 					if cap(s28) == 0 {
-						s28 = make([]other.Thing, 0, 4)
+						s28 = make([]other.Thing, 0, odjsonrt.CapFor[other.Thing](&odjsonCapHolderList))
 					}
 					for {
 						var e29 other.Thing
@@ -531,6 +539,7 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapHolderList.Record(len(s28))
 				}
 				if s28 == nil {
 					s28 = []other.Thing{}
@@ -623,7 +632,7 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 					p++
 				} else {
 					if cap(s39) == 0 {
-						s39 = make([]*other.Wrapper, 0, 4)
+						s39 = make([]*other.Wrapper, 0, odjsonrt.CapFor[*other.Wrapper](&odjsonCapHolderDeep))
 					}
 					for {
 						var e40 *other.Wrapper
@@ -655,6 +664,7 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapHolderDeep.Record(len(s39))
 				}
 				if s39 == nil {
 					s39 = []*other.Wrapper{}
@@ -794,7 +804,7 @@ func (v *Holder) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 				}
 				s43 := v.List[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s43) == 0 {
-					s43 = make([]other.Thing, 0, 4)
+					s43 = make([]other.Thing, 0, odjsonrt.CapFor[other.Thing](&odjsonCapHolderList))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e44 other.Thing
@@ -805,6 +815,9 @@ func (v *Holder) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s43) > 0 {
+					odjsonCapHolderList.Record(len(s43))
 				}
 				if s43 == nil {
 					s43 = []other.Thing{}
@@ -865,7 +878,7 @@ func (v *Holder) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 				}
 				s51 := v.Deep[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s51) == 0 {
-					s51 = make([]*other.Wrapper, 0, 4)
+					s51 = make([]*other.Wrapper, 0, odjsonrt.CapFor[*other.Wrapper](&odjsonCapHolderDeep))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e52 *other.Wrapper
@@ -886,6 +899,9 @@ func (v *Holder) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s51) > 0 {
+					odjsonCapHolderDeep.Record(len(s51))
 				}
 				if s51 == nil {
 					s51 = []*other.Wrapper{}
@@ -1369,6 +1385,9 @@ func odjsonOtherWrapperAppend(dst []byte, v *other.Wrapper, m odjsonrt.StringMod
 	return dst, nil
 }
 
+// odjsonCapodjsonOtherWrapperList remembers how long v.List has been, to allocate it once.
+var odjsonCapodjsonOtherWrapperList odjsonrt.CapHint
+
 // odjsonOtherWrapperParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -1462,7 +1481,7 @@ func odjsonOtherWrapperParse(data []byte, v *other.Wrapper, p int, sc *odjsonrt.
 					p++
 				} else {
 					if cap(s80) == 0 {
-						s80 = make([]other.Thing, 0, 4)
+						s80 = make([]other.Thing, 0, odjsonrt.CapFor[other.Thing](&odjsonCapodjsonOtherWrapperList))
 					}
 					for {
 						var e81 other.Thing
@@ -1485,6 +1504,7 @@ func odjsonOtherWrapperParse(data []byte, v *other.Wrapper, p int, sc *odjsonrt.
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapodjsonOtherWrapperList.Record(len(s80))
 				}
 				if s80 == nil {
 					s80 = []other.Thing{}
@@ -1624,7 +1644,7 @@ func odjsonOtherWrapperParseV2(data []byte, v *other.Wrapper, p int, sc *odjsonr
 					p++
 				} else {
 					if cap(s86) == 0 {
-						s86 = make([]other.Thing, 0, 4)
+						s86 = make([]other.Thing, 0, odjsonrt.CapFor[other.Thing](&odjsonCapodjsonOtherWrapperList))
 					}
 					for {
 						var e87 other.Thing
@@ -1647,6 +1667,7 @@ func odjsonOtherWrapperParseV2(data []byte, v *other.Wrapper, p int, sc *odjsonr
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapodjsonOtherWrapperList.Record(len(s86))
 				}
 				if s86 == nil {
 					s86 = []other.Thing{}
@@ -1770,7 +1791,7 @@ func odjsonOtherWrapperParseFrom(dec *jsontext.Decoder, v *other.Wrapper, sc *od
 				}
 				s88 := v.List[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s88) == 0 {
-					s88 = make([]other.Thing, 0, 4)
+					s88 = make([]other.Thing, 0, odjsonrt.CapFor[other.Thing](&odjsonCapodjsonOtherWrapperList))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e89 other.Thing
@@ -1781,6 +1802,9 @@ func odjsonOtherWrapperParseFrom(dec *jsontext.Decoder, v *other.Wrapper, sc *od
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s88) > 0 {
+					odjsonCapodjsonOtherWrapperList.Record(len(s88))
 				}
 				if s88 == nil {
 					s88 = []other.Thing{}

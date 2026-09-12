@@ -135,7 +135,9 @@ func (g *generator) decodeStructFrom(b *block, s *analyzer.StructInfo) {
 					if f.AsString {
 						g.leafFrom(b, f.Type, selector(f), true)
 					} else {
+						g.capHint = capHintName(s, f)
 						g.decodeFrom(b, f.Type, selector(f))
+						g.capHint = ""
 					}
 				})
 			}
@@ -326,10 +328,11 @@ func (g *generator) containerFrom(b *block, open byte, t *analyzer.Type, target 
 
 func (g *generator) sliceFrom(b *block, t *analyzer.Type, target ast.Expr) {
 	s, e := id(g.tmp("s")), id(g.tmp("e"))
+	hint := g.takeCapHint()
 	g.containerFrom(b, '[', t, target, func(b *block) {
 		g.emit(b, define(s, slice(target, nil, num(0))))
 		g.ifStmt(b, nil, and(bin(nextKind(), token.NEQ, chr(']')), bin(call(id("cap"), s), token.EQL, num(0))), func(b *block) {
-			g.emit(b, assign(s, call(id("make"), typ(t.Expr), num(0), num(4))))
+			g.emit(b, assign(s, call(id("make"), typ(t.Expr), num(0), capExpr(hint, t))))
 		})
 		g.forStmt(b, nil, bin(nextKind(), token.NEQ, chr(']')), nil, func(b *block) {
 			g.emit(b, varDecl(e.Name, typ(t.Elem.Expr)))
@@ -337,6 +340,11 @@ func (g *generator) sliceFrom(b *block, t *analyzer.Type, target ast.Expr) {
 			g.emit(b, assign(s, call(id("append"), s, e)))
 		})
 		g.readToken(b)
+		if hint != "" {
+			g.ifStmt(b, nil, bin(call(id("len"), s), token.GTR, num(0)), func(b *block) {
+				g.emit(b, expr(call(sel(id(hint), "Record"), call(id("len"), s))))
+			})
+		}
 		g.ifStmt(b, nil, bin(s, token.EQL, nilV), func(b *block) {
 			g.emit(b, assign(s, composite(typ(t.Expr))))
 		})

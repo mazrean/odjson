@@ -1069,6 +1069,9 @@ func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 	return dst, nil
 }
 
+// odjsonCapInnerL remembers how long v.L has been, to allocate it once.
+var odjsonCapInnerL odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -1214,7 +1217,7 @@ func (v *Inner) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 					p++
 				} else {
 					if cap(s33) == 0 {
-						s33 = make([]int, 0, 4)
+						s33 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapInnerL))
 					}
 					for {
 						var e34 int
@@ -1249,6 +1252,7 @@ func (v *Inner) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapInnerL.Record(len(s33))
 				}
 				if s33 == nil {
 					s33 = []int{}
@@ -1526,7 +1530,7 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					p++
 				} else {
 					if cap(s68) == 0 {
-						s68 = make([]int, 0, 4)
+						s68 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapInnerL))
 					}
 					for {
 						var e69 int
@@ -1562,6 +1566,7 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapInnerL.Record(len(s68))
 				}
 				if s68 == nil {
 					s68 = []int{}
@@ -1847,7 +1852,7 @@ func (v *Inner) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 					vp98++
 				} else {
 					if cap(s101) == 0 {
-						s101 = make([]int, 0, 4)
+						s101 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapInnerL))
 					}
 					for {
 						var e102 int
@@ -1883,6 +1888,7 @@ func (v *Inner) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 						}
 						return odjsonrt.ErrSyntax(val97, vp98, "after array element")
 					}
+					odjsonCapInnerL.Record(len(s101))
 				}
 				if s101 == nil {
 					s101 = []int{}

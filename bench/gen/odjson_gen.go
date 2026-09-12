@@ -137,6 +137,24 @@ func (v *Book) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	return dst, nil
 }
 
+// odjsonCapBookBookIds remembers how long v.BookIds has been, to allocate it once.
+var odjsonCapBookBookIds odjsonrt.CapHint
+
+// odjsonCapBookTitles remembers how long v.Titles has been, to allocate it once.
+var odjsonCapBookTitles odjsonrt.CapHint
+
+// odjsonCapBookPrices remembers how long v.Prices has been, to allocate it once.
+var odjsonCapBookPrices odjsonrt.CapHint
+
+// odjsonCapBookHots remembers how long v.Hots has been, to allocate it once.
+var odjsonCapBookHots odjsonrt.CapHint
+
+// odjsonCapBookAuthors remembers how long v.Authors has been, to allocate it once.
+var odjsonCapBookAuthors odjsonrt.CapHint
+
+// odjsonCapBookWeights remembers how long v.Weights has been, to allocate it once.
+var odjsonCapBookWeights odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -301,7 +319,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s15) == 0 {
-						s15 = make([]int, 0, 4)
+						s15 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookBookIds))
 					}
 					for {
 						var e16 int
@@ -336,6 +354,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookBookIds.Record(len(s15))
 				}
 				if s15 == nil {
 					s15 = []int{}
@@ -368,7 +387,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s28) == 0 {
-						s28 = make([]string, 0, 4)
+						s28 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapBookTitles))
 					}
 					for {
 						var e29 string
@@ -398,6 +417,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookTitles.Record(len(s28))
 				}
 				if s28 == nil {
 					s28 = []string{}
@@ -435,7 +455,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s41) == 0 {
-						s41 = make([]float64, 0, 4)
+						s41 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapBookPrices))
 					}
 					for {
 						var e42 float64
@@ -470,6 +490,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookPrices.Record(len(s41))
 				}
 				if s41 == nil {
 					s41 = []float64{}
@@ -510,7 +531,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s54) == 0 {
-						s54 = make([]bool, 0, 4)
+						s54 = make([]bool, 0, odjsonrt.CapFor[bool](&odjsonCapBookHots))
 					}
 					for {
 						var e55 bool
@@ -548,6 +569,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookHots.Record(len(s54))
 				}
 				if s54 == nil {
 					s54 = []bool{}
@@ -574,7 +596,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s61) == 0 {
-						s61 = make([]Author, 0, 4)
+						s61 = make([]Author, 0, odjsonrt.CapFor[Author](&odjsonCapBookAuthors))
 					}
 					for {
 						var e62 Author
@@ -597,6 +619,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookAuthors.Record(len(s61))
 				}
 				if s61 == nil {
 					s61 = []Author{}
@@ -618,7 +641,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s65) == 0 {
-						s65 = make([]int, 0, 4)
+						s65 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookWeights))
 					}
 					for {
 						var e66 int
@@ -653,6 +676,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookWeights.Record(len(s65))
 				}
 				if s65 == nil {
 					s65 = []int{}
@@ -860,7 +884,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s81) == 0 {
-						s81 = make([]int, 0, 4)
+						s81 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookBookIds))
 					}
 					for {
 						var e82 int
@@ -896,6 +920,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookBookIds.Record(len(s81))
 				}
 				if s81 == nil {
 					s81 = []int{}
@@ -937,7 +962,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s94) == 0 {
-						s94 = make([]string, 0, 4)
+						s94 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapBookTitles))
 					}
 					for {
 						var e95 string
@@ -968,6 +993,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookTitles.Record(len(s94))
 				}
 				if s94 == nil {
 					s94 = []string{}
@@ -1014,7 +1040,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s107) == 0 {
-						s107 = make([]float64, 0, 4)
+						s107 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapBookPrices))
 					}
 					for {
 						var e108 float64
@@ -1050,6 +1076,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookPrices.Record(len(s107))
 				}
 				if s107 == nil {
 					s107 = []float64{}
@@ -1099,7 +1126,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s120) == 0 {
-						s120 = make([]bool, 0, 4)
+						s120 = make([]bool, 0, odjsonrt.CapFor[bool](&odjsonCapBookHots))
 					}
 					for {
 						var e121 bool
@@ -1138,6 +1165,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookHots.Record(len(s120))
 				}
 				if s120 == nil {
 					s120 = []bool{}
@@ -1172,7 +1200,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s127) == 0 {
-						s127 = make([]Author, 0, 4)
+						s127 = make([]Author, 0, odjsonrt.CapFor[Author](&odjsonCapBookAuthors))
 					}
 					for {
 						var e128 Author
@@ -1195,6 +1223,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookAuthors.Record(len(s127))
 				}
 				if s127 == nil {
 					s127 = []Author{}
@@ -1220,7 +1249,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s131) == 0 {
-						s131 = make([]int, 0, 4)
+						s131 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookWeights))
 					}
 					for {
 						var e132 int
@@ -1256,6 +1285,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapBookWeights.Record(len(s131))
 				}
 				if s131 == nil {
 					s131 = []int{}
@@ -1417,7 +1447,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp142++
 				} else {
 					if cap(s145) == 0 {
-						s145 = make([]int, 0, 4)
+						s145 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookBookIds))
 					}
 					for {
 						var e146 int
@@ -1453,6 +1483,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						return odjsonrt.ErrSyntax(val141, vp142, "after array element")
 					}
+					odjsonCapBookBookIds.Record(len(s145))
 				}
 				if s145 == nil {
 					s145 = []int{}
@@ -1497,7 +1528,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp156++
 				} else {
 					if cap(s159) == 0 {
-						s159 = make([]string, 0, 4)
+						s159 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapBookTitles))
 					}
 					for {
 						var e160 string
@@ -1528,6 +1559,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						return odjsonrt.ErrSyntax(val155, vp156, "after array element")
 					}
+					odjsonCapBookTitles.Record(len(s159))
 				}
 				if s159 == nil {
 					s159 = []string{}
@@ -1572,7 +1604,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp167++
 				} else {
 					if cap(s170) == 0 {
-						s170 = make([]float64, 0, 4)
+						s170 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapBookPrices))
 					}
 					for {
 						var e171 float64
@@ -1608,6 +1640,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						return odjsonrt.ErrSyntax(val166, vp167, "after array element")
 					}
+					odjsonCapBookPrices.Record(len(s170))
 				}
 				if s170 == nil {
 					s170 = []float64{}
@@ -1652,7 +1685,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp181++
 				} else {
 					if cap(s184) == 0 {
-						s184 = make([]bool, 0, 4)
+						s184 = make([]bool, 0, odjsonrt.CapFor[bool](&odjsonCapBookHots))
 					}
 					for {
 						var e185 bool
@@ -1691,6 +1724,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						return odjsonrt.ErrSyntax(val180, vp181, "after array element")
 					}
+					odjsonCapBookHots.Record(len(s184))
 				}
 				if s184 == nil {
 					s184 = []bool{}
@@ -1715,7 +1749,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 				}
 				s189 := v.Authors[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s189) == 0 {
-					s189 = make([]Author, 0, 4)
+					s189 = make([]Author, 0, odjsonrt.CapFor[Author](&odjsonCapBookAuthors))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e190 Author
@@ -1726,6 +1760,9 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s189) > 0 {
+					odjsonCapBookAuthors.Record(len(s189))
 				}
 				if s189 == nil {
 					s189 = []Author{}
@@ -1755,7 +1792,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp192++
 				} else {
 					if cap(s195) == 0 {
-						s195 = make([]int, 0, 4)
+						s195 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookWeights))
 					}
 					for {
 						var e196 int
@@ -1791,6 +1828,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						return odjsonrt.ErrSyntax(val191, vp192, "after array element")
 					}
+					odjsonCapBookWeights.Record(len(s195))
 				}
 				if s195 == nil {
 					s195 = []int{}
@@ -2412,6 +2450,9 @@ func (v *TwitterStruct) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte,
 	return dst, nil
 }
 
+// odjsonCapTwitterStructStatuses remembers how long v.Statuses has been, to allocate it once.
+var odjsonCapTwitterStructStatuses odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -2481,7 +2522,7 @@ func (v *TwitterStruct) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache
 					p++
 				} else {
 					if cap(s236) == 0 {
-						s236 = make([]Statuses, 0, 4)
+						s236 = make([]Statuses, 0, odjsonrt.CapFor[Statuses](&odjsonCapTwitterStructStatuses))
 					}
 					for {
 						var e237 Statuses
@@ -2504,6 +2545,7 @@ func (v *TwitterStruct) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapTwitterStructStatuses.Record(len(s236))
 				}
 				if s236 == nil {
 					s236 = []Statuses{}
@@ -2616,7 +2658,7 @@ func (v *TwitterStruct) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCac
 					p++
 				} else {
 					if cap(s240) == 0 {
-						s240 = make([]Statuses, 0, 4)
+						s240 = make([]Statuses, 0, odjsonrt.CapFor[Statuses](&odjsonCapTwitterStructStatuses))
 					}
 					for {
 						var e241 Statuses
@@ -2639,6 +2681,7 @@ func (v *TwitterStruct) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCac
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapTwitterStructStatuses.Record(len(s240))
 				}
 				if s240 == nil {
 					s240 = []Statuses{}
@@ -2749,7 +2792,7 @@ func (v *TwitterStruct) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.Stri
 				}
 				s242 := v.Statuses[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s242) == 0 {
-					s242 = make([]Statuses, 0, 4)
+					s242 = make([]Statuses, 0, odjsonrt.CapFor[Statuses](&odjsonCapTwitterStructStatuses))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e243 Statuses
@@ -2760,6 +2803,9 @@ func (v *TwitterStruct) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.Stri
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s242) > 0 {
+					odjsonCapTwitterStructStatuses.Record(len(s242))
 				}
 				if s242 == nil {
 					s242 = []Statuses{}
@@ -4755,6 +4801,15 @@ func (v *Entities) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	return dst, nil
 }
 
+// odjsonCapEntitiesUrls remembers how long v.Urls has been, to allocate it once.
+var odjsonCapEntitiesUrls odjsonrt.CapHint
+
+// odjsonCapEntitiesHashtags remembers how long v.Hashtags has been, to allocate it once.
+var odjsonCapEntitiesHashtags odjsonrt.CapHint
+
+// odjsonCapEntitiesUserMentions remembers how long v.UserMentions has been, to allocate it once.
+var odjsonCapEntitiesUserMentions odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -4830,7 +4885,7 @@ func (v *Entities) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 					p++
 				} else {
 					if cap(s436) == 0 {
-						s436 = make([]interface{}, 0, 4)
+						s436 = make([]interface{}, 0, odjsonrt.CapFor[interface{}](&odjsonCapEntitiesUrls))
 					}
 					for {
 						var e437 interface{}
@@ -4861,6 +4916,7 @@ func (v *Entities) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapEntitiesUrls.Record(len(s436))
 				}
 				if s436 == nil {
 					s436 = []interface{}{}
@@ -4882,7 +4938,7 @@ func (v *Entities) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 					p++
 				} else {
 					if cap(s443) == 0 {
-						s443 = make([]Hashtags, 0, 4)
+						s443 = make([]Hashtags, 0, odjsonrt.CapFor[Hashtags](&odjsonCapEntitiesHashtags))
 					}
 					for {
 						var e444 Hashtags
@@ -4905,6 +4961,7 @@ func (v *Entities) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapEntitiesHashtags.Record(len(s443))
 				}
 				if s443 == nil {
 					s443 = []Hashtags{}
@@ -4926,7 +4983,7 @@ func (v *Entities) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 					p++
 				} else {
 					if cap(s447) == 0 {
-						s447 = make([]interface{}, 0, 4)
+						s447 = make([]interface{}, 0, odjsonrt.CapFor[interface{}](&odjsonCapEntitiesUserMentions))
 					}
 					for {
 						var e448 interface{}
@@ -4957,6 +5014,7 @@ func (v *Entities) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapEntitiesUserMentions.Record(len(s447))
 				}
 				if s447 == nil {
 					s447 = []interface{}{}
@@ -5070,7 +5128,7 @@ func (v *Entities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 					p++
 				} else {
 					if cap(s454) == 0 {
-						s454 = make([]interface{}, 0, 4)
+						s454 = make([]interface{}, 0, odjsonrt.CapFor[interface{}](&odjsonCapEntitiesUrls))
 					}
 					for {
 						var e455 interface{}
@@ -5101,6 +5159,7 @@ func (v *Entities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapEntitiesUrls.Record(len(s454))
 				}
 				if s454 == nil {
 					s454 = []interface{}{}
@@ -5126,7 +5185,7 @@ func (v *Entities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 					p++
 				} else {
 					if cap(s461) == 0 {
-						s461 = make([]Hashtags, 0, 4)
+						s461 = make([]Hashtags, 0, odjsonrt.CapFor[Hashtags](&odjsonCapEntitiesHashtags))
 					}
 					for {
 						var e462 Hashtags
@@ -5149,6 +5208,7 @@ func (v *Entities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapEntitiesHashtags.Record(len(s461))
 				}
 				if s461 == nil {
 					s461 = []Hashtags{}
@@ -5174,7 +5234,7 @@ func (v *Entities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 					p++
 				} else {
 					if cap(s465) == 0 {
-						s465 = make([]interface{}, 0, 4)
+						s465 = make([]interface{}, 0, odjsonrt.CapFor[interface{}](&odjsonCapEntitiesUserMentions))
 					}
 					for {
 						var e466 interface{}
@@ -5205,6 +5265,7 @@ func (v *Entities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapEntitiesUserMentions.Record(len(s465))
 				}
 				if s465 == nil {
 					s465 = []interface{}{}
@@ -5318,7 +5379,7 @@ func (v *Entities) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 					vp471++
 				} else {
 					if cap(s474) == 0 {
-						s474 = make([]interface{}, 0, 4)
+						s474 = make([]interface{}, 0, odjsonrt.CapFor[interface{}](&odjsonCapEntitiesUrls))
 					}
 					for {
 						var e475 interface{}
@@ -5349,6 +5410,7 @@ func (v *Entities) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 						}
 						return odjsonrt.ErrSyntax(val470, vp471, "after array element")
 					}
+					odjsonCapEntitiesUrls.Record(len(s474))
 				}
 				if s474 == nil {
 					s474 = []interface{}{}
@@ -5369,7 +5431,7 @@ func (v *Entities) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 				}
 				s479 := v.Hashtags[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s479) == 0 {
-					s479 = make([]Hashtags, 0, 4)
+					s479 = make([]Hashtags, 0, odjsonrt.CapFor[Hashtags](&odjsonCapEntitiesHashtags))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e480 Hashtags
@@ -5380,6 +5442,9 @@ func (v *Entities) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s479) > 0 {
+					odjsonCapEntitiesHashtags.Record(len(s479))
 				}
 				if s479 == nil {
 					s479 = []Hashtags{}
@@ -5409,7 +5474,7 @@ func (v *Entities) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 					vp482++
 				} else {
 					if cap(s485) == 0 {
-						s485 = make([]interface{}, 0, 4)
+						s485 = make([]interface{}, 0, odjsonrt.CapFor[interface{}](&odjsonCapEntitiesUserMentions))
 					}
 					for {
 						var e486 interface{}
@@ -5440,6 +5505,7 @@ func (v *Entities) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 						}
 						return odjsonrt.ErrSyntax(val481, vp482, "after array element")
 					}
+					odjsonCapEntitiesUserMentions.Record(len(s485))
 				}
 				if s485 == nil {
 					s485 = []interface{}{}
@@ -5562,6 +5628,9 @@ func (v *Hashtags) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	return dst, nil
 }
 
+// odjsonCapHashtagsIndices remembers how long v.Indices has been, to allocate it once.
+var odjsonCapHashtagsIndices odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -5642,7 +5711,7 @@ func (v *Hashtags) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 					p++
 				} else {
 					if cap(s496) == 0 {
-						s496 = make([]int, 0, 4)
+						s496 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapHashtagsIndices))
 					}
 					for {
 						var e497 int
@@ -5677,6 +5746,7 @@ func (v *Hashtags) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapHashtagsIndices.Record(len(s496))
 				}
 				if s496 == nil {
 					s496 = []int{}
@@ -5800,7 +5870,7 @@ func (v *Hashtags) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 					p++
 				} else {
 					if cap(s509) == 0 {
-						s509 = make([]int, 0, 4)
+						s509 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapHashtagsIndices))
 					}
 					for {
 						var e510 int
@@ -5836,6 +5906,7 @@ func (v *Hashtags) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapHashtagsIndices.Record(len(s509))
 				}
 				if s509 == nil {
 					s509 = []int{}
@@ -5961,7 +6032,7 @@ func (v *Hashtags) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 					vp520++
 				} else {
 					if cap(s523) == 0 {
-						s523 = make([]int, 0, 4)
+						s523 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapHashtagsIndices))
 					}
 					for {
 						var e524 int
@@ -5997,6 +6068,7 @@ func (v *Hashtags) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 						}
 						return odjsonrt.ErrSyntax(val519, vp520, "after array element")
 					}
+					odjsonCapHashtagsIndices.Record(len(s523))
 				}
 				if s523 == nil {
 					s523 = []int{}
@@ -10063,6 +10135,9 @@ func (v *URL) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	return dst, nil
 }
 
+// odjsonCapURLUrls remembers how long v.Urls has been, to allocate it once.
+var odjsonCapURLUrls odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -10121,7 +10196,7 @@ func (v *URL) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s911) == 0 {
-						s911 = make([]Urls, 0, 4)
+						s911 = make([]Urls, 0, odjsonrt.CapFor[Urls](&odjsonCapURLUrls))
 					}
 					for {
 						var e912 Urls
@@ -10144,6 +10219,7 @@ func (v *URL) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapURLUrls.Record(len(s911))
 				}
 				if s911 == nil {
 					s911 = []Urls{}
@@ -10240,7 +10316,7 @@ func (v *URL) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s915) == 0 {
-						s915 = make([]Urls, 0, 4)
+						s915 = make([]Urls, 0, odjsonrt.CapFor[Urls](&odjsonCapURLUrls))
 					}
 					for {
 						var e916 Urls
@@ -10263,6 +10339,7 @@ func (v *URL) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapURLUrls.Record(len(s915))
 				}
 				if s915 == nil {
 					s915 = []Urls{}
@@ -10360,7 +10437,7 @@ func (v *URL) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 				}
 				s917 := v.Urls[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s917) == 0 {
-					s917 = make([]Urls, 0, 4)
+					s917 = make([]Urls, 0, odjsonrt.CapFor[Urls](&odjsonCapURLUrls))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e918 Urls
@@ -10371,6 +10448,9 @@ func (v *URL) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s917) > 0 {
+					odjsonCapURLUrls.Record(len(s917))
 				}
 				if s917 == nil {
 					s917 = []Urls{}
@@ -10503,6 +10583,9 @@ func (v *Urls) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	return dst, nil
 }
 
+// odjsonCapUrlsIndices remembers how long v.Indices has been, to allocate it once.
+var odjsonCapUrlsIndices odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -10601,7 +10684,7 @@ func (v *Urls) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s928) == 0 {
-						s928 = make([]int, 0, 4)
+						s928 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapUrlsIndices))
 					}
 					for {
 						var e929 int
@@ -10636,6 +10719,7 @@ func (v *Urls) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapUrlsIndices.Record(len(s928))
 				}
 				if s928 == nil {
 					s928 = []int{}
@@ -10781,7 +10865,7 @@ func (v *Urls) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s944) == 0 {
-						s944 = make([]int, 0, 4)
+						s944 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapUrlsIndices))
 					}
 					for {
 						var e945 int
@@ -10817,6 +10901,7 @@ func (v *Urls) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapUrlsIndices.Record(len(s944))
 				}
 				if s944 == nil {
 					s944 = []int{}
@@ -10965,7 +11050,7 @@ func (v *Urls) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp960++
 				} else {
 					if cap(s963) == 0 {
-						s963 = make([]int, 0, 4)
+						s963 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapUrlsIndices))
 					}
 					for {
 						var e964 int
@@ -11001,6 +11086,7 @@ func (v *Urls) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						return odjsonrt.ErrSyntax(val959, vp960, "after array element")
 					}
+					odjsonCapUrlsIndices.Record(len(s963))
 				}
 				if s963 == nil {
 					s963 = []int{}
@@ -11125,6 +11211,9 @@ func (v *Description) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 	return dst, nil
 }
 
+// odjsonCapDescriptionUrls remembers how long v.Urls has been, to allocate it once.
+var odjsonCapDescriptionUrls odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -11183,7 +11272,7 @@ func (v *Description) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					p++
 				} else {
 					if cap(s974) == 0 {
-						s974 = make([]interface{}, 0, 4)
+						s974 = make([]interface{}, 0, odjsonrt.CapFor[interface{}](&odjsonCapDescriptionUrls))
 					}
 					for {
 						var e975 interface{}
@@ -11214,6 +11303,7 @@ func (v *Description) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapDescriptionUrls.Record(len(s974))
 				}
 				if s974 == nil {
 					s974 = []interface{}{}
@@ -11310,7 +11400,7 @@ func (v *Description) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					p++
 				} else {
 					if cap(s981) == 0 {
-						s981 = make([]interface{}, 0, 4)
+						s981 = make([]interface{}, 0, odjsonrt.CapFor[interface{}](&odjsonCapDescriptionUrls))
 					}
 					for {
 						var e982 interface{}
@@ -11341,6 +11431,7 @@ func (v *Description) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapDescriptionUrls.Record(len(s981))
 				}
 				if s981 == nil {
 					s981 = []interface{}{}
@@ -11446,7 +11537,7 @@ func (v *Description) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 					vp987++
 				} else {
 					if cap(s990) == 0 {
-						s990 = make([]interface{}, 0, 4)
+						s990 = make([]interface{}, 0, odjsonrt.CapFor[interface{}](&odjsonCapDescriptionUrls))
 					}
 					for {
 						var e991 interface{}
@@ -11477,6 +11568,7 @@ func (v *Description) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 						}
 						return odjsonrt.ErrSyntax(val986, vp987, "after array element")
 					}
+					odjsonCapDescriptionUrls.Record(len(s990))
 				}
 				if s990 == nil {
 					s990 = []interface{}{}

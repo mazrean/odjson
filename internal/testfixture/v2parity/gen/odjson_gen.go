@@ -781,6 +781,21 @@ func (v *Zoo) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	return dst, nil
 }
 
+// odjsonCapZooSlice remembers how long v.Slice has been, to allocate it once.
+var odjsonCapZooSlice odjsonrt.CapHint
+
+// odjsonCapZooStrings remembers how long v.Strings has been, to allocate it once.
+var odjsonCapZooStrings odjsonrt.CapHint
+
+// odjsonCapZooNesteds remembers how long v.Nesteds has been, to allocate it once.
+var odjsonCapZooNesteds odjsonrt.CapHint
+
+// odjsonCapZooAnys remembers how long v.Anys has been, to allocate it once.
+var odjsonCapZooAnys odjsonrt.CapHint
+
+// odjsonCapZooOmitSlice remembers how long v.OmitSlice has been, to allocate it once.
+var odjsonCapZooOmitSlice odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -1175,7 +1190,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s74) == 0 {
-						s74 = make([]int, 0, 4)
+						s74 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooSlice))
 					}
 					for {
 						var e75 int
@@ -1210,6 +1225,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapZooSlice.Record(len(s74))
 				}
 				if s74 == nil {
 					s74 = []int{}
@@ -1231,7 +1247,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s84) == 0 {
-						s84 = make([]string, 0, 4)
+						s84 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapZooStrings))
 					}
 					for {
 						var e85 string
@@ -1261,6 +1277,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapZooStrings.Record(len(s84))
 				}
 				if s84 == nil {
 					s84 = []string{}
@@ -1496,7 +1513,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s128) == 0 {
-						s128 = make([]Nested, 0, 4)
+						s128 = make([]Nested, 0, odjsonrt.CapFor[Nested](&odjsonCapZooNesteds))
 					}
 					for {
 						var e129 Nested
@@ -1519,6 +1536,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapZooNesteds.Record(len(s128))
 				}
 				if s128 == nil {
 					s128 = []Nested{}
@@ -1599,7 +1617,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s140) == 0 {
-						s140 = make([]any, 0, 4)
+						s140 = make([]any, 0, odjsonrt.CapFor[any](&odjsonCapZooAnys))
 					}
 					for {
 						var e141 any
@@ -1630,6 +1648,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapZooAnys.Record(len(s140))
 				}
 				if s140 == nil {
 					s140 = []any{}
@@ -1790,7 +1809,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s186) == 0 {
-						s186 = make([]int, 0, 4)
+						s186 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooOmitSlice))
 					}
 					for {
 						var e187 int
@@ -1825,6 +1844,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapZooOmitSlice.Record(len(s186))
 				}
 				if s186 == nil {
 					s186 = []int{}
@@ -2381,7 +2401,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s242) == 0 {
-						s242 = make([]int, 0, 4)
+						s242 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooSlice))
 					}
 					for {
 						var e243 int
@@ -2417,6 +2437,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapZooSlice.Record(len(s242))
 				}
 				if s242 == nil {
 					s242 = []int{}
@@ -2442,7 +2463,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s252) == 0 {
-						s252 = make([]string, 0, 4)
+						s252 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapZooStrings))
 					}
 					for {
 						var e253 string
@@ -2473,6 +2494,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapZooStrings.Record(len(s252))
 				}
 				if s252 == nil {
 					s252 = []string{}
@@ -2771,7 +2793,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s300) == 0 {
-						s300 = make([]Nested, 0, 4)
+						s300 = make([]Nested, 0, odjsonrt.CapFor[Nested](&odjsonCapZooNesteds))
 					}
 					for {
 						var e301 Nested
@@ -2794,6 +2816,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapZooNesteds.Record(len(s300))
 				}
 				if s300 == nil {
 					s300 = []Nested{}
@@ -2902,7 +2925,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s314) == 0 {
-						s314 = make([]any, 0, 4)
+						s314 = make([]any, 0, odjsonrt.CapFor[any](&odjsonCapZooAnys))
 					}
 					for {
 						var e315 any
@@ -2933,6 +2956,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapZooAnys.Record(len(s314))
 				}
 				if s314 == nil {
 					s314 = []any{}
@@ -3146,7 +3170,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s362) == 0 {
-						s362 = make([]int, 0, 4)
+						s362 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooOmitSlice))
 					}
 					for {
 						var e363 int
@@ -3182,6 +3206,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapZooOmitSlice.Record(len(s362))
 				}
 				if s362 == nil {
 					s362 = []int{}
@@ -3644,7 +3669,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					vp406++
 				} else {
 					if cap(s409) == 0 {
-						s409 = make([]int, 0, 4)
+						s409 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooSlice))
 					}
 					for {
 						var e410 int
@@ -3680,6 +3705,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 						}
 						return odjsonrt.ErrSyntax(val405, vp406, "after array element")
 					}
+					odjsonCapZooSlice.Record(len(s409))
 				}
 				if s409 == nil {
 					s409 = []int{}
@@ -3708,7 +3734,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					vp418++
 				} else {
 					if cap(s421) == 0 {
-						s421 = make([]string, 0, 4)
+						s421 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapZooStrings))
 					}
 					for {
 						var e422 string
@@ -3739,6 +3765,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 						}
 						return odjsonrt.ErrSyntax(val417, vp418, "after array element")
 					}
+					odjsonCapZooStrings.Record(len(s421))
 				}
 				if s421 == nil {
 					s421 = []string{}
@@ -4007,7 +4034,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 				}
 				s471 := v.Nesteds[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s471) == 0 {
-					s471 = make([]Nested, 0, 4)
+					s471 = make([]Nested, 0, odjsonrt.CapFor[Nested](&odjsonCapZooNesteds))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e472 Nested
@@ -4018,6 +4045,9 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s471) > 0 {
+					odjsonCapZooNesteds.Record(len(s471))
 				}
 				if s471 == nil {
 					s471 = []Nested{}
@@ -4105,7 +4135,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					vp485++
 				} else {
 					if cap(s488) == 0 {
-						s488 = make([]any, 0, 4)
+						s488 = make([]any, 0, odjsonrt.CapFor[any](&odjsonCapZooAnys))
 					}
 					for {
 						var e489 any
@@ -4136,6 +4166,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 						}
 						return odjsonrt.ErrSyntax(val484, vp485, "after array element")
 					}
+					odjsonCapZooAnys.Record(len(s488))
 				}
 				if s488 == nil {
 					s488 = []any{}
@@ -4349,7 +4380,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					vp535++
 				} else {
 					if cap(s538) == 0 {
-						s538 = make([]int, 0, 4)
+						s538 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooOmitSlice))
 					}
 					for {
 						var e539 int
@@ -4385,6 +4416,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 						}
 						return odjsonrt.ErrSyntax(val534, vp535, "after array element")
 					}
+					odjsonCapZooOmitSlice.Record(len(s538))
 				}
 				if s538 == nil {
 					s538 = []int{}

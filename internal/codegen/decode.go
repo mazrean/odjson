@@ -170,7 +170,9 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 						// Both key paths leave p on the value's first byte.
 						mc := c
 						mc.trimmed = true
+						g.capHint = capHintName(s, f)
 						g.decode(b, f.Type, selector(f), mc)
+						g.capHint = ""
 					}
 				})
 			}
@@ -726,6 +728,7 @@ func (g *generator) separator(b *block, c ctx, closing byte, what string) {
 
 func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c ctx) {
 	s, e := id(g.tmp("s")), id(g.tmp("e"))
+	hint := g.takeCapHint()
 	g.expectByte(b, c, '[', t.Expr)
 	g.emit(b, define(s, slice(target, nil, num(0))))
 	g.emit(b, c.skipSpace())
@@ -734,10 +737,12 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 	})
 	g.elseBlock(s0, func(b *block) {
 		// Growing from nothing costs an allocation and a copy per doubling, so
-		// start with room for a few elements — but only once the array is known
-		// to be non-empty, since empty arrays are common and must stay free.
+		// start with room for a few elements — or, for a struct field, for
+		// as many as the field has held before — but only once the array is
+		// known to be non-empty, since empty arrays are common and must stay
+		// free.
 		g.ifStmt(b, nil, bin(call(id("cap"), s), token.EQL, num(0)), func(b *block) {
-			g.emit(b, assign(s, call(id("make"), typ(t.Expr), num(0), num(4))))
+			g.emit(b, assign(s, call(id("make"), typ(t.Expr), num(0), capExpr(hint, t))))
 		})
 		g.loop(b, func(b *block) {
 			g.emit(b, varDecl(e.Name, typ(t.Elem.Expr)))
@@ -745,11 +750,23 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 			g.emit(b, assign(s, call(id("append"), s, e)))
 			g.separator(b, c, ']', "after array element")
 		})
+		if hint != "" {
+			g.emit(b, expr(call(sel(id(hint), "Record"), call(id("len"), s))))
+		}
 	})
 	g.ifStmt(b, nil, bin(s, token.EQL, nilV), func(b *block) {
 		g.emit(b, assign(s, composite(typ(t.Expr))))
 	})
 	g.emit(b, assign(target, s))
+}
+
+// capExpr renders the capacity a slice of type t is allocated with: the
+// field's hint when it has one, otherwise room for a few elements.
+func capExpr(hint string, t *analyzer.Type) ast.Expr {
+	if hint == "" {
+		return num(4)
+	}
+	return call(index(rt("CapFor"), typ(t.Elem.Expr)), addr(id(hint)))
 }
 
 func (g *generator) decodeArray(b *block, t *analyzer.Type, target ast.Expr, c ctx) {

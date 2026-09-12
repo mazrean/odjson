@@ -1403,6 +1403,9 @@ func (v *Scalars) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 	return dst, nil
 }
 
+// odjsonCapScalarsOmitEmptySlice remembers how long v.OmitEmptySlice has been, to allocate it once.
+var odjsonCapScalarsOmitEmptySlice odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -2285,7 +2288,7 @@ func (v *Scalars) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 					p++
 				} else {
 					if cap(s221) == 0 {
-						s221 = make([]int, 0, 4)
+						s221 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapScalarsOmitEmptySlice))
 					}
 					for {
 						var e222 int
@@ -2320,6 +2323,7 @@ func (v *Scalars) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapScalarsOmitEmptySlice.Record(len(s221))
 				}
 				if s221 == nil {
 					s221 = []int{}
@@ -3340,7 +3344,7 @@ func (v *Scalars) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 					p++
 				} else {
 					if cap(s399) == 0 {
-						s399 = make([]int, 0, 4)
+						s399 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapScalarsOmitEmptySlice))
 					}
 					for {
 						var e400 int
@@ -3376,6 +3380,7 @@ func (v *Scalars) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapScalarsOmitEmptySlice.Record(len(s399))
 				}
 				if s399 == nil {
 					s399 = []int{}
@@ -4254,7 +4259,7 @@ func (v *Scalars) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 					vp522++
 				} else {
 					if cap(s525) == 0 {
-						s525 = make([]int, 0, 4)
+						s525 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapScalarsOmitEmptySlice))
 					}
 					for {
 						var e526 int
@@ -4290,6 +4295,7 @@ func (v *Scalars) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						return odjsonrt.ErrSyntax(val521, vp522, "after array element")
 					}
+					odjsonCapScalarsOmitEmptySlice.Record(len(s525))
 				}
 				if s525 == nil {
 					s525 = []int{}
@@ -4742,6 +4748,24 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 	return dst, nil
 }
 
+// odjsonCapCompositesInts remembers how long v.Ints has been, to allocate it once.
+var odjsonCapCompositesInts odjsonrt.CapHint
+
+// odjsonCapCompositesStrings remembers how long v.Strings has been, to allocate it once.
+var odjsonCapCompositesStrings odjsonrt.CapHint
+
+// odjsonCapCompositesInners remembers how long v.Inners has been, to allocate it once.
+var odjsonCapCompositesInners odjsonrt.CapHint
+
+// odjsonCapCompositesInnerPtrs remembers how long v.InnerPtrs has been, to allocate it once.
+var odjsonCapCompositesInnerPtrs odjsonrt.CapHint
+
+// odjsonCapCompositesNested remembers how long v.Nested has been, to allocate it once.
+var odjsonCapCompositesNested odjsonrt.CapHint
+
+// odjsonCapCompositesAnys remembers how long v.Anys has been, to allocate it once.
+var odjsonCapCompositesAnys odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -5185,7 +5209,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 					p++
 				} else {
 					if cap(s592) == 0 {
-						s592 = make([]int, 0, 4)
+						s592 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapCompositesInts))
 					}
 					for {
 						var e593 int
@@ -5220,6 +5244,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesInts.Record(len(s592))
 				}
 				if s592 == nil {
 					s592 = []int{}
@@ -5241,7 +5266,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 					p++
 				} else {
 					if cap(s602) == 0 {
-						s602 = make(Tags, 0, 4)
+						s602 = make(Tags, 0, odjsonrt.CapFor[string](&odjsonCapCompositesStrings))
 					}
 					for {
 						var e603 string
@@ -5271,6 +5296,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesStrings.Record(len(s602))
 				}
 				if s602 == nil {
 					s602 = Tags{}
@@ -5292,7 +5318,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 					p++
 				} else {
 					if cap(s609) == 0 {
-						s609 = make([]Inner, 0, 4)
+						s609 = make([]Inner, 0, odjsonrt.CapFor[Inner](&odjsonCapCompositesInners))
 					}
 					for {
 						var e610 Inner
@@ -5315,6 +5341,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesInners.Record(len(s609))
 				}
 				if s609 == nil {
 					s609 = []Inner{}
@@ -5336,7 +5363,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 					p++
 				} else {
 					if cap(s613) == 0 {
-						s613 = make([]*Inner, 0, 4)
+						s613 = make([]*Inner, 0, odjsonrt.CapFor[*Inner](&odjsonCapCompositesInnerPtrs))
 					}
 					for {
 						var e614 *Inner
@@ -5368,6 +5395,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesInnerPtrs.Record(len(s613))
 				}
 				if s613 == nil {
 					s613 = []*Inner{}
@@ -5389,7 +5417,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 					p++
 				} else {
 					if cap(s619) == 0 {
-						s619 = make([][]int, 0, 4)
+						s619 = make([][]int, 0, odjsonrt.CapFor[[]int](&odjsonCapCompositesNested))
 					}
 					for {
 						var e620 []int
@@ -5464,6 +5492,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesNested.Record(len(s619))
 				}
 				if s619 == nil {
 					s619 = [][]int{}
@@ -5756,7 +5785,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 					p++
 				} else {
 					if cap(s677) == 0 {
-						s677 = make([]any, 0, 4)
+						s677 = make([]any, 0, odjsonrt.CapFor[any](&odjsonCapCompositesAnys))
 					}
 					for {
 						var e678 any
@@ -5787,6 +5816,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesAnys.Record(len(s677))
 				}
 				if s677 == nil {
 					s677 = []any{}
@@ -6277,7 +6307,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 					p++
 				} else {
 					if cap(s721) == 0 {
-						s721 = make([]int, 0, 4)
+						s721 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapCompositesInts))
 					}
 					for {
 						var e722 int
@@ -6313,6 +6343,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesInts.Record(len(s721))
 				}
 				if s721 == nil {
 					s721 = []int{}
@@ -6338,7 +6369,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 					p++
 				} else {
 					if cap(s731) == 0 {
-						s731 = make(Tags, 0, 4)
+						s731 = make(Tags, 0, odjsonrt.CapFor[string](&odjsonCapCompositesStrings))
 					}
 					for {
 						var e732 string
@@ -6369,6 +6400,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesStrings.Record(len(s731))
 				}
 				if s731 == nil {
 					s731 = Tags{}
@@ -6394,7 +6426,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 					p++
 				} else {
 					if cap(s738) == 0 {
-						s738 = make([]Inner, 0, 4)
+						s738 = make([]Inner, 0, odjsonrt.CapFor[Inner](&odjsonCapCompositesInners))
 					}
 					for {
 						var e739 Inner
@@ -6417,6 +6449,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesInners.Record(len(s738))
 				}
 				if s738 == nil {
 					s738 = []Inner{}
@@ -6442,7 +6475,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 					p++
 				} else {
 					if cap(s742) == 0 {
-						s742 = make([]*Inner, 0, 4)
+						s742 = make([]*Inner, 0, odjsonrt.CapFor[*Inner](&odjsonCapCompositesInnerPtrs))
 					}
 					for {
 						var e743 *Inner
@@ -6474,6 +6507,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesInnerPtrs.Record(len(s742))
 				}
 				if s742 == nil {
 					s742 = []*Inner{}
@@ -6499,7 +6533,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 					p++
 				} else {
 					if cap(s748) == 0 {
-						s748 = make([][]int, 0, 4)
+						s748 = make([][]int, 0, odjsonrt.CapFor[[]int](&odjsonCapCompositesNested))
 					}
 					for {
 						var e749 []int
@@ -6575,6 +6609,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesNested.Record(len(s748))
 				}
 				if s748 == nil {
 					s748 = [][]int{}
@@ -6970,7 +7005,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 					p++
 				} else {
 					if cap(s814) == 0 {
-						s814 = make([]any, 0, 4)
+						s814 = make([]any, 0, odjsonrt.CapFor[any](&odjsonCapCompositesAnys))
 					}
 					for {
 						var e815 any
@@ -7001,6 +7036,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCompositesAnys.Record(len(s814))
 				}
 				if s814 == nil {
 					s814 = []any{}
@@ -7441,7 +7477,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 					vp869++
 				} else {
 					if cap(s872) == 0 {
-						s872 = make([]int, 0, 4)
+						s872 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapCompositesInts))
 					}
 					for {
 						var e873 int
@@ -7477,6 +7513,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 						}
 						return odjsonrt.ErrSyntax(val868, vp869, "after array element")
 					}
+					odjsonCapCompositesInts.Record(len(s872))
 				}
 				if s872 == nil {
 					s872 = []int{}
@@ -7505,7 +7542,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 					vp881++
 				} else {
 					if cap(s884) == 0 {
-						s884 = make(Tags, 0, 4)
+						s884 = make(Tags, 0, odjsonrt.CapFor[string](&odjsonCapCompositesStrings))
 					}
 					for {
 						var e885 string
@@ -7536,6 +7573,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 						}
 						return odjsonrt.ErrSyntax(val880, vp881, "after array element")
 					}
+					odjsonCapCompositesStrings.Record(len(s884))
 				}
 				if s884 == nil {
 					s884 = Tags{}
@@ -7556,7 +7594,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 				}
 				s889 := v.Inners[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s889) == 0 {
-					s889 = make([]Inner, 0, 4)
+					s889 = make([]Inner, 0, odjsonrt.CapFor[Inner](&odjsonCapCompositesInners))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e890 Inner
@@ -7567,6 +7605,9 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s889) > 0 {
+					odjsonCapCompositesInners.Record(len(s889))
 				}
 				if s889 == nil {
 					s889 = []Inner{}
@@ -7588,7 +7629,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 				}
 				s891 := v.InnerPtrs[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s891) == 0 {
-					s891 = make([]*Inner, 0, 4)
+					s891 = make([]*Inner, 0, odjsonrt.CapFor[*Inner](&odjsonCapCompositesInnerPtrs))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e892 *Inner
@@ -7609,6 +7650,9 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s891) > 0 {
+					odjsonCapCompositesInnerPtrs.Record(len(s891))
 				}
 				if s891 == nil {
 					s891 = []*Inner{}
@@ -7638,7 +7682,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 					vp894++
 				} else {
 					if cap(s897) == 0 {
-						s897 = make([][]int, 0, 4)
+						s897 = make([][]int, 0, odjsonrt.CapFor[[]int](&odjsonCapCompositesNested))
 					}
 					for {
 						var e898 []int
@@ -7714,6 +7758,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 						}
 						return odjsonrt.ErrSyntax(val893, vp894, "after array element")
 					}
+					odjsonCapCompositesNested.Record(len(s897))
 				}
 				if s897 == nil {
 					s897 = [][]int{}
@@ -8038,7 +8083,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 					vp957++
 				} else {
 					if cap(s960) == 0 {
-						s960 = make([]any, 0, 4)
+						s960 = make([]any, 0, odjsonrt.CapFor[any](&odjsonCapCompositesAnys))
 					}
 					for {
 						var e961 any
@@ -8069,6 +8114,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 						}
 						return odjsonrt.ErrSyntax(val956, vp957, "after array element")
 					}
+					odjsonCapCompositesAnys.Record(len(s960))
 				}
 				if s960 == nil {
 					s960 = []any{}
@@ -8297,6 +8343,9 @@ func (v *Recursive) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, err
 	return dst, nil
 }
 
+// odjsonCapRecursiveChildren remembers how long v.Children has been, to allocate it once.
+var odjsonCapRecursiveChildren odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -8386,7 +8435,7 @@ func (v *Recursive) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 					p++
 				} else {
 					if cap(s990) == 0 {
-						s990 = make([]*Recursive, 0, 4)
+						s990 = make([]*Recursive, 0, odjsonrt.CapFor[*Recursive](&odjsonCapRecursiveChildren))
 					}
 					for {
 						var e991 *Recursive
@@ -8418,6 +8467,7 @@ func (v *Recursive) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapRecursiveChildren.Record(len(s990))
 				}
 				if s990 == nil {
 					s990 = []*Recursive{}
@@ -8541,7 +8591,7 @@ func (v *Recursive) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 					p++
 				} else {
 					if cap(s999) == 0 {
-						s999 = make([]*Recursive, 0, 4)
+						s999 = make([]*Recursive, 0, odjsonrt.CapFor[*Recursive](&odjsonCapRecursiveChildren))
 					}
 					for {
 						var e1000 *Recursive
@@ -8573,6 +8623,7 @@ func (v *Recursive) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapRecursiveChildren.Record(len(s999))
 				}
 				if s999 == nil {
 					s999 = []*Recursive{}
@@ -8690,7 +8741,7 @@ func (v *Recursive) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCa
 				}
 				s1005 := v.Children[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s1005) == 0 {
-					s1005 = make([]*Recursive, 0, 4)
+					s1005 = make([]*Recursive, 0, odjsonrt.CapFor[*Recursive](&odjsonCapRecursiveChildren))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e1006 *Recursive
@@ -8711,6 +8762,9 @@ func (v *Recursive) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCa
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s1005) > 0 {
+					odjsonCapRecursiveChildren.Record(len(s1005))
 				}
 				if s1005 == nil {
 					s1005 = []*Recursive{}

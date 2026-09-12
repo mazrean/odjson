@@ -825,6 +825,9 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	return dst, nil
 }
 
+// odjsonCapHolderList remembers how long v.List has been, to allocate it once.
+var odjsonCapHolderList odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -918,7 +921,7 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 					p++
 				} else {
 					if cap(s36) == 0 {
-						s36 = make([]secret, 0, 4)
+						s36 = make([]secret, 0, odjsonrt.CapFor[secret](&odjsonCapHolderList))
 					}
 					for {
 						var e37 secret
@@ -941,6 +944,7 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapHolderList.Record(len(s36))
 				}
 				if s36 == nil {
 					s36 = []secret{}
@@ -1080,7 +1084,7 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 					p++
 				} else {
 					if cap(s42) == 0 {
-						s42 = make([]secret, 0, 4)
+						s42 = make([]secret, 0, odjsonrt.CapFor[secret](&odjsonCapHolderList))
 					}
 					for {
 						var e43 secret
@@ -1103,6 +1107,7 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapHolderList.Record(len(s42))
 				}
 				if s42 == nil {
 					s42 = []secret{}
@@ -1226,7 +1231,7 @@ func (v *Holder) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 				}
 				s44 := v.List[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s44) == 0 {
-					s44 = make([]secret, 0, 4)
+					s44 = make([]secret, 0, odjsonrt.CapFor[secret](&odjsonCapHolderList))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e45 secret
@@ -1237,6 +1242,9 @@ func (v *Holder) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s44) > 0 {
+					odjsonCapHolderList.Record(len(s44))
 				}
 				if s44 == nil {
 					s44 = []secret{}

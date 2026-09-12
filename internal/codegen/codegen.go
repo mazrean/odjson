@@ -36,6 +36,34 @@ type generator struct {
 	// inlineDepth counts the nested struct encoders currently being spliced
 	// into their parent (see encodeFusedMember); only one level is.
 	inlineDepth int
+
+	// capHint names the odjsonrt.CapHint of the slice field whose decoder
+	// is being written, for the slice fragment to size its allocation by;
+	// empty for a slice anywhere else (an element, a map value), which has
+	// no hint of its own. See capHintName.
+	capHint string
+}
+
+// capHintName is the package level variable holding the [odjsonrt.CapHint]
+// of a struct's slice field, or empty for a field that does not get one.
+// One hint serves the three byte and token driven decoders of the struct.
+func capHintName(s *analyzer.StructInfo, f *analyzer.Field) string {
+	if f.AsString || f.Type.Kind != analyzer.KindSlice {
+		return ""
+	}
+	base := s.Name
+	if !s.Local {
+		base = s.Helper
+	}
+	return "odjsonCap" + base + f.Name
+}
+
+// takeCapHint returns the hint set for the current field and clears it, so
+// that only the field's own slice, not one nested inside it, is sized by it.
+func (g *generator) takeCapHint() string {
+	h := g.capHint
+	g.capHint = ""
+	return h
 }
 
 // ctx names the variables a decoding fragment reads from, and how it reports
@@ -158,6 +186,13 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 			nil, s.Helper+"Append",
 			signature([]*ast.Field{field("dst", sliceType(id("byte"))), receiver(s, false), mode}, sliceType(id("byte")), id("error")),
 			func(b *block) { g.encodeStruct(b, s) })
+	}
+
+	for _, f := range s.Fields {
+		if h := capHintName(s, f); h != "" {
+			g.varDeclTop([]string{"// " + h + " remembers how long v." + f.Name + " has been, to allocate it once."},
+				h, rt("CapHint"))
+		}
 	}
 
 	parseDoc := func(name string) []string {
