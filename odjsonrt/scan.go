@@ -110,17 +110,17 @@ func SkipValue(data []byte, p int) (int, error) {
 			}
 			p = end
 		case 't':
-			if !hasLiteral(data, p, "true") {
+			if !isTrue(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 4
 		case 'f':
-			if !hasLiteral(data, p, "false") {
+			if !isFalse(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 5
 		case 'n':
-			if !hasLiteral(data, p, "null") {
+			if !isNull(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 4
@@ -347,18 +347,13 @@ func Validate(data []byte) error {
 	return EndOfDocument(data, p)
 }
 
-// hasLiteral reports whether data continues with lit at p.
-func hasLiteral(data []byte, p int, lit string) bool {
-	if len(data)-p < len(lit) {
-		return false
-	}
-	for i := 0; i < len(lit); i++ {
-		if data[p+i] != lit[i] {
-			return false
-		}
-	}
-	return true
-}
+// isTrue, isFalse and isNull report whether the literal stands at p. Each
+// is one length test and one word compare once inlined: the compiler
+// expands a compare against a short constant into loads, where a loop over
+// the literal's bytes, however short, ran a byte at a time.
+func isTrue(data []byte, p int) bool  { return p+4 <= len(data) && string(data[p:p+4]) == "true" }
+func isFalse(data []byte, p int) bool { return p+5 <= len(data) && string(data[p:p+5]) == "false" }
+func isNull(data []byte, p int) bool  { return p+4 <= len(data) && string(data[p:p+4]) == "null" }
 
 // isHex reports whether c is an ASCII hexadecimal digit.
 func isHex(c byte) bool {

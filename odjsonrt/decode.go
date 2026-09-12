@@ -408,12 +408,12 @@ func parseBoolSlow(data []byte, p int) (bool, int, error) {
 	}
 	switch data[p] {
 	case 't':
-		if !hasLiteral(data, p, "true") {
+		if !isTrue(data, p) {
 			return false, p, errBeginValue(data, p)
 		}
 		return true, p + 4, nil
 	case 'f':
-		if !hasLiteral(data, p, "false") {
+		if !isFalse(data, p) {
 			return false, p, errBeginValue(data, p)
 		}
 		return false, p + 5, nil
@@ -427,7 +427,7 @@ func ParseNull(data []byte, p int) (next int, ok bool) {
 	// The leading byte settles it for every value that is not null, which is
 	// almost all of them; keeping that test in the caller's inlined body is
 	// worth several percent of a decode.
-	if p < len(data) && data[p] == 'n' && hasLiteral(data, p, "null") {
+	if p < len(data) && data[p] == 'n' && isNull(data, p) {
 		return p + 4, true
 	}
 	return p, false
@@ -609,17 +609,17 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 			}
 			v, p = s, next
 		case 't':
-			if !hasLiteral(data, p, "true") {
+			if !isTrue(data, p) {
 				return nil, p, errBeginValue(data, p)
 			}
 			v, p = true, p+4
 		case 'f':
-			if !hasLiteral(data, p, "false") {
+			if !isFalse(data, p) {
 				return nil, p, errBeginValue(data, p)
 			}
 			v, p = false, p+5
 		case 'n':
-			if !hasLiteral(data, p, "null") {
+			if !isNull(data, p) {
 				return nil, p, errBeginValue(data, p)
 			}
 			v, p = nil, p+4

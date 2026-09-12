@@ -487,17 +487,17 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 			}
 			p = end
 		case 't':
-			if !hasLiteral(data, p, "true") {
+			if !isTrue(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 4
 		case 'f':
-			if !hasLiteral(data, p, "false") {
+			if !isFalse(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 5
 		case 'n':
-			if !hasLiteral(data, p, "null") {
+			if !isNull(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 4
