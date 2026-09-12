@@ -298,6 +298,21 @@ func appendStringChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
 	return append(dst, '"'), nil
 }
 
+// swarUnsafeHTML reports which lanes of w need escaping under ModeV2HTML: the
+// bytes [swarUnsafe] reports plus '<', '>' and '&'. Composing it from
+// swarUnsafe and three swarHasByte calls masks every term on its own; here
+// the lane tests share the two masks, and '<' and '>' (0x3C and 0x3E, one
+// bit apart) share a test by ORing that bit in first. Lanes >= 0x80 are never
+// reported, as in swarUnsafe.
+func swarUnsafeHTML(w uint64) uint64 {
+	ctrl := w - swarLo*0x20
+	quote := (w ^ (swarLo * '"')) - swarLo
+	esc := (w ^ (swarLo * '\\')) - swarLo
+	angle := ((w | swarLo*0x02) ^ (swarLo * '>')) - swarLo
+	amp := (w ^ (swarLo * '&')) - swarLo
+	return (ctrl | quote | esc | angle | amp) &^ w & swarHi
+}
+
 // appendQuotedV2HTML is the ModeV2HTML implementation: [appendQuotedStream]'s
 // escaping, plus what encoding/json's reformat adds to it under
 // PreserveRawStrings, EscapeForHTML and EscapeForJS. That reformat walks the
@@ -311,7 +326,7 @@ func appendQuotedV2HTML(dst []byte, src []byte) []byte {
 	for i := 0; i < len(src); {
 		for i+8 <= len(src) {
 			w := binary.LittleEndian.Uint64(src[i:])
-			if m := swarUnsafe(w) | swarHasByte(w, '<') | swarHasByte(w, '>') | swarHasByte(w, '&') | w&swarHi; m != 0 {
+			if m := swarUnsafeHTML(w) | w&swarHi; m != 0 {
 				i += swarIndex(m)
 				goto found
 			}
@@ -333,7 +348,7 @@ func appendQuotedV2HTML(dst []byte, src []byte) []byte {
 				i += 2
 				for i+8 <= len(src) {
 					w := binary.LittleEndian.Uint64(src[i:])
-					if w&swarHi == 0 || swarUnsafe(w)|swarHasByte(w, '<')|swarHasByte(w, '>')|swarHasByte(w, '&') != 0 || !swarLatin(w) {
+					if w&swarHi == 0 || swarUnsafeHTML(w) != 0 || !swarLatin(w) {
 						break
 					}
 					i += 8
