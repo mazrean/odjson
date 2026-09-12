@@ -284,6 +284,11 @@ func ParseStringWith(data []byte, p int, c *StringCache) (string, int, error) {
 	if data[p] != '"' {
 		return "", p, ErrType(data, p, "string")
 	}
+	if uint(p+9) <= uint(len(data)) {
+		if end := shortString(load64(data, p+1), p); end > 0 {
+			return c.Make(data[p+1 : end-1]), end, nil
+		}
+	}
 	end, hasEscape, _, err := scanString(data, p)
 	if err != nil {
 		return "", end, err

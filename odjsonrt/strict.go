@@ -52,6 +52,27 @@ func quoteName(name []byte) string {
 	return string(b)
 }
 
+// shortString settles the string literal at p, which holds the opening
+// quote, when its body is at most seven plain ASCII bytes: the closing
+// quote is then in w, the word after the opening quote, and the word test
+// the scan would start with is the whole scan. It returns the index past
+// the closing quote, or 0 for any other literal, which the scan then
+// takes; a string never ends at 0. Member names and short values are most
+// of a document's strings, and each one was a call into scanStringStrict.
+// The caller loads the word, after checking that it exists: with the load
+// inside, the function is past the inliner's budget.
+func shortString(w uint64, p int) int {
+	if m := swarStringStop(w) | w&swarHi; m != 0 {
+		// The lowest lane is at or before the first byte the scan would
+		// stop on, so when it holds the quote nothing else stood before
+		// it.
+		if k := swarIndex(m); byte(w>>(8*uint(k))) == '"' {
+			return p + 2 + k
+		}
+	}
+	return 0
+}
+
 // parseStringBytesStrict is [ParseStringBytes] under json/v2's rules.
 func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next int, err error) {
 	if uint(p) >= uint(len(data)) {
@@ -59,6 +80,11 @@ func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next in
 	}
 	if data[p] != '"' {
 		return nil, false, p, ErrType(data, p, "string")
+	}
+	if uint(p+9) <= uint(len(data)) {
+		if end := shortString(load64(data, p+1), p); end > 0 {
+			return data[p+1 : end-1], true, end, nil
+		}
 	}
 	end, hasEscape, _, err := scanStringStrict(data, p)
 	if err != nil {
@@ -81,6 +107,9 @@ func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next in
 // [SkipValueStrict] uses, so a skipped string with escapes is checked in
 // place instead of being unescaped into a buffer nobody reads.
 func skipStringStrict(data []byte, p int) (int, error) {
+	// No shortString here: the values a skip meets are long more often
+	// than the names are, and the test cost more on those than it saved
+	// on the short ones (the retweeted_status skip +1.4%).
 	end, hasEscape, _, err := scanStringStrict(data, p)
 	if err != nil {
 		return end, err
@@ -220,6 +249,11 @@ func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) 
 	}
 	if data[p] != '"' {
 		return "", p, ErrType(data, p, "string")
+	}
+	if uint(p+9) <= uint(len(data)) {
+		if end := shortString(load64(data, p+1), p); end > 0 {
+			return c.Make(data[p+1 : end-1]), end, nil
+		}
 	}
 	end, hasEscape, nonASCII, err := scanStringStrict(data, p)
 	if err != nil {
@@ -395,9 +429,16 @@ func strictKey(data []byte, p int, names [][]byte, lv *strictLevel) ([][]byte, i
 	if data[p] != '"' {
 		return names, p, errChar(data, p, "looking for beginning of object key string")
 	}
-	end, hasEscape, _, err := scanStringStrict(data, p)
-	if err != nil {
-		return names, end, err
+	end := 0
+	if uint(p+9) <= uint(len(data)) {
+		end = shortString(load64(data, p+1), p)
+	}
+	hasEscape := false
+	var err error
+	if end == 0 {
+		if end, hasEscape, _, err = scanStringStrict(data, p); err != nil {
+			return names, end, err
+		}
 	}
 	name := data[p+1 : end-1]
 	if hasEscape {

@@ -30,6 +30,11 @@ func ParseStringCached(data []byte, p int, c *StringCache) (string, int, error) 
 	if data[p] != '"' {
 		return "", p, ErrType(data, p, "string")
 	}
+	if uint(p+9) <= uint(len(data)) {
+		if end := shortString(load64(data, p+1), p); end > 0 {
+			return c.Make(data[p+1 : end-1]), end, nil
+		}
+	}
 	end, hasEscape, nonASCII, err := scanString(data, p)
 	if err != nil {
 		return "", end, err
@@ -78,6 +83,11 @@ func ParseStringBytes(data []byte, p int) (s []byte, aliased bool, next int, err
 	}
 	if data[p] != '"' {
 		return nil, false, p, ErrType(data, p, "string")
+	}
+	if uint(p+9) <= uint(len(data)) {
+		if end := shortString(load64(data, p+1), p); end > 0 {
+			return data[p+1 : end-1], true, end, nil
+		}
 	}
 	end, hasEscape, nonASCII, err := scanString(data, p)
 	if err != nil {
