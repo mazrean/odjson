@@ -2483,7 +2483,7 @@ func (v *TwitterStruct) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache
 					idx, p = 0, p+10
 				}
 			case 'e':
-				if len(rest) >= 17 && string(rest[:17]) == "\"search_metadata\"" {
+				if len(rest) >= 17 && string(rest[:16]) == "\"search_metadata" && string(rest[16:17]) == "\"" {
 					idx, p = 1, p+17
 				}
 			}
@@ -2614,7 +2614,7 @@ func (v *TwitterStruct) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCac
 					idx, p = 0, p+10
 				}
 			case 'e':
-				if len(rest) >= 17 && string(rest[:17]) == "\"search_metadata\"" {
+				if len(rest) >= 17 && string(rest[:16]) == "\"search_metadata" && string(rest[16:17]) == "\"" {
 					idx, p = 1, p+17
 				}
 			}
@@ -3187,28 +3187,28 @@ func (v *Statuses) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 						if len(rest) > 20 {
 							switch rest[20] {
 							case '_':
-								if len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_user_id_str\"" {
+								if len(rest) >= 25 && string(rest[:16]) == "\"in_reply_to_use" && string(rest[16:25]) == "r_id_str\"" {
 									idx, p = 6, p+25
 								}
 							case 'i':
 								if len(rest) > 22 {
 									switch rest[22] {
 									case '_':
-										if len(rest) >= 27 && string(rest[:27]) == "\"in_reply_to_status_id_str\"" {
+										if len(rest) >= 27 && string(rest[:16]) == "\"in_reply_to_sta" && string(rest[16:27]) == "tus_id_str\"" {
 											idx, p = 11, p+27
 										}
 									case '"':
-										if len(rest) >= 23 && string(rest[:23]) == "\"in_reply_to_status_id\"" {
+										if len(rest) >= 23 && string(rest[:16]) == "\"in_reply_to_sta" && string(rest[16:23]) == "tus_id\"" {
 											idx, p = 20, p+23
 										}
 									}
 								}
 							case '"':
-								if len(rest) >= 21 && string(rest[:21]) == "\"in_reply_to_user_id\"" {
+								if len(rest) >= 21 && string(rest[:16]) == "\"in_reply_to_use" && string(rest[16:21]) == "r_id\"" {
 									idx, p = 15, p+21
 								}
 							case 'n':
-								if len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_screen_name\"" {
+								if len(rest) >= 25 && string(rest[:16]) == "\"in_reply_to_scr" && string(rest[16:25]) == "een_name\"" {
 									idx, p = 18, p+25
 								}
 							}
@@ -3673,28 +3673,28 @@ func (v *Statuses) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 						if len(rest) > 20 {
 							switch rest[20] {
 							case '_':
-								if len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_user_id_str\"" {
+								if len(rest) >= 25 && string(rest[:16]) == "\"in_reply_to_use" && string(rest[16:25]) == "r_id_str\"" {
 									idx, p = 6, p+25
 								}
 							case 'i':
 								if len(rest) > 22 {
 									switch rest[22] {
 									case '_':
-										if len(rest) >= 27 && string(rest[:27]) == "\"in_reply_to_status_id_str\"" {
+										if len(rest) >= 27 && string(rest[:16]) == "\"in_reply_to_sta" && string(rest[16:27]) == "tus_id_str\"" {
 											idx, p = 11, p+27
 										}
 									case '"':
-										if len(rest) >= 23 && string(rest[:23]) == "\"in_reply_to_status_id\"" {
+										if len(rest) >= 23 && string(rest[:16]) == "\"in_reply_to_sta" && string(rest[16:23]) == "tus_id\"" {
 											idx, p = 20, p+23
 										}
 									}
 								}
 							case '"':
-								if len(rest) >= 21 && string(rest[:21]) == "\"in_reply_to_user_id\"" {
+								if len(rest) >= 21 && string(rest[:16]) == "\"in_reply_to_use" && string(rest[16:21]) == "r_id\"" {
 									idx, p = 15, p+21
 								}
 							case 'n':
-								if len(rest) >= 25 && string(rest[:25]) == "\"in_reply_to_screen_name\"" {
+								if len(rest) >= 25 && string(rest[:16]) == "\"in_reply_to_scr" && string(rest[16:25]) == "een_name\"" {
 									idx, p = 18, p+25
 								}
 							}
@@ -6211,7 +6211,7 @@ func (v *Metadata) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				if len(rest) >= 19 && string(rest[:19]) == "\"iso_language_code\"" {
+				if len(rest) >= 19 && string(rest[:16]) == "\"iso_language_co" && string(rest[16:19]) == "de\"" {
 					idx, p = 0, p+19
 				}
 			case 'r':
@@ -6314,7 +6314,7 @@ func (v *Metadata) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		if len(rest) > 1 {
 			switch rest[1] {
 			case 'i':
-				if len(rest) >= 19 && string(rest[:19]) == "\"iso_language_code\"" {
+				if len(rest) >= 19 && string(rest[:16]) == "\"iso_language_co" && string(rest[16:19]) == "de\"" {
 					idx, p = 0, p+19
 				}
 			case 'r':
@@ -6810,11 +6810,11 @@ func (v *User) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						if len(rest) > 17 {
 							switch rest[17] {
 							case 'f':
-								if len(rest) >= 28 && string(rest[:28]) == "\"profile_sidebar_fill_color\"" {
+								if len(rest) >= 28 && string(rest[:16]) == "\"profile_sidebar" && string(rest[16:28]) == "_fill_color\"" {
 									idx, p = 0, p+28
 								}
 							case 'b':
-								if len(rest) >= 30 && string(rest[:30]) == "\"profile_sidebar_border_color\"" {
+								if len(rest) >= 30 && string(rest[:16]) == "\"profile_sidebar" && string(rest[16:30]) == "_border_color\"" {
 									idx, p = 1, p+30
 								}
 							}
@@ -6823,24 +6823,24 @@ func (v *User) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						if len(rest) > 20 {
 							switch rest[20] {
 							case 't':
-								if len(rest) >= 25 && string(rest[:25]) == "\"profile_background_tile\"" {
+								if len(rest) >= 25 && string(rest[:16]) == "\"profile_backgro" && string(rest[16:25]) == "und_tile\"" {
 									idx, p = 2, p+25
 								}
 							case 'i':
 								if len(rest) > 29 {
 									switch rest[29] {
 									case '_':
-										if len(rest) >= 36 && string(rest[:36]) == "\"profile_background_image_url_https\"" {
+										if len(rest) >= 36 && string(rest[:16]) == "\"profile_backgro" && string(rest[16:32]) == "und_image_url_ht" && string(rest[32:36]) == "tps\"" {
 											idx, p = 26, p+36
 										}
 									case '"':
-										if len(rest) >= 30 && string(rest[:30]) == "\"profile_background_image_url\"" {
+										if len(rest) >= 30 && string(rest[:16]) == "\"profile_backgro" && string(rest[16:30]) == "und_image_url\"" {
 											idx, p = 33, p+30
 										}
 									}
 								}
 							case 'c':
-								if len(rest) >= 26 && string(rest[:26]) == "\"profile_background_color\"" {
+								if len(rest) >= 26 && string(rest[:16]) == "\"profile_backgro" && string(rest[16:26]) == "und_color\"" {
 									idx, p = 27, p+26
 								}
 							}
@@ -6849,11 +6849,11 @@ func (v *User) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						if len(rest) > 18 {
 							switch rest[18] {
 							case '"':
-								if len(rest) >= 19 && string(rest[:19]) == "\"profile_image_url\"" {
+								if len(rest) >= 19 && string(rest[:16]) == "\"profile_image_u" && string(rest[16:19]) == "rl\"" {
 									idx, p = 4, p+19
 								}
 							case '_':
-								if len(rest) >= 25 && string(rest[:25]) == "\"profile_image_url_https\"" {
+								if len(rest) >= 25 && string(rest[:16]) == "\"profile_image_u" && string(rest[16:25]) == "rl_https\"" {
 									idx, p = 16, p+25
 								}
 							}
@@ -6861,7 +6861,7 @@ func (v *User) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					case 'l':
 						switch rest[1] {
 						case 'p':
-							if len(rest) >= 20 && string(rest[:20]) == "\"profile_link_color\"" {
+							if len(rest) >= 20 && string(rest[:16]) == "\"profile_link_co" && string(rest[16:20]) == "lor\"" {
 								idx, p = 8, p+20
 							}
 						case 'g':
@@ -6870,11 +6870,11 @@ func (v *User) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 							}
 						}
 					case 'u':
-						if len(rest) >= 30 && string(rest[:30]) == "\"profile_use_background_image\"" {
+						if len(rest) >= 30 && string(rest[:16]) == "\"profile_use_bac" && string(rest[16:30]) == "kground_image\"" {
 							idx, p = 19, p+30
 						}
 					case 't':
-						if len(rest) >= 20 && string(rest[:20]) == "\"profile_text_color\"" {
+						if len(rest) >= 20 && string(rest[:16]) == "\"profile_text_co" && string(rest[16:20]) == "lor\"" {
 							idx, p = 21, p+20
 						}
 					case 'd':
@@ -6882,7 +6882,7 @@ func (v *User) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 							idx, p = 24, p+11
 						}
 					case '_':
-						if len(rest) >= 23 && string(rest[:23]) == "\"show_all_inline_media\"" {
+						if len(rest) >= 23 && string(rest[:16]) == "\"show_all_inline" && string(rest[16:23]) == "_media\"" {
 							idx, p = 37, p+23
 						}
 					}
@@ -6919,11 +6919,11 @@ func (v *User) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					if len(rest) > 7 {
 						switch rest[7] {
 						case '_':
-							if len(rest) >= 21 && string(rest[:21]) == "\"follow_request_sent\"" {
+							if len(rest) >= 21 && string(rest[:16]) == "\"follow_request_" && string(rest[16:21]) == "sent\"" {
 								idx, p = 7, p+21
 							}
 						case 'e':
-							if len(rest) >= 17 && string(rest[:17]) == "\"followers_count\"" {
+							if len(rest) >= 17 && string(rest[:16]) == "\"followers_count" && string(rest[16:17]) == "\"" {
 								idx, p = 23, p+17
 							}
 						case 'i':
@@ -6963,11 +6963,11 @@ func (v *User) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 				if len(rest) > 16 {
 					switch rest[16] {
 					case '"':
-						if len(rest) >= 17 && string(rest[:17]) == "\"default_profile\"" {
+						if len(rest) >= 17 && string(rest[:16]) == "\"default_profile" && string(rest[16:17]) == "\"" {
 							idx, p = 12, p+17
 						}
 					case '_':
-						if len(rest) >= 23 && string(rest[:23]) == "\"default_profile_image\"" {
+						if len(rest) >= 23 && string(rest[:16]) == "\"default_profile" && string(rest[16:23]) == "_image\"" {
 							idx, p = 32, p+23
 						}
 					}
@@ -6975,7 +6975,7 @@ func (v *User) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 			case 'n':
 				switch rest[1] {
 				case 'c':
-					if len(rest) >= 22 && string(rest[:22]) == "\"contributors_enabled\"" {
+					if len(rest) >= 22 && string(rest[:16]) == "\"contributors_en" && string(rest[16:22]) == "abled\"" {
 						idx, p = 13, p+22
 					}
 				case 'l':
@@ -6984,7 +6984,7 @@ func (v *User) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					}
 				}
 			case 'v':
-				if len(rest) >= 18 && string(rest[:18]) == "\"favourites_count\"" {
+				if len(rest) >= 18 && string(rest[:16]) == "\"favourites_coun" && string(rest[16:18]) == "t\"" {
 					idx, p = 14, p+18
 				}
 			case '"':
@@ -7717,11 +7717,11 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						if len(rest) > 17 {
 							switch rest[17] {
 							case 'f':
-								if len(rest) >= 28 && string(rest[:28]) == "\"profile_sidebar_fill_color\"" {
+								if len(rest) >= 28 && string(rest[:16]) == "\"profile_sidebar" && string(rest[16:28]) == "_fill_color\"" {
 									idx, p = 0, p+28
 								}
 							case 'b':
-								if len(rest) >= 30 && string(rest[:30]) == "\"profile_sidebar_border_color\"" {
+								if len(rest) >= 30 && string(rest[:16]) == "\"profile_sidebar" && string(rest[16:30]) == "_border_color\"" {
 									idx, p = 1, p+30
 								}
 							}
@@ -7730,24 +7730,24 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						if len(rest) > 20 {
 							switch rest[20] {
 							case 't':
-								if len(rest) >= 25 && string(rest[:25]) == "\"profile_background_tile\"" {
+								if len(rest) >= 25 && string(rest[:16]) == "\"profile_backgro" && string(rest[16:25]) == "und_tile\"" {
 									idx, p = 2, p+25
 								}
 							case 'i':
 								if len(rest) > 29 {
 									switch rest[29] {
 									case '_':
-										if len(rest) >= 36 && string(rest[:36]) == "\"profile_background_image_url_https\"" {
+										if len(rest) >= 36 && string(rest[:16]) == "\"profile_backgro" && string(rest[16:32]) == "und_image_url_ht" && string(rest[32:36]) == "tps\"" {
 											idx, p = 26, p+36
 										}
 									case '"':
-										if len(rest) >= 30 && string(rest[:30]) == "\"profile_background_image_url\"" {
+										if len(rest) >= 30 && string(rest[:16]) == "\"profile_backgro" && string(rest[16:30]) == "und_image_url\"" {
 											idx, p = 33, p+30
 										}
 									}
 								}
 							case 'c':
-								if len(rest) >= 26 && string(rest[:26]) == "\"profile_background_color\"" {
+								if len(rest) >= 26 && string(rest[:16]) == "\"profile_backgro" && string(rest[16:26]) == "und_color\"" {
 									idx, p = 27, p+26
 								}
 							}
@@ -7756,11 +7756,11 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						if len(rest) > 18 {
 							switch rest[18] {
 							case '"':
-								if len(rest) >= 19 && string(rest[:19]) == "\"profile_image_url\"" {
+								if len(rest) >= 19 && string(rest[:16]) == "\"profile_image_u" && string(rest[16:19]) == "rl\"" {
 									idx, p = 4, p+19
 								}
 							case '_':
-								if len(rest) >= 25 && string(rest[:25]) == "\"profile_image_url_https\"" {
+								if len(rest) >= 25 && string(rest[:16]) == "\"profile_image_u" && string(rest[16:25]) == "rl_https\"" {
 									idx, p = 16, p+25
 								}
 							}
@@ -7768,7 +7768,7 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					case 'l':
 						switch rest[1] {
 						case 'p':
-							if len(rest) >= 20 && string(rest[:20]) == "\"profile_link_color\"" {
+							if len(rest) >= 20 && string(rest[:16]) == "\"profile_link_co" && string(rest[16:20]) == "lor\"" {
 								idx, p = 8, p+20
 							}
 						case 'g':
@@ -7777,11 +7777,11 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 							}
 						}
 					case 'u':
-						if len(rest) >= 30 && string(rest[:30]) == "\"profile_use_background_image\"" {
+						if len(rest) >= 30 && string(rest[:16]) == "\"profile_use_bac" && string(rest[16:30]) == "kground_image\"" {
 							idx, p = 19, p+30
 						}
 					case 't':
-						if len(rest) >= 20 && string(rest[:20]) == "\"profile_text_color\"" {
+						if len(rest) >= 20 && string(rest[:16]) == "\"profile_text_co" && string(rest[16:20]) == "lor\"" {
 							idx, p = 21, p+20
 						}
 					case 'd':
@@ -7789,7 +7789,7 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 							idx, p = 24, p+11
 						}
 					case '_':
-						if len(rest) >= 23 && string(rest[:23]) == "\"show_all_inline_media\"" {
+						if len(rest) >= 23 && string(rest[:16]) == "\"show_all_inline" && string(rest[16:23]) == "_media\"" {
 							idx, p = 37, p+23
 						}
 					}
@@ -7826,11 +7826,11 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					if len(rest) > 7 {
 						switch rest[7] {
 						case '_':
-							if len(rest) >= 21 && string(rest[:21]) == "\"follow_request_sent\"" {
+							if len(rest) >= 21 && string(rest[:16]) == "\"follow_request_" && string(rest[16:21]) == "sent\"" {
 								idx, p = 7, p+21
 							}
 						case 'e':
-							if len(rest) >= 17 && string(rest[:17]) == "\"followers_count\"" {
+							if len(rest) >= 17 && string(rest[:16]) == "\"followers_count" && string(rest[16:17]) == "\"" {
 								idx, p = 23, p+17
 							}
 						case 'i':
@@ -7870,11 +7870,11 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 				if len(rest) > 16 {
 					switch rest[16] {
 					case '"':
-						if len(rest) >= 17 && string(rest[:17]) == "\"default_profile\"" {
+						if len(rest) >= 17 && string(rest[:16]) == "\"default_profile" && string(rest[16:17]) == "\"" {
 							idx, p = 12, p+17
 						}
 					case '_':
-						if len(rest) >= 23 && string(rest[:23]) == "\"default_profile_image\"" {
+						if len(rest) >= 23 && string(rest[:16]) == "\"default_profile" && string(rest[16:23]) == "_image\"" {
 							idx, p = 32, p+23
 						}
 					}
@@ -7882,7 +7882,7 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			case 'n':
 				switch rest[1] {
 				case 'c':
-					if len(rest) >= 22 && string(rest[:22]) == "\"contributors_enabled\"" {
+					if len(rest) >= 22 && string(rest[:16]) == "\"contributors_en" && string(rest[16:22]) == "abled\"" {
 						idx, p = 13, p+22
 					}
 				case 'l':
@@ -7891,7 +7891,7 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					}
 				}
 			case 'v':
-				if len(rest) >= 18 && string(rest[:18]) == "\"favourites_count\"" {
+				if len(rest) >= 18 && string(rest[:16]) == "\"favourites_coun" && string(rest[16:18]) == "t\"" {
 					idx, p = 14, p+18
 				}
 			case '"':

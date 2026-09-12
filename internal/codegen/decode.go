@@ -248,6 +248,10 @@ func (g *generator) rawKeys(b *block, s *analyzer.StructInfo, c ctx) {
 	g.rawKeyTree(b, cands, c, 0, nil)
 }
 
+// rawCompareChunk is the longest constant the compiler compares inline
+// (2*RegSize in cmd/compile's walkCompareString on the 64-bit targets).
+const rawCompareChunk = 16
+
 // rawCand is one name the raw match can hit: its field index and the name
 // as it appears in a document, quotes included.
 type rawCand struct {
@@ -267,7 +271,18 @@ func (g *generator) rawKeyTree(b *block, cands []rawCand, c ctx, known int, used
 		if int(l) > known {
 			conds = append(conds, bin(call(id("len"), rest), token.GEQ, num(l)))
 		}
-		conds = append(conds, bin(call(id("string"), slice(rest, nil, num(l))), token.EQL, str(k.quoted)))
+		// The comparison is emitted in pieces of at most sixteen bytes:
+		// that is the length up to which the compiler expands a compare
+		// against a constant into word loads, and a longer one is a call
+		// to memequal on every member that reaches this leaf.
+		for lo := int64(0); lo < l; lo += rawCompareChunk {
+			hi := min(lo+rawCompareChunk, l)
+			var from ast.Expr
+			if lo > 0 {
+				from = num(lo)
+			}
+			conds = append(conds, bin(call(id("string"), slice(rest, from, num(hi))), token.EQL, str(k.quoted[lo:hi])))
+		}
 		g.ifStmt(b, nil, and(conds...), func(b *block) {
 			// The name itself is not kept: the one place that needs it,
 			// the duplicate error, reads it back from kp.

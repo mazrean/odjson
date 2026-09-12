@@ -17056,7 +17056,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				if len(rest) > 6 {
 					switch rest[6] {
 					case 'n':
-						if len(rest) >= 26 && string(rest[:26]) == "\"audienceSubCategoryNames\"" {
+						if len(rest) >= 26 && string(rest[:16]) == "\"audienceSubCate" && string(rest[16:26]) == "goryNames\"" {
 							idx, p = 1, p+26
 						}
 					case 'N':
@@ -17082,7 +17082,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					idx, p = 4, p+14
 				}
 			case 't':
-				if len(rest) >= 19 && string(rest[:19]) == "\"seatCategoryNames\"" {
+				if len(rest) >= 19 && string(rest[:16]) == "\"seatCategoryNam" && string(rest[16:19]) == "es\"" {
 					idx, p = 5, p+19
 				}
 			case 'T':
@@ -17819,7 +17819,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				if len(rest) > 6 {
 					switch rest[6] {
 					case 'n':
-						if len(rest) >= 26 && string(rest[:26]) == "\"audienceSubCategoryNames\"" {
+						if len(rest) >= 26 && string(rest[:16]) == "\"audienceSubCate" && string(rest[16:26]) == "goryNames\"" {
 							idx, p = 1, p+26
 						}
 					case 'N':
@@ -17845,7 +17845,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					idx, p = 4, p+14
 				}
 			case 't':
-				if len(rest) >= 19 && string(rest[:19]) == "\"seatCategoryNames\"" {
+				if len(rest) >= 19 && string(rest[:16]) == "\"seatCategoryNam" && string(rest[16:19]) == "es\"" {
 					idx, p = 5, p+19
 				}
 			case 'T':
@@ -22146,7 +22146,7 @@ func (v *Price) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 					idx, p = 0, p+8
 				}
 			case 'u':
-				if len(rest) >= 23 && string(rest[:23]) == "\"audienceSubCategoryId\"" {
+				if len(rest) >= 23 && string(rest[:16]) == "\"audienceSubCate" && string(rest[16:23]) == "goryId\"" {
 					idx, p = 1, p+23
 				}
 			case 'e':
@@ -22281,7 +22281,7 @@ func (v *Price) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					idx, p = 0, p+8
 				}
 			case 'u':
-				if len(rest) >= 23 && string(rest[:23]) == "\"audienceSubCategoryId\"" {
+				if len(rest) >= 23 && string(rest[:16]) == "\"audienceSubCate" && string(rest[16:23]) == "goryId\"" {
 					idx, p = 1, p+23
 				}
 			case 'e':
