@@ -25,29 +25,32 @@ using the standard library, and take it off whenever you like" is the product,
 and a second entry point contradicts it.
 
 **Positioning** (measured, see `bench/`): the target is `encoding/json/v2`
-(2.2-3.5x faster on all four measurements) and `encoding/json` (3.2x on
-the two encodes, since the direct path learned v1's coder flags, and 1.2-1.5x
+(2.9-3.8x faster on all four measurements) and `encoding/json` (3.4x on
+the two encodes, since the direct path learned v1's coder flags, and 1.3-1.6x
 on the two decodes, which stay on the public API path because v1's flags
 allow what the strict parsers refuse). `github.com/bytedance/sonic` and
 `github.com/goccy/go-json` honour the v1 interfaces too and the generated code
 is correct under them, but odjson does **not** make them faster: it wins only
-their small unmarshal rows (sonic's by 1.16x and go-json's by 1.06x in
+their small unmarshal rows (sonic's by 1.20x and go-json's by 1.10x in
 `bench/ab`), and `bench/floor` proves why the rest cannot be won rather than
 asserting it: with a
-`MarshalJSON` that costs nothing, sonic still spends 106us on the twitter
-payload against 114us for its own path, and go-json 344us against 243us,
+`MarshalJSON` that costs nothing, sonic still spends 105us on the twitter
+payload against 113us for its own path, and go-json 345us against 240us,
 because sonic validates and go-json compacts whatever a marshaler returns.
 On the decode side the floor is the skip-and-validate pass they make before
-calling `UnmarshalJSON`: 286us and 477us on twitter, against their own 513us
-and 672us, so the generated decoder would have to run 2.3x faster than sonic's
-JIT to break even there. Do not re-open either question without re-running
-`bench/floor` and `bench/ab`. In `README.md` those two libraries are
+calling `UnmarshalJSON`: 271us and 477us on twitter, against their own 497us
+and 651us, so the generated decoder would have to decode that document 2.2x
+faster than sonic's JIT to break even there. Do not re-open either question
+without re-running `bench/floor` and `bench/ab`. In `README.md` those two
+libraries are
 **comparison baselines only** — their "with odjson" columns stay out of the
 tables, and the claim to keep honest is that json/v2 + odjson beats go-json on
-all four (the narrowest 1.25x, the small encode) and is level with sonic on
-three of the four (within 3% in the quoted run, all three in sonic's favour,
-and 5% across runs; `bench/ab` in one process reads 1.02x slower / level /
-1.02x slower) and 1.7x ahead on the small decode (1.67x in `bench/ab`). Re-measure before restating any of it.
+all four (the narrowest 1.37x, the small encode) and, since the third decode
+round, beats sonic on all four as well — but not by one margin: the decodes
+are 1.33x and 1.86x (1.29x and 1.84x in `bench/ab`, so real either way), the
+twitter encode 1.09x (1.08x in `ab`), and the small encode 1.09x here against
+1.05x in `ab`, which is the edge of the 5% two runs differ by, so it reads as
+level to 1.1x and nothing stronger. Re-measure before restating any of it.
 
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,
@@ -67,7 +70,7 @@ a plain `json.Marshal` / `json.Unmarshal`, from `encoding/json/v2` or
 `encoding/json`, the generated methods write into and read from the coder's
 own buffer through reflect-computed offsets and `unsafe`, at any depth (a
 top-level value, an element of a slice or map, a struct field), because
-`jsontext`'s public API charges a floor (357us / 799ns for a marshaler that
+`jsontext`'s public API charges a floor (354us / 775ns for a marshaler that
 costs nothing) and a per-name duplicate check that put 1.3x out of reach (see
 "The direct path" and "What the decode side pays" in `docs/internals.md`).
 Under `encoding/json`'s flags the encoder writes `odjsonrt.ModeV2HTML`, which
