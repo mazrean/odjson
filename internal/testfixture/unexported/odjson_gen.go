@@ -18,11 +18,12 @@ func (v *secret) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	dst = append(dst, ",\"id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.ID))
 	if len(v.Name) != 0 {
-		dst = append(dst, ",\"name\":"...)
-		dst, err = odjsonrt.AppendStringChecked(dst, string(v.Name), m)
+		dst = append(dst, ",\"name\":\""...)
+		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Name), m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, '"')
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')

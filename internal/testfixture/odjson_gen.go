@@ -21,11 +21,12 @@ func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 	dst = append(dst, ",\"id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.ID))
 	if len(v.Note) != 0 {
-		dst = append(dst, ",\"note\":"...)
-		dst, err = odjsonrt.AppendStringChecked(dst, string(v.Note), m)
+		dst = append(dst, ",\"note\":\""...)
+		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Note), m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, '"')
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
@@ -456,11 +457,12 @@ func (v *Base) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	dst = append(dst, ",\"base_id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.BaseID))
 	if len(v.BaseName) != 0 {
-		dst = append(dst, ",\"base_name\":"...)
-		dst, err = odjsonrt.AppendStringChecked(dst, string(v.BaseName), m)
+		dst = append(dst, ",\"base_name\":\""...)
+		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.BaseName), m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, '"')
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
@@ -887,12 +889,12 @@ func (v *Base) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *PtrBase) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"ptr_field\":"...)
-	dst, err = odjsonrt.AppendStringChecked(dst, string(v.PtrField), m)
+	dst = append(dst, "{\"ptr_field\":\""...)
+	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.PtrField), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '}')
+	dst = append(dst, '"', '}')
 	return dst, nil
 }
 
@@ -1235,18 +1237,20 @@ func (v *Scalars) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 	dst = append(dst, ",\"base_id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Base.BaseID))
 	if len(v.Base.BaseName) != 0 {
-		dst = append(dst, ",\"base_name\":"...)
-		dst, err = odjsonrt.AppendStringChecked(dst, string(v.Base.BaseName), m)
+		dst = append(dst, ",\"base_name\":\""...)
+		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Base.BaseName), m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, '"')
 	}
 	if v.PtrBase != nil {
-		dst = append(dst, ",\"ptr_field\":"...)
-		dst, err = odjsonrt.AppendStringChecked(dst, string(v.PtrBase.PtrField), m)
+		dst = append(dst, ",\"ptr_field\":\""...)
+		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.PtrBase.PtrField), m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, '"')
 	}
 	dst = append(dst, ",\"bool\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.Bool))
@@ -1280,17 +1284,17 @@ func (v *Scalars) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"string\":"...)
-	dst, err = odjsonrt.AppendStringChecked(dst, string(v.String), m)
+	dst = append(dst, ",\"string\":\""...)
+	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.String), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"named\":"...)
-	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Named), m)
+	dst = append(dst, "\",\"named\":\""...)
+	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Named), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"named_level\":"...)
+	dst = append(dst, "\",\"named_level\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.NamedLevel))
 	dst = append(dst, ",\"qint\":"...)
 	dst = append(dst, '"')
@@ -1317,22 +1321,24 @@ func (v *Scalars) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 		dst = odjsonrt.AppendInt(dst, int64((*v.QuotedPtr)))
 		dst = append(dst, '"')
 	}
-	dst = append(dst, ",\"renamed\":"...)
-	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Renamed), m)
+	dst = append(dst, ",\"renamed\":\""...)
+	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Renamed), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"Untagged\":"...)
-	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Untagged), m)
+	dst = append(dst, "\",\"Untagged\":\""...)
+	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Untagged), m)
 	if err != nil {
 		return nil, err
 	}
+	dst = append(dst, '"')
 	if len(v.OmitEmptyString) != 0 {
-		dst = append(dst, ",\"oe_string\":"...)
-		dst, err = odjsonrt.AppendStringChecked(dst, string(v.OmitEmptyString), m)
+		dst = append(dst, ",\"oe_string\":\""...)
+		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.OmitEmptyString), m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, '"')
 	}
 	if m.V2() || v.OmitEmptyInt != 0 {
 		dst = append(dst, ",\"oe_int\":"...)
@@ -1343,10 +1349,12 @@ func (v *Scalars) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 		if v.OmitEmptyPtr == nil {
 			dst = append(dst, 'n', 'u', 'l', 'l')
 		} else {
-			dst, err = odjsonrt.AppendStringChecked(dst, string((*v.OmitEmptyPtr)), m)
+			dst = append(dst, '"')
+			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.OmitEmptyPtr)), m)
 			if err != nil {
 				return nil, err
 			}
+			dst = append(dst, '"')
 		}
 	}
 	if len(v.OmitEmptySlice) != 0 {
@@ -1379,11 +1387,12 @@ func (v *Scalars) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 		}
 	}
 	if v.OmitZeroString != "" {
-		dst = append(dst, ",\"oz_string\":"...)
-		dst, err = odjsonrt.AppendStringChecked(dst, string(v.OmitZeroString), m)
+		dst = append(dst, ",\"oz_string\":\""...)
+		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.OmitZeroString), m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, '"')
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
@@ -4470,10 +4479,12 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 			if i542 > 0 {
 				dst = append(dst, ',')
 			}
-			dst, err = odjsonrt.AppendStringChecked(dst, string(v.Strings[i542]), m)
+			dst = append(dst, '"')
+			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Strings[i542]), m)
 			if err != nil {
 				return nil, err
 			}
+			dst = append(dst, '"')
 		}
 		dst = append(dst, ']')
 	}
@@ -4551,16 +4562,19 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 			if i549 > 0 {
 				dst = append(dst, ',')
 			}
-			dst, err = odjsonrt.AppendStringChecked(dst, k548, m)
+			dst = append(dst, '"')
+			dst, err = odjsonrt.AppendStringBodyChecked(dst, k548, m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, ':')
+			dst = append(dst, '"', ':')
 			mv550 := v.StringMap[k548]
-			dst, err = odjsonrt.AppendStringChecked(dst, string(mv550), m)
+			dst = append(dst, '"')
+			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv550), m)
 			if err != nil {
 				return nil, err
 			}
+			dst = append(dst, '"')
 		}
 		dst = append(dst, '}')
 	}
@@ -4578,11 +4592,12 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 			if i553 > 0 {
 				dst = append(dst, ',')
 			}
-			dst, err = odjsonrt.AppendStringChecked(dst, k552, m)
+			dst = append(dst, '"')
+			dst, err = odjsonrt.AppendStringBodyChecked(dst, k552, m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, ':')
+			dst = append(dst, '"', ':')
 			mv554 := v.InnerMap[k552]
 			dst, err = mv554.odjsonAppend(dst, m)
 			if err != nil {
@@ -4605,11 +4620,12 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 			if i557 > 0 {
 				dst = append(dst, ',')
 			}
-			dst, err = odjsonrt.AppendStringChecked(dst, k556, m)
+			dst = append(dst, '"')
+			dst, err = odjsonrt.AppendStringBodyChecked(dst, k556, m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, ':')
+			dst = append(dst, '"', ':')
 			mv558 := v.NamedMap[k556]
 			dst = odjsonrt.AppendInt(dst, int64(mv558))
 		}
@@ -4629,11 +4645,12 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 			if i561 > 0 {
 				dst = append(dst, ',')
 			}
-			dst, err = odjsonrt.AppendStringChecked(dst, k560, m)
+			dst = append(dst, '"')
+			dst, err = odjsonrt.AppendStringBodyChecked(dst, k560, m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, ':')
+			dst = append(dst, '"', ':')
 			mv562 := v.ColorMap[Color(k560)]
 			dst = odjsonrt.AppendInt(dst, int64(mv562))
 		}
@@ -8243,11 +8260,12 @@ func (v *Recursive) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, err
 	var err error
 	_ = err
 	start := len(dst)
-	dst = append(dst, ",\"name\":"...)
-	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Name), m)
+	dst = append(dst, ",\"name\":\""...)
+	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Name), m)
 	if err != nil {
 		return nil, err
 	}
+	dst = append(dst, '"')
 	if len(v.Children) != 0 {
 		dst = append(dst, ",\"children\":"...)
 		if v.Children == nil {

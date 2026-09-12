@@ -74,6 +74,36 @@ func (g *generator) encodeStruct(b *block, s *analyzer.StructInfo) {
 	// into a brace afterwards, which costs a branch and a store per
 	// object; a struct without omitempty, omitzero or a nil-able embedded
 	// pointer never needs that, and most structs are that.
+	// A string member's quotes are folded into the literals around it: the
+	// opening quote ends the member name literal and the closing one starts
+	// the next member's, so the string helper writes the body alone and two
+	// one-byte appends per string member disappear. pending says the last
+	// member written left its closing quote to whoever writes next; only an
+	// unconditional member can take it, since a conditional one may write
+	// nothing at all.
+	pending := false
+	member := func(b *block, f *analyzer.Field, sep string) {
+		if pending {
+			sep = `"` + sep
+		}
+		lit := sep + jsonString(f.JSONName, g.opts.EscapeHTML) + ":"
+		if fusableString(f) {
+			g.appendLit(b, lit+`"`)
+			g.emit(b, appendChecked(callRT("AppendStringBodyChecked", dst, call(id("string"), selector(f)), mode)))
+			g.encErr(b)
+			pending = true
+			return
+		}
+		g.appendLit(b, lit)
+		g.encodeMember(b, f)
+		pending = false
+	}
+	closing := func() string {
+		if pending {
+			return `"}`
+		}
+		return "}"
+	}
 	if fixed {
 		if len(s.Fields) == 0 {
 			g.emit(b, appendChars("{}"))
@@ -85,25 +115,44 @@ func (g *generator) encodeStruct(b *block, s *analyzer.StructInfo) {
 			if i == 0 {
 				sep = "{"
 			}
-			g.appendLit(b, sep+jsonString(f.JSONName, g.opts.EscapeHTML)+":")
-			g.encodeMember(b, f)
+			member(b, f, sep)
 		}
-		g.emit(b, appendChars("}"))
+		g.emit(b, appendChars(closing()))
 		g.emit(b, ret(dst, nilV))
 		return
 	}
 	start := id("start")
 	g.emit(b, define(start, call(id("len"), dst)))
 	for i, f := range s.Fields {
-		body := func(b *block) {
-			g.appendLit(b, ","+jsonString(f.JSONName, g.opts.EscapeHTML)+":")
+		if len(conds[i]) == 0 {
+			member(b, f, ",")
+			continue
+		}
+		if pending {
+			g.emit(b, appendChars(`"`))
+			pending = false
+		}
+		g.ifStmt(b, nil, and(conds[i]...), func(b *block) {
+			lit := "," + jsonString(f.JSONName, g.opts.EscapeHTML) + ":"
+			if fusableString(f) {
+				// The opening quote still folds into the name; the
+				// closing one cannot be left pending past the block.
+				g.appendLit(b, lit+`"`)
+				g.emit(b, appendChecked(callRT("AppendStringBodyChecked", dst, call(id("string"), selector(f)), mode)))
+				g.encErr(b)
+				g.emit(b, appendChars(`"`))
+				return
+			}
+			g.appendLit(b, lit)
 			g.encodeMember(b, f)
-		}
-		if len(conds[i]) > 0 {
-			g.ifStmt(b, nil, and(conds[i]...), body)
-		} else {
-			body(b)
-		}
+		})
+	}
+	if pending {
+		// An unconditional member was written, so the object is not empty.
+		g.emit(b, assign(index(dst, start), chr('{')))
+		g.emit(b, appendChars(`"}`))
+		g.emit(b, ret(dst, nilV))
+		return
 	}
 	s0 := g.ifStmt(b, nil, bin(call(id("len"), dst), token.EQL, start), func(b *block) {
 		g.emit(b, appendChars("{}"))
@@ -113,6 +162,16 @@ func (g *generator) encodeStruct(b *block, s *analyzer.StructInfo) {
 		g.emit(b, appendChars("}"))
 	})
 	g.emit(b, ret(dst, nilV))
+}
+
+// fusableString reports whether f is written by the plain string helper, so
+// that its quotes can be folded into the literals around it. A ",string"
+// member, or a string type with its own marshaler, is written by a helper
+// that produces the quotes itself.
+func fusableString(f *analyzer.Field) bool {
+	t := f.Type
+	return !f.AsString && t.Kind == analyzer.KindString &&
+		!t.Marshaler && !t.PtrMarshaler && !t.TextMarshaler && !t.PtrTextMarshaler
 }
 
 // memberConds renders the conditions under which f is written at all: the
@@ -246,8 +305,14 @@ func (g *generator) encode(b *block, t *analyzer.Type, src ast.Expr, addressable
 		g.emit(b, appendChecked(callRT("AppendFloat", dst, call(id("float64"), src), num(int64(t.Bits)))))
 		g.encErr(b)
 	case analyzer.KindString:
-		g.emit(b, appendChecked(callRT("AppendStringChecked", dst, call(id("string"), src), mode)))
+		// A string outside a struct member (an element, a map value, a
+		// pointer's target) cannot fold its quotes into a name literal, so
+		// they are written here around the same body call; the quoted
+		// runtime helper would cost a second call.
+		g.emit(b, appendChars("\""))
+		g.emit(b, appendChecked(callRT("AppendStringBodyChecked", dst, call(id("string"), src), mode)))
 		g.encErr(b)
+		g.emit(b, appendChars("\""))
 	case analyzer.KindBytes:
 		s := g.ifStmt(b, nil, bin(src, token.EQL, nilV), func(b *block) {
 			g.emit(b, assign(dst, callRT("AppendNilBytes", dst, mode)))
@@ -297,9 +362,10 @@ func (g *generator) encode(b *block, t *analyzer.Type, src ast.Expr, addressable
 				g.ifStmt(b, nil, bin(i, token.GTR, num(0)), func(b *block) {
 					g.emit(b, appendChars(","))
 				})
-				g.emit(b, appendChecked(callRT("AppendStringChecked", dst, k, mode)))
+				g.emit(b, appendChars("\""))
+				g.emit(b, appendChecked(callRT("AppendStringBodyChecked", dst, k, mode)))
 				g.encErr(b)
-				g.emit(b, appendChars(":"))
+				g.emit(b, appendChars("\":"))
 				g.emit(b, define(mv, index(src, conv(t.Key.Expr, k))))
 				g.encode(b, t.Elem, mv, true)
 			})

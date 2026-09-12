@@ -52,8 +52,6 @@ func (m StringMode) V2() bool { return m >= ModeStream }
 // AppendStringChecked is [AppendStringMode] with the error [ModeV2] can
 // report: a string that is not valid UTF-8. The other modes never fail.
 func AppendStringChecked(dst []byte, s string, m StringMode) ([]byte, error) {
-	// A single call, so that this inlines into generated code and a string
-	// under ModeV2, the common case, costs one call rather than two.
 	return appendStringChecked(dst, unsafe.Slice(unsafe.StringData(s), len(s)), m)
 }
 
@@ -84,11 +82,11 @@ func AppendStringMode(dst []byte, s string, m StringMode) []byte {
 func AppendStringBytesMode(dst []byte, s []byte, m StringMode) []byte {
 	switch m {
 	case ModeStream, ModeV2:
-		return appendQuotedStream(dst, s)
+		return appendQuotedStream(dst, s, true)
 	case ModeV2HTML:
-		return appendQuotedV2HTML(dst, s)
+		return appendQuotedV2HTML(dst, s, true)
 	}
-	return appendQuoted(dst, s, m == ModeHTML)
+	return appendQuoted(dst, s, m == ModeHTML, true)
 }
 
 // AppendStringQuotedMode writes s as a JSON string whose content is itself a
@@ -130,14 +128,18 @@ func swarUnsafe(w uint64) uint64 {
 // would have to type switch on any(src), which boxes the string header on
 // every call and costs more than the scan for short values.
 func appendQuotedStreamString(dst []byte, s string) []byte {
-	return appendQuotedStream(dst, unsafe.Slice(unsafe.StringData(s), len(s)))
+	return appendQuotedStream(dst, unsafe.Slice(unsafe.StringData(s), len(s)), true)
 }
 
 // appendQuotedStream is the ModeStream implementation: eight bytes are checked
 // per iteration, whole safe runs are copied at once, and no UTF-8 decoding
 // happens at all.
-func appendQuotedStream(dst []byte, src []byte) []byte {
-	dst = append(dst, '"')
+//
+// quoted says whether to write the surrounding quotes (see appendQuoted).
+func appendQuotedStream(dst []byte, src []byte, quoted bool) []byte {
+	if quoted {
+		dst = append(dst, '"')
+	}
 	start := 0
 	for i := 0; i < len(src); {
 		// Two words per iteration: the loads are independent, so the CPU
@@ -176,7 +178,10 @@ func appendQuotedStream(dst []byte, src []byte) []byte {
 		start = i
 	}
 	dst = append(dst, src[start:]...)
-	return append(dst, '"')
+	if quoted {
+		dst = append(dst, '"')
+	}
+	return dst
 }
 
 // appendEscape appends the escape sequence for b, a byte that JSON syntax
@@ -200,24 +205,41 @@ func appendEscape(dst []byte, b byte) []byte {
 	}
 }
 
-// appendStringChecked is [AppendStringChecked] on a byte slice. Its body is
-// the ModeV2 implementation: [appendQuotedStream]'s escaping with json/v2's
-// UTF-8 rule folded into the same pass. The word scan stops at a byte that
-// needs escaping or at the first non-ASCII byte; a non-ASCII run is
-// validated in place by skipNonASCII, which also finds where the scan
-// resumes. A string that is not valid UTF-8 is reported as [ErrInvalidUTF8]
-// with dst as it was. The other modes are handed on.
+// appendStringChecked is [AppendStringChecked] on a byte slice: the quotes
+// around [appendStringBodyChecked]. It is one unit over the inlining budget,
+// so the hot callers (generated code, appendAny) write the quotes themselves
+// and call the body, which keeps a string at one call; this is for the
+// exported entry point and the direct path's self-test. Under [ModeV2] a
+// string that is not valid UTF-8 is reported as [ErrInvalidUTF8] with dst as
+// it was.
 func appendStringChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
+	mark := len(dst)
+	dst, err := appendStringBodyChecked(append(dst, '"'), src, m)
+	if err != nil {
+		return dst[:mark], err
+	}
+	return append(dst, '"'), nil
+}
+
+// appendStringBodyChecked is [appendStringChecked] without the quotes: the
+// caller has written the opening quote, as the tail of a longer literal in a
+// generated encoder, and writes the closing one as the head of the next.
+// Under [ModeV2], the mode the direct path writes, the body is here rather
+// than behind a further call: a string costs the one call from the caller,
+// as it did when the quotes were part of it. Invalid UTF-8 is reported as
+// [ErrInvalidUTF8] with dst as it was, the opening quote included, so the
+// caller's buffer is left exactly as the failed member found it. The other
+// modes are handed on.
+func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
 	switch m {
 	case ModeStream:
-		return appendQuotedStream(dst, src), nil
+		return appendQuotedStream(dst, src, false), nil
 	case ModeHTML, ModePlain:
-		return appendQuoted(dst, src, m == ModeHTML), nil
+		return appendQuoted(dst, src, m == ModeHTML, false), nil
 	case ModeV2HTML:
-		return appendQuotedV2HTML(dst, src), nil
+		return appendQuotedV2HTML(dst, src, false), nil
 	}
 	mark := len(dst)
-	dst = append(dst, '"')
 	start := 0
 	for i := 0; i < len(src); {
 		for i+16 <= len(src) {
@@ -294,8 +316,15 @@ func appendStringChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
 		i++
 		start = i
 	}
-	dst = append(dst, src[start:]...)
-	return append(dst, '"'), nil
+	return append(dst, src[start:]...), nil
+}
+
+// AppendStringBodyChecked is [AppendStringChecked] without the quotes, for
+// generated code that folds a string member's quotes into the member name
+// literal before it and the one after it. Under [ModeV2] it reports
+// [ErrInvalidUTF8] with dst unchanged.
+func AppendStringBodyChecked(dst []byte, s string, m StringMode) ([]byte, error) {
+	return appendStringBodyChecked(dst, unsafe.Slice(unsafe.StringData(s), len(s)), m)
 }
 
 // appendQuotedV2HTML is the ModeV2HTML implementation: [appendQuotedStream]'s
@@ -305,8 +334,12 @@ func appendStringChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
 // everything else as it is, an invalid byte included, so this does the same:
 // a non-ASCII run is validated in place by skipNonASCII and searched for the
 // two line separators, and a run it refuses is copied one byte at a time.
-func appendQuotedV2HTML(dst []byte, src []byte) []byte {
-	dst = append(dst, '"')
+//
+// quoted says whether to write the surrounding quotes (see appendQuoted).
+func appendQuotedV2HTML(dst []byte, src []byte, quoted bool) []byte {
+	if quoted {
+		dst = append(dst, '"')
+	}
 	start := 0
 	for i := 0; i < len(src); {
 		for i+8 <= len(src) {
@@ -393,7 +426,10 @@ func appendQuotedV2HTML(dst []byte, src []byte) []byte {
 		start = i
 	}
 	dst = append(dst, src[start:]...)
-	return append(dst, '"')
+	if quoted {
+		dst = append(dst, '"')
+	}
+	return dst
 }
 
 // ParseStringTrusted is [ParseString] for input whose UTF-8 has already been
