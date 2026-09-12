@@ -412,7 +412,7 @@ where the two differ by more than the spread. Every row is within ±2% by
 | `unique-strings` | 2.08× | 1.53× | 1.51× (1.00×) | 1.04× |
 | `numbers` | 1.32× (1.14×) | 1.09× | 1.31× (1.15×) | **0.87×** |
 | `floats` (synthetic GeoJSON) | 1.53× (1.07×) | 1.96× | 1.55× (1.07×) | 1.32× |
-| `canada` | 1.22× (1.01×) | 1.31× | 1.22× (1.02×) | 1.07× |
+| `canada` | 1.15× (1.01×) | 1.31× | 1.15× (1.02×) | 1.07× |
 | `dense` | 4.33× (3.65×) | 3.28× | 4.31× (1.27×) | 1.39× |
 | `sparse` | 8.51× | 2.39× | 7.21× (2.70×) | 1.47× |
 | `skip` | — | 1.53× (1.68×) | — | 1.37× |
@@ -472,7 +472,10 @@ What did not hold, and what was done about it:
   `odjsonrt/ftoa.go` stopped calling `strconv` (see "Float formatting"):
   against the tree of the day before, the generated side reads `floats`
   −28%, `numbers` −15% (four `-randlayout` builds a side, five interleaved
-  runs, n=20, p=0.000) and `canada` −17% (`-count 5`, one layout), with
+  runs, n=20, p=0.000) and `canada` −12% (`-count 5`, one layout each
+  side; the round-one binaries had read −17%, and the base side alone moved
+  5% between the two builds, which is the layout noise the pooling is
+  for), with
   `small` and `twitter` within the noise of their untouched decode rows
   (encode `small` +1.5% / +2.7% at p=0.42 / 0.06 under `json/v2` /
   `encoding/json`, against a v1 `twitter` decode that moved +1.9% at
@@ -618,13 +621,14 @@ at 20% of that: the rest was `formatBase10` writing digits two at a time
 into a scratch buffer, `setDigits` trimming them, and `fmtEFG` copying them
 into the output one `append` per byte. The literature on the search
 (Ryu, Schubfach, Dragonbox, Tejú Jaguá) would have shaved the 20%;
-`odjsonrt/ftoa.go` keeps the same search, done in 6.7 ns with a 30 entry
-table for the fixed-notation range, and replaced the 80%. In the
+`odjsonrt/ftoa.go` keeps the same search, done in 6.7 ns with a 701 entry
+table (the same range `strconv` covers; the fixed-notation range alone
+would need 30), and replaced the 80%. In the
 `odjsonrt` benchmarks (Ryzen 9 7950X, Go 1.27.1):
 
 | values | before | after |
 | --- | --- | --- |
-| 1024 full precision coordinates (`AppendFloatFull`) | 44 ns each (12 of them the short path declining, 32 `strconv`) | 25 ns each |
+| 1024 full precision coordinates (`AppendFloatFull`) | 44 ns each (12 of them the short path declining, 32 `strconv`) | 27 ns each (2 of them the one-place round a coordinate pays before the gate turns it away) |
 | `40.8`, `-0.1`, `0.1`, `12.99`, `139.69171` (`AppendFloatShort`) | 12 ns each | 10.6 ns each |
 | 1024 values in exponent notation, magnitudes 1e-300 to 1e300 (`AppendFloatExp`) | 27 ns each (`strconv`) | 24 ns each |
 
