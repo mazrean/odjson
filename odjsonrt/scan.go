@@ -182,14 +182,10 @@ func scanKey(data []byte, p int) (int, error) {
 	if err != nil {
 		return end, err
 	}
-	p = SkipSpace(data, end)
-	if p >= len(data) {
-		return p, errUnexpectedEnd(p)
+	if next := AfterName(data, end); next > 0 {
+		return next, nil
 	}
-	if data[p] != ':' {
-		return p, errChar(data, p, "after object key")
-	}
-	return SkipSpace(data, p+1), nil
+	return afterKeySlow(data, end)
 }
 
 // scanString scans the JSON string literal that starts at p (which must hold a

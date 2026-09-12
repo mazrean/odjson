@@ -255,18 +255,16 @@ func ParseKeyStrict(data []byte, p int) (key []byte, next int, err error) {
 	if data[p] != '"' {
 		return nil, p, errChar(data, p, "looking for beginning of object key string")
 	}
-	key, _, next, err = parseStringBytesStrict(data, p)
+	key, _, end, err := parseStringBytesStrict(data, p)
 	if err != nil {
-		return nil, next, err
+		return nil, end, err
 	}
-	next = SkipSpace(data, next)
-	if next >= len(data) {
-		return nil, next, errUnexpectedEnd(next)
+	if next = AfterName(data, end); next == 0 {
+		if next, err = afterKeySlow(data, end); err != nil {
+			return nil, next, err
+		}
 	}
-	if data[next] != ':' {
-		return nil, next, errChar(data, next, "after object key")
-	}
-	return key, SkipSpace(data, next+1), nil
+	return key, next, nil
 }
 
 // ParseBase64Strict is [ParseBase64] under json/v2's rules.
@@ -409,14 +407,14 @@ func strictKey(data []byte, p int, names [][]byte, lv *strictLevel) ([][]byte, i
 		}
 		name = out
 	}
-	next := SkipSpace(data, end)
-	if next >= len(data) {
-		return names, next, errUnexpectedEnd(next)
+	// The colon and the one space an indented document puts after it are
+	// settled inline; anything else, including the errors, is a call.
+	next := AfterName(data, end)
+	if next == 0 {
+		if next, err = afterKeySlow(data, end); err != nil {
+			return names, next, err
+		}
 	}
-	if data[next] != ':' {
-		return names, next, errChar(data, next, "after object key")
-	}
-	next = SkipSpace(data, next+1)
 	h := nameHash(name)
 	w, bit := h>>62, uint64(1)<<(h>>56&63)
 	if lv.filter[w]&bit != 0 {

@@ -114,18 +114,16 @@ func ParseKey(data []byte, p int) (key []byte, aliased bool, next int, err error
 	if data[p] != '"' {
 		return nil, false, p, errChar(data, p, "looking for beginning of object key string")
 	}
-	key, aliased, next, err = ParseStringBytes(data, p)
+	key, aliased, end, err := ParseStringBytes(data, p)
 	if err != nil {
-		return nil, false, next, err
+		return nil, false, end, err
 	}
-	next = SkipSpace(data, next)
-	if next >= len(data) {
-		return nil, false, next, errUnexpectedEnd(next)
+	if next = AfterName(data, end); next == 0 {
+		if next, err = afterKeySlow(data, end); err != nil {
+			return nil, false, next, err
+		}
 	}
-	if data[next] != ':' {
-		return nil, false, next, errChar(data, next, "after object key")
-	}
-	return key, aliased, SkipSpace(data, next+1), nil
+	return key, aliased, next, nil
 }
 
 // AfterKey consumes the colon that follows an object member name ending
