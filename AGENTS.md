@@ -25,12 +25,13 @@ using the standard library, and take it off whenever you like" is the product,
 and a second entry point contradicts it.
 
 **Positioning** (measured, see `bench/`): the target is `encoding/json/v2`
-(2.1-3.6x faster on all four measurements) and `encoding/json` (1.2-1.6x on
-three of four; the twitter encode is 4% behind because v1's coder flags make
-the direct path decline). `github.com/bytedance/sonic` and
+(2.2-3.5x faster on all four measurements) and `encoding/json` (3.2x on
+the two encodes, since the direct path learned v1's coder flags, and 1.2-1.5x
+on the two decodes, which stay on the public API path because v1's flags
+allow what the strict parsers refuse). `github.com/bytedance/sonic` and
 `github.com/goccy/go-json` honour the v1 interfaces too and the generated code
 is correct under them, but odjson does **not** make them faster: it wins only
-their small unmarshal rows (sonic's by 1.15x and go-json's by 1.12x in
+their small unmarshal rows (sonic's by 1.16x and go-json's by 1.06x in
 `bench/ab`), and `bench/floor` proves why the rest cannot be won rather than
 asserting it: with a
 `MarshalJSON` that costs nothing, sonic still spends 106us on the twitter
@@ -43,11 +44,10 @@ JIT to break even there. Do not re-open either question without re-running
 `bench/floor` and `bench/ab`. In `README.md` those two libraries are
 **comparison baselines only** — their "with odjson" columns stay out of the
 tables, and the claim to keep honest is that json/v2 + odjson beats go-json on
-all four (the narrowest 1.32x, shared by the small encode and the large
-decode) and is level with sonic on three of the four (within 2% in the quoted
-run and 5% across runs, in either direction; `bench/ab` in one process reads
-1.03x slower / 1.04x slower / 1.02x faster) and 1.7x ahead on the small decode
-(1.62x in `bench/ab`). Re-measure before restating any of it.
+all four (the narrowest 1.25x, the small encode) and is level with sonic on
+three of the four (within 3% in the quoted run, all three in sonic's favour,
+and 5% across runs; `bench/ab` in one process reads 1.02x slower / level /
+1.02x slower) and 1.7x ahead on the small decode (1.67x in `bench/ab`). Re-measure before restating any of it.
 
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,
@@ -62,16 +62,21 @@ that decoder has to keep the parity fixtures green, and any new fast path must
 decline rather than guess: `internal/testfixture`'s scalar cases cover the
 spellings the raw match cannot see.
 
-The json/v2 numbers rest on `odjsonrt/direct.go`, **the direct path**: for a
-top-level value under a plain `json.Marshal` / `json.Unmarshal` the generated
-methods write into and read from the coder's own buffer through
-reflect-computed offsets and `unsafe`, because `jsontext`'s public API charges
-a floor (357us / 799ns for a marshaler that costs nothing) and a per-name
-duplicate check that put 1.3x out of reach (see "The direct path" and "What
-the decode side pays" in `docs/internals.md`). It is gated to the Go minor version it
-was verified against (1.27), checked by type at init, self-tested through
-json/v2 before use, and compiled out by `-tags odjson_safe`; every generated
-method keeps the public API path as its fallback. **On a new Go minor,
+The json/v2 numbers rest on `odjsonrt/direct.go`, **the direct path**: under
+a plain `json.Marshal` / `json.Unmarshal`, from `encoding/json/v2` or
+`encoding/json`, the generated methods write into and read from the coder's
+own buffer through reflect-computed offsets and `unsafe`, at any depth (a
+top-level value, an element of a slice or map, a struct field), because
+`jsontext`'s public API charges a floor (357us / 799ns for a marshaler that
+costs nothing) and a per-name duplicate check that put 1.3x out of reach (see
+"The direct path" and "What the decode side pays" in `docs/internals.md`).
+Under `encoding/json`'s flags the encoder writes `odjsonrt.ModeV2HTML`, which
+is byte for byte what that call's reformat made of the public path's output;
+its decode stays on the public path, because those flags allow what the
+strict parsers refuse. It is gated to the Go minor version it was verified
+against (1.27), checked by type at init, self-tested through json/v2 and
+encoding/json before use, and compiled out by `-tags odjson_safe`; every
+generated method keeps the public API path as its fallback. **On a new Go minor,
 re-verify the layout against `jsontext`'s source and add that minor to
 `verifiedGoMinors` in `odjsonrt/direct.go`; never widen it blind.**
 `.github/workflows/go-minor.yml` does the mechanical half of that nightly — it
@@ -183,8 +188,9 @@ Within the root module:
 
 Every fixture's generated file is committed, and `internal/generate`'s tests
 regenerate each one and fail on any difference. Regenerate with
-`go generate ./...` from the repo root (and again from `bench/gen` — a separate
-module) whenever the generator changes.
+`go generate ./...` from the repo root (and again from `bench/` — a separate
+module, whose `gen` and `shapes/gen` packages both carry a directive) whenever
+the generator changes.
 - `docs/internals.md` — the measurement record and the implementation detail
   behind `README.md`'s summary: the public API ceiling, the direct path, what
   the decode side pays, the v1/v2 semantics table, and why sonic and go-json
@@ -231,7 +237,7 @@ introduce `-X`/`ldflags` version injection, and do not disable `-buildvcs`.
   way to clear them — but never on a generated file: `internal/generate`'s
   tests regenerate and diff, so a modernize finding inside an `odjson_gen.go`
   means the **emitter** in `internal/codegen` has to change, followed by
-  `go generate ./...` from the root and from `bench/gen`. The generated code
+  `go generate ./...` from the root and from `bench/`. The generated code
   may use anything the root module's `go` directive allows, because a consumer
   cannot import `odjsonrt` from a module with a lower one.
 - Run it from the repository root:

@@ -17,7 +17,7 @@ func TestDirectEnabled(t *testing.T) {
 		t.Skipf("direct path is gated to %v, running %s", verifiedGoMinors, runtime.Version())
 	}
 	if !DirectEnabled() {
-		t.Fatal("the direct path is disabled on the Go version it was verified against")
+		t.Fatalf("the direct path is disabled on the Go version it was verified against: %s", directReason)
 	}
 }
 

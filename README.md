@@ -7,7 +7,7 @@ English | [日本語](./README.ja.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 **odjson** (*overdrive JSON*) is a CLI code generator that brings `encoding/json/v2` up to [`bytedance/sonic`](https://github.com/bytedance/sonic) speed without editing a line of your code.
-JSON encoding and decoding that already goes through the standard `encoding/json/v2` gets 2.1×–3.6× faster by adding the comment below and running `go generate`.
+JSON encoding and decoding that already goes through the standard `encoding/json/v2` gets 2.2×–3.5× faster by adding the comment below and running `go generate`.
 ```go
 //go:generate go tool odjson -type User
 ```
@@ -16,10 +16,10 @@ Deleting the generated file (`odjson_gen.go`) puts everything back to plain `enc
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bench-dark.svg">
-  <img alt="Time per operation, lower is better. Marshal large: encoding/json/v2 399 µs, with odjson 112 µs, sonic 114 µs, go-json 243 µs. Marshal small: 1060 ns, with odjson 319 ns, sonic 312 ns, go-json 421 ns. Unmarshal large: 1080 µs, with odjson 508 µs, sonic 513 µs, go-json 672 µs. Unmarshal small: 1864 ns, with odjson 562 ns, sonic 951 ns, go-json 794 ns." src="./docs/assets/bench-light.svg" width="912">
+  <img alt="Time per operation, lower is better. Marshal large: encoding/json/v2 400 µs, with odjson 113 µs, sonic 116 µs, go-json 245 µs. Marshal small: 1036 ns, with odjson 305 ns, sonic 311 ns, go-json 380 ns. Unmarshal large: 1111 µs, with odjson 516 µs, sonic 526 µs, go-json 687 µs. Unmarshal small: 1910 ns, with odjson 601 ns, sonic 1023 ns, go-json 799 ns." src="./docs/assets/bench-light.svg" width="912">
 </picture>
 
-The benchmarks measure **2.1×–3.6× over `encoding/json/v2`** on encode and decode alike. They also put odjson ahead of [`goccy/go-json`](https://github.com/goccy/go-json) on every measurement, and level with [`bytedance/sonic`](https://github.com/bytedance/sonic) — which JIT-compiles hand-written assembly and uses SIMD — on three of the four, with a 1.7× lead on the small decode.
+The benchmarks measure **2.2×–3.5× over `encoding/json/v2`** on encode and decode alike. They also put odjson ahead of [`goccy/go-json`](https://github.com/goccy/go-json) on every measurement, and level with [`bytedance/sonic`](https://github.com/bytedance/sonic) — which JIT-compiles hand-written assembly and uses SIMD — on three of the four, with a 1.7× lead on the small decode.
 
 <details>
 <summary>Benchmark environment and how to reproduce it</summary>
@@ -73,7 +73,7 @@ The method and the assumptions behind it are written up in [bench/README.md](./b
 
 Go 1.27 or newer. Generated files import `encoding/json/jsontext`, so they do not compile on 1.26 and older.
 
-`encoding/json` benefits too, since 1.27 implements it on top of `encoding/json/v2` internally, but odjson is tuned to get the most out of `encoding/json/v2`, which is the recommended way to use it. Through `encoding/json` three of the four measurements come out at 1.2×–1.6×, while the `large` encode is 4% slower: the coder flags `encoding/json` sets make the direct write into the internal buffer, described below, decline to run.
+`encoding/json` benefits too, since 1.27 implements it on top of `encoding/json/v2` internally, but odjson is tuned to get the most out of `encoding/json/v2`, which is the recommended way to use it. Through `encoding/json` the two encodes come out at 3.2× and the two decodes at 1.2×–1.5×: the encodes take the direct write into the internal buffer described below, while the decodes go through the public API, because the coder flags `encoding/json` sets allow input that the direct path's strict parsers refuse.
 
 ## Quick Start
 

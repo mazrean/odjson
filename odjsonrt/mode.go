@@ -32,15 +32,22 @@ const (
 	// invalid UTF-8 reported as an error since nothing downstream will. It
 	// is what the direct path (see direct.go) writes into the encoder.
 	ModeV2
+	// ModeV2HTML is what encoding/json's Marshal makes of a MarshalerTo:
+	// json/v2's semantics for everything but the string escaping, which is
+	// encoding/json's. It reproduces the reformat that call applies to
+	// [ModeStream] bytes: '<', '>', '&', U+2028 and U+2029 are escaped and
+	// invalid UTF-8 is copied as it is. The direct path writes it into an
+	// encoder that call created.
+	ModeV2HTML
 )
 
 // EscapeHTML reports whether the mode escapes '<', '>' and '&'.
-func (m StringMode) EscapeHTML() bool { return m == ModeHTML }
+func (m StringMode) EscapeHTML() bool { return m == ModeHTML || m == ModeV2HTML }
 
 // V2 reports whether the mode follows encoding/json/v2's semantics for
 // everything but string escaping: nil containers encode as empty ones and
 // omitempty keeps zero numbers and bools.
-func (m StringMode) V2() bool { return m == ModeStream || m == ModeV2 }
+func (m StringMode) V2() bool { return m >= ModeStream }
 
 // AppendStringChecked is [AppendStringMode] with the error [ModeV2] can
 // report: a string that is not valid UTF-8. The other modes never fail.
@@ -70,16 +77,16 @@ var streamSafeSet = func() (t [256]bool) {
 // AppendStringMode appends s to dst as a quoted JSON string under mode m.
 // Under [ModeV2] it cannot report invalid UTF-8; use [AppendStringChecked].
 func AppendStringMode(dst []byte, s string, m StringMode) []byte {
-	if m.V2() {
-		return appendQuotedStreamString(dst, s)
-	}
-	return appendQuotedString(dst, s, m == ModeHTML)
+	return AppendStringBytesMode(dst, unsafe.Slice(unsafe.StringData(s), len(s)), m)
 }
 
 // AppendStringBytesMode is [AppendStringMode] for a byte slice.
 func AppendStringBytesMode(dst []byte, s []byte, m StringMode) []byte {
-	if m.V2() {
+	switch m {
+	case ModeStream, ModeV2:
 		return appendQuotedStream(dst, s)
+	case ModeV2HTML:
+		return appendQuotedV2HTML(dst, s)
 	}
 	return appendQuoted(dst, s, m == ModeHTML)
 }
@@ -90,9 +97,11 @@ func AppendStringQuotedMode(dst []byte, s string, m StringMode) []byte {
 	if !m.V2() {
 		return AppendStringQuoted(dst, s, m == ModeHTML)
 	}
+	// The inner string is always ModeStream's: under ModeV2HTML the
+	// reformat this mode reproduces only ever sees the outer one.
 	buf := GetBuffer()
 	buf.B = appendQuotedStreamString(buf.B, s)
-	dst = appendQuotedStream(dst, buf.B)
+	dst = AppendStringBytesMode(dst, buf.B, m)
 	PutBuffer(buf)
 	return dst
 }
@@ -204,6 +213,8 @@ func appendStringChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
 		return appendQuotedStream(dst, src), nil
 	case ModeHTML, ModePlain:
 		return appendQuoted(dst, src, m == ModeHTML), nil
+	case ModeV2HTML:
+		return appendQuotedV2HTML(dst, src), nil
 	}
 	mark := len(dst)
 	dst = append(dst, '"')
@@ -241,7 +252,38 @@ func appendStringChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
 		}
 		if b := src[i]; b >= utf8.RuneSelf {
 			// The run stays part of the pending copy: a valid sequence
-			// holds nothing that needs escaping.
+			// holds nothing that needs escaping. A two byte sequence is
+			// settled here without the call, and the words after it are
+			// taken whole while they are accented Latin text (see
+			// swarLatin), which would otherwise stop the scan at every
+			// letter; the first word without a non-ASCII byte hands back
+			// to the scan above.
+			if b-0xC2 < 0x1E && i+1 < len(src) && src[i+1]&0xC0 == 0x80 {
+				i += 2
+				if i < len(src) && src[i] >= utf8.RuneSelf {
+					// A dense run (Cyrillic, Greek): skipNonASCII takes
+					// it a word at a time.
+					if i = skipNonASCII(src, i); i < 0 {
+						return dst[:mark], ErrInvalidUTF8
+					}
+					continue
+				}
+				for i+8 <= len(src) {
+					w := binary.LittleEndian.Uint64(src[i:])
+					if w&swarHi == 0 || swarUnsafe(w) != 0 || !swarLatin(w) {
+						break
+					}
+					i += 8
+				}
+				continue
+			}
+			// A lone four byte sequence (an emoji among ASCII) likewise: F0
+			// needs a second byte of 90-BF, F4 one of 80-8F, F1-F3 any.
+			if b-0xF0 < 5 && i+3 < len(src) && src[i+1]&0xC0 == 0x80 && src[i+2]&0xC0 == 0x80 && src[i+3]&0xC0 == 0x80 &&
+				(b != 0xF0 || src[i+1] >= 0x90) && (b != 0xF4 || src[i+1] < 0x90) {
+				i += 4
+				continue
+			}
 			if i = skipNonASCII(src, i); i < 0 {
 				return dst[:mark], ErrInvalidUTF8
 			}
@@ -254,6 +296,104 @@ func appendStringChecked(dst []byte, src []byte, m StringMode) ([]byte, error) {
 	}
 	dst = append(dst, src[start:]...)
 	return append(dst, '"'), nil
+}
+
+// appendQuotedV2HTML is the ModeV2HTML implementation: [appendQuotedStream]'s
+// escaping, plus what encoding/json's reformat adds to it under
+// PreserveRawStrings, EscapeForHTML and EscapeForJS. That reformat walks the
+// literal rune by rune, escapes '<', '>', '&', U+2028 and U+2029, and copies
+// everything else as it is, an invalid byte included, so this does the same:
+// a non-ASCII run is validated in place by skipNonASCII and searched for the
+// two line separators, and a run it refuses is copied one byte at a time.
+func appendQuotedV2HTML(dst []byte, src []byte) []byte {
+	dst = append(dst, '"')
+	start := 0
+	for i := 0; i < len(src); {
+		for i+8 <= len(src) {
+			w := binary.LittleEndian.Uint64(src[i:])
+			if m := swarUnsafe(w) | swarHasByte(w, '<') | swarHasByte(w, '>') | swarHasByte(w, '&') | w&swarHi; m != 0 {
+				i += swarIndex(m)
+				goto found
+			}
+			i += 8
+		}
+		for i < len(src) && htmlSafeSet[src[i]] {
+			i++
+		}
+	found:
+		if i >= len(src) {
+			break
+		}
+		b := src[i]
+		if b >= utf8.RuneSelf {
+			// A two byte sequence followed by ASCII, then words of
+			// accented Latin text, are settled as in appendStringChecked;
+			// neither can hold a line separator.
+			if b-0xC2 < 0x1E && i+1 < len(src) && src[i+1]&0xC0 == 0x80 && (i+2 >= len(src) || src[i+2] < utf8.RuneSelf) {
+				i += 2
+				for i+8 <= len(src) {
+					w := binary.LittleEndian.Uint64(src[i:])
+					if w&swarHi == 0 || swarUnsafe(w)|swarHasByte(w, '<')|swarHasByte(w, '>')|swarHasByte(w, '&') != 0 || !swarLatin(w) {
+						break
+					}
+					i += 8
+				}
+				continue
+			}
+			// A lone four byte sequence (an emoji among ASCII) likewise: F0
+			// needs a second byte of 90-BF, F4 one of 80-8F, F1-F3 any.
+			if b-0xF0 < 5 && i+3 < len(src) && src[i+1]&0xC0 == 0x80 && src[i+2]&0xC0 == 0x80 && src[i+3]&0xC0 == 0x80 &&
+				(b != 0xF0 || src[i+1] >= 0x90) && (b != 0xF4 || src[i+1] < 0x90) {
+				i += 4
+				continue
+			}
+			j := skipNonASCII(src, i)
+			if j < 0 {
+				// Not UTF-8 somewhere in this run. The reformat decodes
+				// rune by rune, so a line separator before the bad byte
+				// is still escaped, and the bad byte itself stays in the
+				// pending copy. The rest of the run is settled here, not
+				// by scanning it again from the next rune on.
+				for i < len(src) && src[i] >= utf8.RuneSelf {
+					r, size := utf8.DecodeRune(src[i:])
+					if r == 0x2028 || r == 0x2029 {
+						dst = append(dst, src[start:i]...)
+						dst = append(dst, '\\', 'u', '2', '0', '2', hexDigits[r&0xF])
+						start = i + size
+					}
+					i += size
+				}
+				continue
+			}
+			for k := i; k+2 < j; {
+				n := bytes.IndexByte(src[k:j-2], 0xE2)
+				if n < 0 {
+					break
+				}
+				k += n
+				if src[k+1] == 0x80 && src[k+2]&^1 == 0xA8 {
+					dst = append(dst, src[start:k]...)
+					dst = append(dst, '\\', 'u', '2', '0', '2', hexDigits[src[k+2]&0xF])
+					k += 3
+					start = k
+					continue
+				}
+				k++
+			}
+			i = j
+			continue
+		}
+		dst = append(dst, src[start:i]...)
+		if b == '<' || b == '>' || b == '&' {
+			dst = append(dst, '\\', 'u', '0', '0', hexDigits[b>>4], hexDigits[b&0xF])
+		} else {
+			dst = appendEscape(dst, b)
+		}
+		i++
+		start = i
+	}
+	dst = append(dst, src[start:]...)
+	return append(dst, '"')
 }
 
 // ParseStringTrusted is [ParseString] for input whose UTF-8 has already been
