@@ -126,10 +126,10 @@ would not pay the reformat at all, but it pays per member instead, and at this
 fixture's density that is no better — see the density note below.
 
 `Marshal small` is arithmetic rather than throughput: of odjson's 241 ns,
-about 50 ns is the formatting of the three non-integral floats in the fixture
-(16 ns each on the short-decimal path described below; `strconv`'s shortest
-formatting, which `json/v2`'s own encoder pays, is 26 ns each). Fitting would
-mean halving everything else.
+about 35 ns is the formatting of the three non-integral floats in the fixture
+(11 ns each on the short-decimal path described under "Float formatting";
+`strconv`'s shortest formatting, which `json/v2`'s own encoder pays, is 26 ns
+each). Fitting would mean halving everything else.
 
 `Unmarshal twitter` was in that list until the generated decoder stopped
 consuming unknown members with `Decoder.SkipValue` and started using
@@ -165,8 +165,9 @@ mostly CJK text; the escape scan now stops at the first non-ASCII byte and a
 validator settles the run from there, three bytes at a time for the sequences
 CJK is made of and by `utf8.DecodeRune` for anything else. Member names are
 appended in pieces the compiler moves inline rather than through `memmove`,
-and a float that was a short decimal before it was parsed is printed as that
-decimal, proven with exact arithmetic rather than found with Ryu.
+and no float goes through `strconv`: a short decimal is proven by one
+division and anything else by a shortest-digit search whose digits are
+written as whole words (see "Float formatting").
 
 On the decode side the same fused validation runs inside the string scanner,
 and the rest of the profile is the byte oriented decoder's structure: a
@@ -409,9 +410,9 @@ where the two differ by more than the spread. Every row is within ±2% by
 | `text-emoji` | 1.17× (0.94×) | 1.10× | 0.99× (0.46×) | 0.98× |
 | `text-escaped` | 1.46× | 1.25× | 1.09× (0.55×) | **0.82×** |
 | `unique-strings` | 2.08× | 1.53× | 1.51× (1.00×) | 1.04× |
-| `numbers` | 1.14× | 1.09× | 1.15× (0.68×) | **0.87×** |
-| `floats` (synthetic GeoJSON) | 1.07× | 1.96× | 1.07× (0.64×) | 1.32× |
-| `canada` | 1.01× (1.12×) | 1.31× | 1.02× (0.67×) | 1.07× |
+| `numbers` | 1.32× (1.14×) | 1.09× | 1.31× (1.15×) | **0.87×** |
+| `floats` (synthetic GeoJSON) | 1.53× (1.07×) | 1.96× | 1.55× (1.07×) | 1.32× |
+| `canada` | 1.22× (1.01×) | 1.31× | 1.22× (1.02×) | 1.07× |
 | `dense` | 4.33× (3.65×) | 3.28× | 4.31× (1.27×) | 1.39× |
 | `sparse` | 8.51× | 2.39× | 7.21× (2.70×) | 1.47× |
 | `skip` | — | 1.53× (1.68×) | — | 1.37× |
@@ -463,14 +464,18 @@ What did not hold, and what was done about it:
   2.16× / 2.19×, Latin 1.32× / 1.47×, emoji 1.17× / 1.10×; Latin stays below
   ASCII (2.23×) because an accent every few bytes still ends each word scan
   early.
-- **Full precision floats are level.** `canada` and the synthetic `floats`
-  encode at 1.01–1.07× on both libraries, `numbers` at 1.14×: the short
-  decimal path declines them and both sides then run `strconv`'s shortest
-  formatting, which is the whole cost. That is the price of not running Ryu
-  and it will not move; what did move is the short path itself, which now
-  proves a candidate by one division instead of a two-word argument and
-  accepts every short decimal rather than 93% of them (see `ftoa.go`), which
-  is where `small`'s encode went from 290 to 272 ns.
+- **Full precision floats were level, and are not any more.** On 2026-09-11
+  `canada` and the synthetic `floats` encoded at 1.01–1.07× on both
+  libraries and `numbers` at 1.14×: the short decimal path declined them
+  and both sides then ran `strconv`'s shortest formatting, which was the
+  whole cost. The three encode rows in the table are from 2026-09-12, after
+  `odjsonrt/ftoa.go` stopped calling `strconv` (see "Float formatting"):
+  against the tree of the day before, the generated side reads `floats`
+  −31%, `canada` −17% and `numbers` −14% (`-count 6`, p=0.002), with
+  `small` and `twitter` within layout noise (p ≥ 0.13, one layout, n=6). The short path itself had moved
+  the day before, when it started proving a candidate by one division
+  instead of a two-word argument and accepting every short decimal rather
+  than 93% of them, which is where `small`'s encode went from 290 to 272 ns.
 
 sonic and go-json behave as the floor predicts on every shape: the generated
 codec is slower on all 25 encode rows on sonic (0.13–0.63×) and on 24 of 25
@@ -599,6 +604,70 @@ Do **not** also set `CompactMarshaler`: it sounds right for odjson's
 always-compact output, but it measures 1.7× *slower* than sonic's default and
 2.3× slower than the trusting config above — 520 µs on `twitter`, against
 303 µs and 230 µs measured beside it in a run of its own.
+
+## Float formatting
+
+`strconv.AppendFloat(v, 'f', -1, 64)` on a full precision coordinate
+measured 33 ns on the 7950X, and a profile of it put the shortest-digit
+search itself (Go 1.27's unrounded scaling, `internal/strconv/uscale.go`)
+at 20% of that: the rest was `formatBase10` writing digits two at a time
+into a scratch buffer, `setDigits` trimming them, and `fmtEFG` copying them
+into the output one `append` per byte. The literature on the search
+(Ryu, Schubfach, Dragonbox, Tejú Jaguá) would have shaved the 20%;
+`odjsonrt/ftoa.go` keeps the same search, done in 6.7 ns with a 30 entry
+table for the fixed-notation range, and replaced the 80%. In the
+`odjsonrt` benchmarks (Ryzen 9 7950X, Go 1.27.1):
+
+| values | before | after |
+| --- | --- | --- |
+| 1024 full precision coordinates (`AppendFloatFull`) | 44 ns each (12 of them the short path declining, 32 `strconv`) | 25 ns each |
+| `40.8`, `-0.1`, `0.1`, `12.99`, `139.69171` (`AppendFloatShort`) | 12 ns each | 10.6 ns each |
+
+What it does, and what was measured on the way there:
+
+- **The search is the paper's**, 2–3 128-bit multiplications by a rounded-up
+  power of ten with two fraction bits and a sticky bit, and `pow10gen.go`
+  writes the 30 entries the fixed-notation range needs (p from −6 to 23)
+  the way `strconv`'s generator writes its 696. Exponent notation and
+  `float32` still go to `strconv`.
+- **The digits become ASCII eight at a time** with three multiplications
+  (`digits8`: halves, quarters, digits, each split masked so that the shift
+  does not mix the lanes), verified against `strconv` on all 10^8 inputs.
+- **Nothing shifts a digit into place.** A first writer aligned the 17 digit
+  string and spliced the point in with masks and funnel shifts, all
+  branch-free, and measured 31 ns per value: about 190 instructions, most of
+  them the compiler's guards around variable shifts. The writer that stayed
+  takes the integer part as `⌊v⌋` (one conversion; the shortest decimal of
+  a float below 2^53 crosses no integer the float does not, since any
+  integer between them would be a float nearer the decimal) and the fraction
+  as what remains of the digits, and stores each as a fixed-width word ending
+  where it must end in a scratch buffer, the fraction first and the integer
+  part and the point over its padding, then copies the scratch out in four
+  whole words. A value's shape changes offsets, not code paths.
+- **Trailing zeros are counted, not divided out.** The search leaves them
+  when the interval held a multiple of a hundred, and a short decimal is
+  nothing but: 40.8 arrives as 4080000000000000. Dividing by ten in a loop
+  cost 14 rounds on that value and put a short decimal at 34 ns; they are
+  now the leading zero bytes of the fraction's last word (`LeadingZeros64`
+  of a SWAR nonzero-byte mask) and simply left outside the length.
+- **Short decimals never reach the search.** Without a short path the
+  general writer put `small`'s encode up 9–15%. The path that was there
+  before (candidate `round(v·10^f)` for f = 1…7, proven by one division)
+  came back with two changes: a gate in front, one multiplication by 10^7
+  whose product is an integer for every decimal of at most seven places, so
+  a full precision value pays one round instead of seven before declining;
+  and a writer that shifts the digits into one word a digit at a time and
+  stores it whole, for the numbers of at most eight bytes that nearly all of
+  them are. The same digits through two `digits8` words and a splice read
+  15.6 ns per value against the old path's 12 on `small`'s three floats, and
+  `small` +4%; the word-at-a-time loop reads 10.6 and `small` level.
+- **Parity is byte for byte.** `TestAppendFloatMatchesStrconv` runs 55
+  million values against `strconv` (every decimal of up to six significant
+  digits and seven places with its float neighbours, random bit patterns
+  across the fixed range, binade edges, exact ties, the large integers),
+  `TestFtoaPow10` recomputes the table with `math/big`, and
+  `TestAppendFixedShapes` runs the writer on every digit count and point
+  position against a byte loop.
 
 ## Measured and rejected, September 2026
 
