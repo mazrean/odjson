@@ -103,8 +103,9 @@ type StringCache struct {
 	// names is scratch for the strict struct decoders: the unknown member
 	// names of every object currently open, back to back, so that the
 	// duplicate check on them allocates nothing and costs no zeroing per
-	// object. See [UnknownNames].
-	names [][]byte
+	// object. See [UnknownNames]. It is held through a pointer, allocated
+	// on first use, so that StringCache stays a comparable type.
+	names *[][]byte
 }
 
 const stringCacheSize = 256
@@ -117,7 +118,10 @@ func UnknownNames(c *StringCache) (names [][]byte, mark int) {
 	if c == nil {
 		return nil, 0
 	}
-	return c.names, len(c.names)
+	if c.names == nil {
+		c.names = new([][]byte)
+	}
+	return *c.names, len(*c.names)
 }
 
 // EndUnknownNames gives the list back once the object is closed, with this
@@ -128,7 +132,7 @@ func EndUnknownNames(c *StringCache, names [][]byte, mark int) {
 		// The names alias the document; clearing them keeps a pooled
 		// cache from holding on to it.
 		clear(names[mark:])
-		c.names = names[:mark]
+		*c.names = names[:mark]
 	}
 }
 
@@ -146,11 +150,11 @@ func GetStringCache() *StringCache {
 
 // PutStringCache returns a cache obtained from [GetStringCache].
 func PutStringCache(c *StringCache) {
-	if len(c.names) > 0 {
+	if c.names != nil && len(*c.names) > 0 {
 		// A decoder that failed left the names of its open objects, and
 		// they alias its document.
-		clear(c.names)
-		c.names = c.names[:0]
+		clear(*c.names)
+		*c.names = (*c.names)[:0]
 	}
 	stringCachePool.Put(c)
 }

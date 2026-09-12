@@ -22,23 +22,30 @@ func TestUnknownNames(t *testing.T) {
 	}
 	inner = append(inner, []byte("z"))
 	EndUnknownNames(c, inner, im)
-	if len(c.names) != 0 {
-		t.Fatalf("after inner: %d names kept", len(c.names))
+	if len(*c.names) != 0 {
+		t.Fatalf("after inner: %d names kept", len(*c.names))
 	}
 	EndUnknownNames(c, outer, om)
-	if len(c.names) != 0 || cap(c.names) == 0 {
-		t.Fatalf("after outer: len %d cap %d", len(c.names), cap(c.names))
+	if len(*c.names) != 0 || cap(*c.names) == 0 {
+		t.Fatalf("after outer: len %d cap %d", len(*c.names), cap(*c.names))
 	}
-	for _, n := range c.names[:cap(c.names)] {
+	for _, n := range (*c.names)[:cap(*c.names)] {
 		if n != nil {
 			t.Fatalf("a name was kept after the object closed: %q", n)
 		}
 	}
 
 	// A decoder that fails leaves its names; the pool clears them.
-	c.names = append(c.names, []byte("left"))
+	*c.names = append(*c.names, []byte("left"))
 	PutStringCache(c)
-	if len(c.names) != 0 || c.names[:1][0] != nil {
-		t.Fatalf("PutStringCache kept a name: %v", c.names[:1])
+	if len(*c.names) != 0 || (*c.names)[:1][0] != nil {
+		t.Fatalf("PutStringCache kept a name: %v", (*c.names)[:1])
+	}
+
+	// Generated code before this change never touched the scratch, and a
+	// cache is a comparable type that callers may compare.
+	var zero StringCache
+	if zero != (StringCache{}) {
+		t.Fatal("StringCache must stay comparable")
 	}
 }
