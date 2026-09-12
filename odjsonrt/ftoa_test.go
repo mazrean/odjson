@@ -8,15 +8,18 @@ import (
 	"testing"
 )
 
-// appendFloatRef is AppendFloat's general path, the answer the fixed
-// notation path must reproduce byte for byte.
-func appendFloatRef(dst []byte, v float64) []byte {
+// appendFloatRef is what encoding/json does with strconv, the answer
+// AppendFloat must reproduce byte for byte at either width.
+func appendFloatRef(dst []byte, v float64, bits int) []byte {
 	abs := math.Abs(v)
 	format := byte('f')
-	if abs != 0 && (abs < 1e-6 || abs >= 1e21) {
-		format = 'e'
+	if abs != 0 {
+		if bits == 64 && (abs < 1e-6 || abs >= 1e21) ||
+			bits == 32 && (float32(abs) < 1e-6 || float32(abs) >= 1e21) {
+			format = 'e'
+		}
 	}
-	dst = strconv.AppendFloat(dst, v, format, -1, 64)
+	dst = strconv.AppendFloat(dst, v, format, -1, bits)
 	if format == 'e' {
 		n := len(dst)
 		if n >= 4 && dst[n-4] == 'e' && dst[n-3] == '-' && dst[n-2] == '0' {
@@ -27,27 +30,29 @@ func appendFloatRef(dst []byte, v float64) []byte {
 	return dst
 }
 
-// TestAppendFloatMatchesStrconv checks the fixed notation path against
-// strconv on every short decimal and the floats next to each, on random
-// bit patterns across the whole range it sees, and on the edges of that
-// range. A single byte of difference is a failure: the path must print
-// exactly what strconv prints.
+// TestAppendFloatMatchesStrconv checks AppendFloat against strconv on
+// every short decimal and the floats next to each, on random bit patterns
+// across the fixed notation range and then across the whole of both
+// formats, subnormals included, and on the edges. A single byte of
+// difference is a failure: the path must print exactly what strconv
+// prints.
 func TestAppendFloatMatchesStrconv(t *testing.T) {
 	var buf, ref []byte
 	fails := 0
-	check := func(v float64) {
+	checkAt := func(v float64, bits int) {
 		buf, ref = buf[:0], ref[:0]
 		var err error
-		if buf, err = AppendFloat(buf, v, 64); err != nil {
+		if buf, err = AppendFloat(buf, v, bits); err != nil {
 			t.Fatalf("%v: %v", v, err)
 		}
-		ref = appendFloatRef(ref, v)
+		ref = appendFloatRef(ref, v, bits)
 		if string(buf) != string(ref) {
 			if fails++; fails < 20 {
-				t.Errorf("AppendFloat(%v %#x) = %q, want %q", v, math.Float64bits(v), buf, ref)
+				t.Errorf("AppendFloat(%v %#x, %d) = %q, want %q", v, math.Float64bits(v), bits, buf, ref)
 			}
 		}
 	}
+	check := func(v float64) { checkAt(v, 64) }
 	both := func(v float64) {
 		check(v)
 		check(-v)
@@ -106,6 +111,38 @@ func TestAppendFloatMatchesStrconv(t *testing.T) {
 	// Signed zeros.
 	check(0)
 	check(math.Copysign(0, -1))
+
+	// Exponent notation: random bit patterns over every binade, both
+	// ways, subnormals and the extremes included.
+	for range 2_000_000 {
+		v := math.Float64frombits(r.Uint64() &^ (1 << 63))
+		if math.IsInf(v, 0) || math.IsNaN(v) {
+			continue
+		}
+		check(v)
+		check(-v)
+	}
+	for range 200_000 {
+		both(math.Float64frombits(r.Uint64N(1 << 52))) // subnormal
+	}
+	for _, v := range []float64{math.MaxFloat64, math.SmallestNonzeroFloat64, 2.2250738585072014e-308, 1e-7, 1e-300, 1e21, 1e22, 1e300, 123456789e-20, 5e-324, 1e-6 / 2} {
+		check(v)
+		check(-v)
+		check(math.Nextafter(v, 0))
+	}
+	// float32, at its own width: every bit pattern in the fixed range has
+	// a shortest form of its own, so a sample of them, and of the rest.
+	for range 3_000_000 {
+		f := math.Float32frombits(r.Uint32())
+		if math.IsInf(float64(f), 0) || f != f {
+			continue
+		}
+		checkAt(float64(f), 32)
+	}
+	for _, f := range []float32{0, float32(math.Copysign(0, -1)), 1, 0.1, 0.3, 1e-6, 1e-7, 1e21, 1e20, 16777216, 16777217, 1048576.25, 3.4028235e38, 1.4e-45, 1.17549435e-38, 33554432, 0.5, 2.5} {
+		checkAt(float64(f), 32)
+		checkAt(-float64(f), 32)
+	}
 	if fails > 0 {
 		t.Errorf("%d mismatches", fails)
 	}
@@ -259,7 +296,7 @@ func BenchmarkAppendFloatRef(b *testing.B) {
 	buf := make([]byte, 0, 64)
 	for b.Loop() {
 		for _, v := range vals {
-			buf = appendFloatRef(buf[:0], v)
+			buf = appendFloatRef(buf[:0], v, 64)
 		}
 	}
 }
@@ -287,7 +324,38 @@ func BenchmarkAppendFloatFullRef(b *testing.B) {
 	buf := make([]byte, 0, 64)
 	for b.Loop() {
 		for _, v := range benchCoords {
-			buf = appendFloatRef(buf[:0], v)
+			buf = appendFloatRef(buf[:0], v, 64)
+		}
+	}
+}
+
+// Values in exponent notation, a third of the numbers shape.
+var benchExp = func() []float64 {
+	r := rand.New(rand.NewPCG(3, 4))
+	v := make([]float64, 1024)
+	for i := range v {
+		v[i] = math.Pow(10, float64(r.IntN(600)-300)) * r.Float64()
+		if a := math.Abs(v[i]); a >= 1e-6 && a < 1e21 {
+			v[i] *= 1e30
+		}
+	}
+	return v
+}()
+
+func BenchmarkAppendFloatExp(b *testing.B) {
+	buf := make([]byte, 0, 64)
+	for b.Loop() {
+		for _, v := range benchExp {
+			buf, _ = AppendFloat(buf[:0], v, 64)
+		}
+	}
+}
+
+func BenchmarkAppendFloatExpRef(b *testing.B) {
+	buf := make([]byte, 0, 64)
+	for b.Loop() {
+		for _, v := range benchExp {
+			buf = appendFloatRef(buf[:0], v, 64)
 		}
 	}
 }

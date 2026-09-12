@@ -37,10 +37,11 @@ import (
 // exactly: the paper proves the truncated 128-bit power never puts an
 // integer on the wrong side.
 //
-// Only values with fixed notation come here (|v| in [1e-6, 1e21)), which
-// keeps the power table to 30 entries; exponent notation and float32 stay
-// on strconv. TestAppendFloatMatchesStrconv holds the output byte for byte
-// to strconv's.
+// Every finite float64 and float32 comes here, in fixed notation (|v| in
+// [1e-6, 1e21)) or exponent notation; a float32 runs the same search with
+// its own mantissa width and the ends of its own, wider interval, which is
+// why the short decimal path below, a float64 argument, does not serve it.
+// TestAppendFloatMatchesStrconv holds the output byte for byte to strconv's.
 
 // pow10Entry is hi·2^64 − lo: the form in which the generator stores a
 // rounded-up 128-bit power of ten, chosen so that the product's high word
@@ -49,12 +50,13 @@ type pow10Entry struct {
 	hi, lo uint64
 }
 
-// The range of ftoaPow10, the table pow10gen.go writes; the search asks for
-// p between -5 and 22 on the values that reach it, and one more each way is
-// margin for the log estimates.
+// The range of ftoaPow10, the table pow10gen.go writes: the search asks for
+// p between -296 and 340 over the float64 range (the smallest subnormal is
+// 4.9e-324 and the largest value 1.8e308), and the margin is for the log
+// estimates. The fixed notation range alone needs -5 to 22.
 const (
-	ftoaPow10Min = -6
-	ftoaPow10Max = 23
+	ftoaPow10Min = -350
+	ftoaPow10Max = 350
 )
 
 //go:generate go run pow10gen.go
@@ -104,17 +106,26 @@ func scale(x uint64, pow pow10Entry, s uint) unrounded {
 }
 
 // shortest returns the shortest decimal d·10^p that parses back to the
-// float m·2^e, for m normalised so that its high bit is set and mantBits
-// the width of the format's mantissa. The value must lie in the range
-// ftoaPow10 covers and above the subnormals.
-func shortest(m uint64, e, mantBits int) (d uint64, p int) {
+// float m·2^e, for m normalised so that its high bit is set, mantBits the
+// width of the format's mantissa and minExp the e below which the float
+// is subnormal and its ulp no longer shrinks with it.
+func shortest(m uint64, e, mantBits, minExp int) (d uint64, p int) {
 	z := 63 - mantBits // the ulp, in units of m
 	var lo, hi uint64
-	if m == 1<<63 {
+	switch {
+	case m == 1<<63 && e > minExp:
+		// A power of two: the neighbour below is half as far.
 		p = -log10Skewed(e + z)
 		lo = m - 1<<(z-2)
 		hi = m + 1<<(z-1)
-	} else {
+	case e >= minExp:
+		p = -log10Pow2(e + z)
+		lo = m - 1<<(z-1)
+		hi = m + 1<<(z-1)
+	default:
+		// Subnormal: the ulp is the smallest one, however far m was
+		// shifted to normalise it.
+		z += minExp - e
 		p = -log10Pow2(e + z)
 		lo = m - 1<<(z-1)
 		hi = m + 1<<(z-1)
@@ -430,13 +441,27 @@ func appendFixedInteger(dst []byte, neg bool, d uint64, zeros int) []byte {
 	return dst
 }
 
-// appendFloat64Fixed appends v in fixed notation with the fewest digits
-// that parse back to it, for finite v with 1e-6 <= |v| < 1e21 or v a zero.
-func appendFloat64Fixed(dst []byte, v float64) []byte {
-	b := math.Float64bits(v)
-	neg := b>>63 != 0
-	exp := int(b>>52) & 0x7ff
-	mant := b & (1<<52 - 1)
+// appendFloatSearch appends finite v with the fewest digits that parse
+// back to it at width (32 or 64) bits of precision: in fixed notation when
+// format is 'f', which the caller uses for 1e-6 <= |v| < 1e21 and zero,
+// and otherwise in exponent notation.
+func appendFloatSearch(dst []byte, v float64, width int, format byte) []byte {
+	var mant uint64
+	var exp, mantBits, bias, minExp int
+	var neg bool
+	if width == 32 {
+		b := math.Float32bits(float32(v))
+		neg = b>>31 != 0
+		exp = int(b>>23) & 0xff
+		mant = uint64(b & (1<<23 - 1))
+		mantBits, bias, minExp = 23, 127, -189
+	} else {
+		b := math.Float64bits(v)
+		neg = b>>63 != 0
+		exp = int(b>>52) & 0x7ff
+		mant = b & (1<<52 - 1)
+		mantBits, bias, minExp = 52, 1023, -1085
+	}
 	if exp == 0 {
 		if mant == 0 {
 			if neg {
@@ -446,9 +471,96 @@ func appendFloat64Fixed(dst []byte, v float64) []byte {
 		}
 		exp = 1
 	} else {
-		mant |= 1 << 52
+		mant |= 1 << mantBits
 	}
 	s := bits.LeadingZeros64(mant)
-	d, p := shortest(mant<<s, exp-1023-52-s, 52)
+	d, p := shortest(mant<<s, exp-bias-mantBits-s, mantBits, minExp)
+	if format == 'e' {
+		return appendExponent(dst, neg, d, p)
+	}
 	return appendFixed(dst, neg, math.Abs(v), d, p)
+}
+
+// appendExponent appends d·10^p as encoding/json's exponent notation: the
+// first digit, a point and the rest when there are more, then 'e', the
+// sign and the exponent without padding (strconv pads a two digit
+// exponent and encoding/json takes the zero off a negative one; a
+// positive exponent here is at least 21). Like appendFixed it writes the
+// digits8 words at the end of a scratch, moves the first digit down a
+// byte to make room for the point, counts the trailing zeros on the last
+// word, puts the exponent where the digits stop, and copies four words
+// out; a funnel shift that aligned the words in registers instead
+// measured 24 ns against 15 for this.
+func appendExponent(dst []byte, neg bool, d uint64, p int) []byte {
+	nd := numDigits(d)
+	exp := p + nd - 1
+
+	// The digits, 17 wide, ending at end.
+	var buf [64]byte
+	const end = 24
+	top := d / 1e16
+	rest := d - top*1e16
+	q := rest / 1e8
+	lo := digits8(rest - q*1e8)
+	hi := digits8(q)
+	binary.LittleEndian.PutUint64(buf[end-8:], lo)
+	binary.LittleEndian.PutUint64(buf[end-16:], hi)
+	buf[end-17] = byte('0' + top)
+
+	// Trailing zeros: leading zero bytes of the last word, then of the one
+	// before it, then the top digit.
+	nz := nonzeroBytes(lo ^ digitZeros)
+	tz := bits.LeadingZeros64(nz) >> 3
+	if nz == 0 {
+		nz = nonzeroBytes(hi ^ digitZeros)
+		tz = 8 + bits.LeadingZeros64(nz)>>3
+		if nz == 0 {
+			tz = 16
+		}
+	}
+
+	// The first digit down one byte, the point in its place.
+	from := end - nd - 1
+	buf[from] = buf[from+1]
+	buf[from+1] = '.'
+	n := end - tz
+	if nd-tz == 1 {
+		n = from + 1 // over the point
+	}
+
+	// The exponent, without branches on its sign or width, which a
+	// document of assorted magnitudes makes unpredictable: three digits
+	// in a word, shifted down to the ones it has.
+	sign := byte('+')
+	if exp < 0 {
+		sign = '-'
+		exp = -exp
+	}
+	l := 1
+	if exp >= 10 {
+		l = 2
+	}
+	if exp >= 100 {
+		l = 3
+	}
+	tail := uint64('e') | uint64(sign)<<8 |
+		(uint64('0'+exp/100)|uint64('0'+exp/10%10)<<8|uint64('0'+exp%10)<<16)>>(8*uint(3-l))<<16
+	binary.LittleEndian.PutUint64(buf[n:], tail)
+	n += 2 + l
+
+	if neg {
+		from--
+		buf[from] = '-'
+	}
+	if cap(dst)-len(dst) < 32 {
+		dst = slices.Grow(dst, 32)
+	}
+	k := len(dst)
+	out := dst[k : k+32]
+	src := buf[from : from+32]
+	binary.LittleEndian.PutUint64(out[0:], binary.LittleEndian.Uint64(src[0:]))
+	binary.LittleEndian.PutUint64(out[8:], binary.LittleEndian.Uint64(src[8:]))
+	binary.LittleEndian.PutUint64(out[16:], binary.LittleEndian.Uint64(src[16:]))
+	binary.LittleEndian.PutUint64(out[24:], binary.LittleEndian.Uint64(src[24:]))
+	return dst[:k+n-from]
 }

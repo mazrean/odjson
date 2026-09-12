@@ -235,23 +235,13 @@ func AppendFloat(dst []byte, v float64, bits int) ([]byte, error) {
 			format = 'e'
 		}
 	}
+	// The number is written here rather than by strconv; see ftoa.go.
 	if format == 'f' && bits == 64 {
-		// Fixed notation is written here; see ftoa.go.
 		if out, ok := appendShortFloat(dst, v < 0, abs); ok {
 			return out, nil
 		}
-		return appendFloat64Fixed(dst, v), nil
 	}
-	dst = strconv.AppendFloat(dst, v, format, -1, bits)
-	if format == 'e' {
-		// Clean up e-09 to e-9.
-		n := len(dst)
-		if n >= 4 && dst[n-4] == 'e' && dst[n-3] == '-' && dst[n-2] == '0' {
-			dst[n-2] = dst[n-1]
-			dst = dst[:n-1]
-		}
-	}
-	return dst, nil
+	return appendFloatSearch(dst, v, bits, format), nil
 }
 
 // AppendBool appends v as a JSON boolean.
