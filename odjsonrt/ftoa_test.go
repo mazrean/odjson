@@ -2,13 +2,14 @@ package odjsonrt
 
 import (
 	"math"
+	"math/big"
 	"math/rand/v2"
 	"strconv"
 	"testing"
 )
 
-// appendFloatRef is AppendFloat's general path, the answer the short decimal
-// path must reproduce byte for byte.
+// appendFloatRef is AppendFloat's general path, the answer the fixed
+// notation path must reproduce byte for byte.
 func appendFloatRef(dst []byte, v float64) []byte {
 	abs := math.Abs(v)
 	format := byte('f')
@@ -26,11 +27,11 @@ func appendFloatRef(dst []byte, v float64) []byte {
 	return dst
 }
 
-// TestAppendFloatMatchesStrconv checks the short decimal path against
-// strconv on the values it is built for, every short decimal and the floats
-// next to each, and on random bit patterns across the whole range it can
-// see. A single byte of difference is a failure: the path must print
-// exactly what strconv prints or decline.
+// TestAppendFloatMatchesStrconv checks the fixed notation path against
+// strconv on every short decimal and the floats next to each, on random
+// bit patterns across the whole range it sees, and on the edges of that
+// range. A single byte of difference is a failure: the path must print
+// exactly what strconv prints.
 func TestAppendFloatMatchesStrconv(t *testing.T) {
 	var buf, ref []byte
 	fails := 0
@@ -96,40 +97,150 @@ func TestAppendFloatMatchesStrconv(t *testing.T) {
 			both(math.Ldexp(num, e-3))
 		}
 	}
+	// Large values: integers that print with trailing zeros, and the
+	// non-integers between 1e15 and 1e21 that print as integers.
+	for range 200_000 {
+		both(float64(r.Uint64N(1<<53)) * pow10[r.IntN(6)+1])
+		both(math.Float64frombits(uint64(1023+50+r.IntN(20))<<52 | r.Uint64N(1<<52)))
+	}
+	// Signed zeros.
+	check(0)
+	check(math.Copysign(0, -1))
 	if fails > 0 {
 		t.Errorf("%d mismatches", fails)
 	}
 }
 
-// TestAppendShortFloatCoverage pins that the common shapes really do take
-// the short path, since the benchmark gain rests on it.
-func TestAppendShortFloatCoverage(t *testing.T) {
-	for _, v := range []float64{40.8, -0.1, 0.1, 12.99, 139.69171, 35.6895, 0.001, 1234567.5, 99.99} {
-		if _, ok := appendShortFloat(nil, v); !ok {
-			t.Errorf("%v declined", v)
+// TestDigits8 runs digits8 on every input.
+func TestDigits8(t *testing.T) {
+	var got [8]byte
+	for x := range uint64(1e8) {
+		w := digits8(x)
+		for i := range got {
+			got[i] = byte(w >> (8 * i))
+		}
+		want := strconv.FormatUint(x+1e8, 10)[1:]
+		if string(got[:]) != want {
+			t.Fatalf("digits8(%d) = %q, want %q", x, got, want)
 		}
 	}
-	for _, v := range []float64{0.30000000000000004, math.Pi, 1e22, 1e-6 * 1.000000000001} {
-		if out, ok := appendShortFloat(nil, v); ok {
-			t.Errorf("%v accepted as %q", v, out)
+}
+
+// TestFtoaPow10 recomputes the table with math/big: each entry must be
+// ⌈10^p · 2^k⌉ for the k that puts it in [2^127, 2^128), stored as
+// hi·2^64 − lo.
+func TestFtoaPow10(t *testing.T) {
+	if n := ftoaPow10Max - ftoaPow10Min + 1; len(ftoaPow10) != n {
+		t.Fatalf("table has %d entries, want %d", len(ftoaPow10), n)
+	}
+	one := big.NewInt(1)
+	two := big.NewRat(2, 1)
+	lo128 := new(big.Rat).SetInt(new(big.Int).Lsh(one, 127))
+	hi128 := new(big.Rat).SetInt(new(big.Int).Lsh(one, 128))
+	for p := ftoaPow10Min; p <= ftoaPow10Max; p++ {
+		r := new(big.Rat)
+		if p >= 0 {
+			r.SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(p)), nil))
+		} else {
+			r.SetFrac(one, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-p)), nil))
+		}
+		for r.Cmp(lo128) < 0 {
+			r.Mul(r, two)
+		}
+		for r.Cmp(hi128) >= 0 {
+			r.Quo(r, two)
+		}
+		want := new(big.Int).Quo(r.Num(), r.Denom())
+		if !r.IsInt() {
+			want.Add(want, one)
+		}
+		e := ftoaPow10[p-ftoaPow10Min]
+		got := new(big.Int).Lsh(new(big.Int).SetUint64(e.hi), 64)
+		got.Sub(got, new(big.Int).SetUint64(e.lo))
+		if got.Cmp(want) != 0 {
+			t.Errorf("1e%d: table holds %v, want %v", p, got, want)
 		}
 	}
-	// Random short decimals of up to sixteen significant digits all take
-	// the path: the division proves every one of them. (The earlier guess,
-	// which needed the product to land exactly on an integer, missed 7%.)
-	r := rand.New(rand.NewPCG(7, 8))
-	declined := 0
-	for range 1000000 {
-		f := 1 + r.IntN(maxShortFrac)
-		n := 1 + r.Int64N(int64(pow10u[16-f]))
-		if v := float64(n) / pow10[f]; v*pow10[f] < 1e15 {
-			if _, ok := appendShortFloat(nil, v); !ok {
-				declined++
+}
+
+// appendFixedRef formats d·10^p in fixed notation a byte at a time.
+func appendFixedRef(dst []byte, neg bool, d uint64, p int) []byte {
+	for d%10 == 0 {
+		d /= 10
+		p++
+	}
+	s := strconv.FormatUint(d, 10)
+	dp := len(s) + p
+	if neg {
+		dst = append(dst, '-')
+	}
+	switch {
+	case dp <= 0:
+		dst = append(dst, '0', '.')
+		for range -dp {
+			dst = append(dst, '0')
+		}
+		dst = append(dst, s...)
+	case dp < len(s):
+		dst = append(dst, s[:dp]...)
+		dst = append(dst, '.')
+		dst = append(dst, s[dp:]...)
+	default:
+		dst = append(dst, s...)
+		for range dp - len(s) {
+			dst = append(dst, '0')
+		}
+	}
+	return dst
+}
+
+// TestAppendFixedShapes checks the word-splicing writer against a byte
+// loop on every digit count, every point position the fixed range allows,
+// and digit strings with trailing zeros, appending to buffers with and
+// without room.
+func TestAppendFixedShapes(t *testing.T) {
+	r := rand.New(rand.NewPCG(1, 2))
+	var got, want []byte
+	for nd := 1; nd <= 17; nd++ {
+		for dp := -5; dp <= 21; dp++ {
+			for trial := range 200 {
+				d := pow10u[nd-1] + r.Uint64N(pow10u[nd]-pow10u[nd-1])
+				if trial%4 == 0 {
+					// Trailing zeros, which the writer must trim.
+					z := 1 + r.IntN(nd)
+					d = d / pow10u[z] * pow10u[z]
+					if d == 0 {
+						continue
+					}
+				}
+				p := dp - nd
+				if float64(d)*math.Pow(10, float64(p)) < 1e-6 || float64(d)*math.Pow(10, float64(p)) >= 1e21 {
+					continue
+				}
+				neg := trial%2 == 1
+				// The float the digits stand for, as the writer sees it.
+				abs, err := strconv.ParseFloat(strconv.FormatUint(d, 10)+"e"+strconv.Itoa(p), 64)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want = appendFixedRef(make([]byte, 3, 64), neg, d, p)
+				if string(want[3:]) != strconv.FormatFloat(math.Copysign(abs, 1-2*float64(trial%2)), 'f', -1, 64) {
+					// The digits are not that float's shortest: no
+					// float64 sends them, and the writer may assume one.
+					continue
+				}
+				// Room for it, and a full buffer that has to grow.
+				got = appendFixed(make([]byte, 3, 64), neg, abs, d, p)
+				if string(got) != string(want) {
+					t.Fatalf("appendFixed(%v, %d, %d) = %q, want %q", neg, d, p, got[3:], want[3:])
+				}
+				full := make([]byte, 5)
+				got = appendFixed(full[:5:5], neg, abs, d, p)
+				if string(got[:5]) != string(full) || string(got[5:]) != string(want[3:]) {
+					t.Fatalf("appendFixed(%v, %d, %d) into a full buffer = %q, want %q", neg, d, p, got[5:], want[3:])
+				}
 			}
 		}
-	}
-	if declined > 0 {
-		t.Errorf("%d of 1000000 short decimals declined", declined)
 	}
 }
 
@@ -148,6 +259,34 @@ func BenchmarkAppendFloatRef(b *testing.B) {
 	buf := make([]byte, 0, 64)
 	for b.Loop() {
 		for _, v := range vals {
+			buf = appendFloatRef(buf[:0], v)
+		}
+	}
+}
+
+// Full precision coordinates, the shape canada.json is made of.
+var benchCoords = func() []float64 {
+	r := rand.New(rand.NewPCG(1, 2))
+	v := make([]float64, 1024)
+	for i := range v {
+		v[i] = r.Float64()*360 - 180
+	}
+	return v
+}()
+
+func BenchmarkAppendFloatFull(b *testing.B) {
+	buf := make([]byte, 0, 64)
+	for b.Loop() {
+		for _, v := range benchCoords {
+			buf, _ = AppendFloat(buf[:0], v, 64)
+		}
+	}
+}
+
+func BenchmarkAppendFloatFullRef(b *testing.B) {
+	buf := make([]byte, 0, 64)
+	for b.Loop() {
+		for _, v := range benchCoords {
 			buf = appendFloatRef(buf[:0], v)
 		}
 	}

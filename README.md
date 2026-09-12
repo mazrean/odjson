@@ -213,7 +213,7 @@ That is where a large part of the speed comes from, and it depends on the standa
 
 A number of smaller optimisations are what close the remaining gap to `github.com/bytedance/sonic`:
 - buffer reuse through `sync.Pool`
-- a dedicated formatting algorithm for `float` values with few digits
+- a dedicated `float` formatter: a short decimal is proven by one division, anything else by a shortest-digit search that writes whole words instead of going through `strconv`
 - word-at-a-time scanning
 - fusing UTF-8 validation into the string scan, removing the separate validation pass
 
