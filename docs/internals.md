@@ -600,6 +600,41 @@ always-compact output, but it measures 1.7× *slower* than sonic's default and
 2.3× slower than the trusting config above — 520 µs on `twitter`, against
 303 µs and 230 µs measured beside it in a run of its own.
 
+## Measured and rejected, September 2026
+
+A survey of what the fast JSON libraries do (sonic, simdjson, glaze,
+yyjson, json-constantiater, the Go 1.27 `strconv`) produced eleven
+candidates for the generated code and the runtime. Each was implemented
+on its own branch and measured the same way: `bench/gen`, both
+`encoding/json/v2` and `encoding/json` rows, every branch built four
+times with `-ldflags=-randlayout=N` and the four layouts pooled over five
+interleaved runs (n=20 per row), compared to `main` with `benchstat`. The
+reason for the pooling is under "Measurement notes". What stayed:
+
+| change | json/v2 rows that moved |
+| --- | --- |
+| the string stop test (`swarStringStop`, `swarUnsafe`) settles control bytes and quotes in one subtraction, by XORing each lane with 0x02 first | twitter encode -3.0% (and -2.5% under `encoding/json`); the decodes within 1.2% |
+| `appendQuotedV2HTML` tests a word for all six escape bytes at once (`swarUnsafeHTML`) | `encoding/json` twitter encode -2.9%; the json/v2 rows, which never run that mode, within 0.6% |
+| the generated encoder **opens the object with its first member's name** when no member is conditional, and **folds each string member's quotes into the literals around it** (`{"name":"` … `","next":`), the runtime writing the body alone (`AppendStringBodyChecked`) | small encode **-4.3%** (and -5.5% under `encoding/json`), twitter level; the decodes within 1.2%. Replicated on fresh builds (-4.0% / -5.2% in the first batch). A first cut put the ModeV2 body behind a separate switch function, which made every string two calls deep and read +1.9% on the twitter encode; the body now sits inside the switch function, and the quoted form is quotes written by the caller around the same call |
+| a **small nested struct** (at most four members, none conditional, one level) is **spliced into its parent's encoder**, so its braces and quotes join the fusion above (`,"author":{"name":"` is one literal) | small encode **-2.5%** against the quote fusion alone (p=0.015 at n=48; -2.8% under `encoding/json`), twitter level. The call it removes is not the gain: three nested frames measured 0.7 ns, and splicing without the fusion read level |
+
+What did not, with the numbers that decided it (json/v2 rows, p<0.05
+unless marked ~):
+
+| candidate | result |
+| --- | --- |
+| **a 256-bit filter in front of the strict unknown-name check**, so that a document full of unknown members does not pay the linear dedup scan | small decode **+8.1%**, `encoding/json` small **+3.6%**; twitter unmoved, because every `User` name is known and the unknown member's inner names already go through the skip filter. A first cut that kept the filter and the name slice in one struct escaped to the heap (allocations 6 → 11); the flat version still costs more on every object than it saves on the rare unknown-heavy one |
+| **learned-order key speculation**: a per-type table remembers which member followed which, and the decoder tries that candidate before the byte switch | small decode **+10.3%**, twitter decode **+3.7%**, `encoding/json` small **+5.1%**. The atomic load and the compare cost more than the switch they were meant to skip, on documents already in declaration order; the shuffled-order case, where it could only gain, was not worth measuring after that |
+| **an eight-digit SWAR fold in `ParseDecimal`** | every row ~ (small decode +2.6%, p=0.059). The numbers in both fixtures are short ids; the byte loop is already a handful of cycles |
+| **decoding slice elements in place** (`append` a zero element, decode into `&s[len-1]`) instead of into a temporary that is then appended | every row ~. The element copy it removes is a few words per element |
+| **opening the object with its first member's name** (`{"name":` as one literal, `}` unconditional) when no member is conditional, instead of writing a comma and patching it into a brace | `encoding/json` small encode -2.8% (p=0.015), json/v2 small -1.8% (p=0.068) in one batch, -4.0% / -3.2% in a second whose untouched v1 twitter decode moved -3.1% at the same time: not separable from layout on its own. Kept only as the base of the quote fusion above, whose literals it completes |
+| **glaze-style front hash** for deep member-name trees (a hash of the first eight bytes selecting the candidate) | emitted nothing for the benchmark structs: the deep tree is exactly where the names share their first eight bytes (`profile_background_…`, `profile_sidebar_…`), so the hash cannot separate them. Structural, dropped before measuring |
+
+Not attempted: length-specialised integer formatting for the narrow types
+(`int8`, `int16`, `uint16`), which `strconv`'s two-digit tables already
+handle in a couple of steps; json-constantiater's opt-in assumption tags;
+anything that needs `GOEXPERIMENT=simd`.
+
 ## Measurement notes
 
 All figures on this page were re-measured together on an AMD Ryzen 9 7950X,
@@ -634,6 +669,24 @@ With the direct path compiled out (`-tags odjson_safe`), the same process put
 path was widened — the decode side still wins, the encode side does not. That
 is what a Go minor odjson has not verified yet costs, until a release widens
 the gate.
+
+**Function and data layout move the small rows by more than most changes
+do.** Two builds of the same source that differ only in `-ldflags=-randlayout=N`
+read up to 3% apart on the `small` rows, and a branch that changes a
+generated file shifts every row it cannot causally touch: in the September
+2026 batch two decoder-only branches moved the json/v2 `small` encode by
+-3.3% and -3.9% (p≤0.016) and the twitter encode by -1.8%, and two
+encoder-only branches moved the `encoding/json` twitter decode by -5.2% at
+p=0.000. Function order is what `-randlayout` randomises; the data the
+generated file adds (its literals, a table) moves everything after it in
+rodata, which no linker flag randomises. So a sub-5% comparison is made
+like this: build every side four times with different `-randlayout` seeds,
+run the four layouts interleaved across the sides and pool them, and read
+a branch's *untouched* rows first — the largest move among them is that
+branch's floor, and a row it does touch counts only at p<0.05 and above
+the floor. `bench/ab`'s one-process ratio does not escape this: the
+generated side and the reflection side share a binary, but not the
+alignment of the generated code's own data.
 
 Compare your own with
 [`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) rather than
