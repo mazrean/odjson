@@ -23,28 +23,25 @@ func SkipSpace(data []byte, p int) int {
 
 // skipSpaceSlow consumes an actual run of whitespace.
 func skipSpaceSlow(data []byte, p int) int {
-	// The one space after a colon is the commonest run by far, and it is
-	// settled by the next byte: p+1 is a constant offset, not a value
-	// computed from the data, so nothing waits on the word scan below.
-	if uint(p+1) < uint(len(data)) && data[p] == ' ' && data[p+1] > ' ' {
-		return p + 1
-	}
 	// An indented document is mostly a newline followed by a run of
 	// spaces. Two words cover a run of up to sixteen, and the length is
 	// computed rather than branched on: the lowest lane that differs from
 	// a space is the first non-space byte, exactly, a word of nothing but
 	// spaces reports eight, and the second word counts only when the first
 	// was all spaces. Run lengths vary from line to line, so a loop that
-	// tests each word mispredicts on most of them; this does not. Whatever
-	// the run ends on, the loop below takes over, and it is a run of
-	// nothing but spaces when it finds a non-space byte right away.
+	// tests each word mispredicts on most of them; this does not. The one
+	// space after a colon, once the commonest run, no longer arrives here:
+	// AfterName settles it in every caller.
 	if uint(p+17) <= uint(len(data)) && data[p] == '\n' {
-		// The two words are sliced to their exact extent so that the
-		// loads carry no bounds test of their own: the one test above
-		// covers both.
 		n0 := bits.TrailingZeros64(load64(data, p+1)^allSpaces) / 8
 		n1 := bits.TrailingZeros64(load64(data, p+9)^allSpaces) / 8
 		p += 1 + n0 + n1&-(n0>>3)
+		// Whatever the run ended on, one compare says whether it starts
+		// a token, which it nearly always does; the table lookup below
+		// is for the rest.
+		if uint(p) < uint(len(data)) && data[p] > ' ' {
+			return p
+		}
 	}
 	for uint(p) < uint(len(data)) && spaceSet[data[p]] {
 		p++
