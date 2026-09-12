@@ -57,6 +57,11 @@ that is the whole of the difference between the two standard library columns.
 The run is from 2026-09-12, after the changes described under "What the other
 shapes say"; the run before them had `encoding/json`'s `twitter` encode at
 1.04× *slower* (430 µs against 412 µs), which is what those changes removed.
+The same comparison shows the `small` decode ratio at 3.18× against the
+previous run's 3.32× (562 → 601 ns, while reflection moved 1864 → 1910 ns):
+about 3.5% of that is the wider entry check, measured back-to-back on the same
+day against the previous build (598 → 619 ns), and the rest is the day and the
+binary; `bench/ab` in one process reads 575 ns for the same decode.
 
 Against the libraries people leave the standard library for, that puts
 `encoding/json/v2` + odjson:
