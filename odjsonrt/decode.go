@@ -519,6 +519,11 @@ type anyFrame struct {
 	arr []any
 	obj map[string]any
 	key string
+	// keyPos is where key stands in the document, for the duplicate
+	// error, which is raised when the value is attached rather than when
+	// the name is read: a lookup then and an insert later would hash the
+	// name twice, and the insert alone says whether the name was new.
+	keyPos int
 }
 
 // ParseAny decodes the value at p the way encoding/json decodes into an
@@ -573,7 +578,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 			if err != nil {
 				return nil, next, err
 			}
-			stack = append(stack, anyFrame{obj: obj, key: key})
+			stack = append(stack, anyFrame{obj: obj, key: key, keyPos: p})
 			p = next
 			continue
 		case '[':
@@ -647,7 +652,14 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 			}
 			f := &stack[len(stack)-1]
 			if f.obj != nil {
+				n := len(f.obj)
 				f.obj[f.key] = v
+				if strict && len(f.obj) == n {
+					// The insert found the name already there. The
+					// value it replaced was the earlier member's, which
+					// no longer matters: the document is refused.
+					return nil, f.keyPos, ErrDuplicateName(data, f.keyPos, []byte(f.key))
+				}
 			} else {
 				f.arr = append(f.arr, v)
 			}
@@ -664,12 +676,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 					if err != nil {
 						return nil, next, err
 					}
-					if strict {
-						if _, dup := f.obj[key]; dup {
-							return nil, p, ErrDuplicateName(data, p, []byte(key))
-						}
-					}
-					f.key = key
+					f.key, f.keyPos = key, p
 					p = next
 				}
 			case isObj && data[p] == '}':
