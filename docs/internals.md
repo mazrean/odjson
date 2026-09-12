@@ -803,6 +803,8 @@ the order it was built:
 | `skipSpaceSlow` takes the **indent path first**, the space after a colon having lost every caller to `AfterName`, and tests the byte the run ended on with one compare before the table loop; the one-space test stays, after it, for the `", "` of a document written on one line, which a first cut dropped and which then cost +54% on that shape | whitespace runs that still reach it: indented twitter 44.8 → 38.5 µs, the same document rewritten with `", "` 21.6 → 23.1 |
 | a **run of CJK text taken word by word** in `skipNonASCII`, without going back through the other scripts' patterns every six bytes | non-ASCII runs 19.1 → 16.5 µs |
 | `EndUnknownNames` **skipped for an object that added no unknown name**, which is most of them | — |
+| the **encoder's word loops and digit stores given the same treatment**: `load64` in `appendQuotedStream`, `appendStringBodyChecked` and `appendQuotedV2HTML`, sub-slices of exact extent under the float formatter's `PutUint64`, unsigned index tests in the byte loops; bounds tests in the encoder's files 106 → 89 | writing every twitter string once per mode: `ModeHTML` 383 → 326 µs (-14.9%, a byte loop with one test per byte gone), `ModeStream` and `ModeV2` -2%, `ModeV2HTML` level |
+| **decoded strings carved out of shared chunks** (`StringCache.alloc`): a string the table does not hold is copied into the cache's current 4 KiB chunk instead of being allocated on its own, escaped strings are unescaped into a scratch buffer the cache keeps and carved from there, and a string longer than a quarter of a chunk keeps its own allocation. The trade, stated on `StringCache`, is retention: a string pins its chunk while reachable, and a pooled cache can pin up to 256 chunks through its table until the pool drops it. Approved as a product decision on 2026-09-12, having been declined before | two layouts, five interleaved runs, against the commit before: `json/v2` twitter decode **442 → 411 µs (-7.1%)**, allocations **2,468 → 1,037**, bytes -2.3%; `encoding/json` twitter -3.4%, small -1.4%; `json/v2` small level (p=0.075). A 16 KiB chunk read the same (-0.7%, p=0.075) and pins four times as much |
 
 What did not:
 
@@ -828,11 +830,11 @@ five interleaved runs, reads twitter **434 → 380 µs (-12.5%)** and small
 **420 → 401 ns (-4.6%)**, both at p=0.000. On single builds, unpooled, the json/v2 twitter decode
 went 474 → 418 µs and the small one 594 → 539 ns.
 
-What is left is what was left before, minus the tests: the strict skip
-is 0.39 ns per byte skipped, the whitespace skip 2.5 ns per indent run,
-and of the 2,468 allocations a twitter decode makes, 900 are the string
-boxes, maps, slices and slice headers the `any` fields dictate, which
-only an interface built by hand could remove.
+What is left is what was left before, minus the tests and the string
+allocations: the strict skip is 0.39 ns per byte skipped, the whitespace
+skip 2.5 ns per indent run, and of the 1,037 allocations a twitter decode
+now makes, 900 are the string boxes, maps, slices and slice headers the
+`any` fields dictate, which only an interface built by hand could remove.
 
 ## Measurement notes
 
