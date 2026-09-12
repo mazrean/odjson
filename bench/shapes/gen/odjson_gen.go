@@ -1301,16 +1301,18 @@ func (v *Item) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Item) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeItem.Record(buf)
+		odjsonSizeItem.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -1334,14 +1336,14 @@ func (v *Item) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -1787,16 +1789,18 @@ func (v *Owner) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Owner) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeOwner.Record(buf)
+		odjsonSizeOwner.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -1820,14 +1824,14 @@ func (v *Owner) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -2367,16 +2371,18 @@ func (v *Page) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Page) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizePage.Record(buf)
+		odjsonSizePage.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -2400,14 +2406,14 @@ func (v *Page) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -2842,16 +2848,18 @@ func (v *Text) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Text) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeText.Record(buf)
+		odjsonSizeText.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -2875,14 +2883,14 @@ func (v *Text) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -3317,16 +3325,18 @@ func (v *IDs) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v IDs) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeIDs.Record(buf)
+		odjsonSizeIDs.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -3350,14 +3360,14 @@ func (v *IDs) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -3666,16 +3676,18 @@ func (v *Generic) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Generic) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeGeneric.Record(buf)
+		odjsonSizeGeneric.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -3699,14 +3711,14 @@ func (v *Generic) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -5242,16 +5254,18 @@ func (v *Numbers) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Numbers) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeNumbers.Record(buf)
+		odjsonSizeNumbers.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -5275,14 +5289,14 @@ func (v *Numbers) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -5675,16 +5689,18 @@ func (v *DenseDoc) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v DenseDoc) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeDenseDoc.Record(buf)
+		odjsonSizeDenseDoc.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -5708,14 +5724,14 @@ func (v *DenseDoc) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -10214,16 +10230,18 @@ func (v *Dense) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Dense) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeDense.Record(buf)
+		odjsonSizeDense.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -10247,14 +10265,14 @@ func (v *Dense) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -10647,16 +10665,18 @@ func (v *SparseDoc) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v SparseDoc) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeSparseDoc.Record(buf)
+		odjsonSizeSparseDoc.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -10680,14 +10700,14 @@ func (v *SparseDoc) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -14489,16 +14509,18 @@ func (v *Sparse) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Sparse) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeSparse.Record(buf)
+		odjsonSizeSparse.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -14522,14 +14544,14 @@ func (v *Sparse) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -14996,16 +15018,18 @@ func (v *Canada) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Canada) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeCanada.Record(buf)
+		odjsonSizeCanada.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -15029,14 +15053,14 @@ func (v *Canada) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -15620,16 +15644,18 @@ func (v *Feature) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Feature) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeFeature.Record(buf)
+		odjsonSizeFeature.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -15653,14 +15679,14 @@ func (v *Feature) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -16446,16 +16472,18 @@ func (v *Geometry) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Geometry) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeGeometry.Record(buf)
+		odjsonSizeGeometry.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -16479,14 +16507,14 @@ func (v *Geometry) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -19348,16 +19376,18 @@ func (v *CitmCatalog) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v CitmCatalog) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeCitmCatalog.Record(buf)
+		odjsonSizeCitmCatalog.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -19381,14 +19411,14 @@ func (v *CitmCatalog) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -20592,16 +20622,18 @@ func (v *Event) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Event) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeEvent.Record(buf)
+		odjsonSizeEvent.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -20625,14 +20657,14 @@ func (v *Event) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -21773,16 +21805,18 @@ func (v *Performance) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Performance) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizePerformance.Record(buf)
+		odjsonSizePerformance.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -21806,14 +21840,14 @@ func (v *Performance) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -22275,16 +22309,18 @@ func (v *Price) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Price) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizePrice.Record(buf)
+		odjsonSizePrice.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -22308,14 +22344,14 @@ func (v *Price) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -22790,16 +22826,18 @@ func (v *SeatCategory) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v SeatCategory) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeSeatCategory.Record(buf)
+		odjsonSizeSeatCategory.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -22823,14 +22861,14 @@ func (v *SeatCategory) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)
@@ -23358,16 +23396,18 @@ func (v *Area) UnmarshalJSON(data []byte) error {
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (v Area) MarshalJSONTo(enc *jsontext.Encoder) error {
-	// A top-level value under a plain json.Marshal is appended straight
-	// into the encoder's buffer; see odjsonrt.BeginDirectEncode for what
-	// qualifies. Nothing downstream looks at those bytes, so ModeV2 does
-	// json/v2's own escaping and rejects invalid UTF-8 itself.
-	if buf, ok := odjsonrt.BeginDirectEncode(enc); ok {
-		buf, err := v.odjsonAppend(buf, odjsonrt.ModeV2)
+	// Under a plain json.Marshal, from encoding/json/v2 or encoding/json,
+	// the value is appended straight into the encoder's buffer at any
+	// depth; see odjsonrt.BeginDirectEncodeMode for what qualifies and
+	// for the mode, which does that call's escaping itself since nothing
+	// downstream looks at the bytes.
+	if buf, m, ok := odjsonrt.BeginDirectEncodeMode(enc); ok {
+		n := len(buf)
+		buf, err := v.odjsonAppend(buf, m)
 		if err != nil {
 			return err
 		}
-		odjsonSizeArea.Record(buf)
+		odjsonSizeArea.Record(buf[n:])
 		odjsonrt.EndDirectEncode(enc, buf)
 		return nil
 	}
@@ -23391,14 +23431,14 @@ func (v *Area) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// that recurs in the document is allocated once.
 	sc := odjsonrt.GetStringCache()
 	var err error
-	// A top-level value under a plain json.Unmarshal is parsed straight
-	// out of the decoder's buffer; see odjsonrt.BeginDirectDecode for what
-	// qualifies. Nobody has validated those bytes, so odjsonParseV2 rejects
-	// what jsontext would have.
-	if data, ok := odjsonrt.BeginDirectDecode(dec); ok {
+	// Under a plain json.Unmarshal the value is parsed straight out of
+	// the decoder's buffer at any depth; see odjsonrt.BeginDirectDecodeAt
+	// for what qualifies. Nobody has validated those bytes, so
+	// odjsonParseV2 rejects what jsontext would have.
+	if data, p, ok := odjsonrt.BeginDirectDecodeAt(dec); ok {
 		var end int
-		if end, err = v.odjsonParseV2(data, 0, sc, true); err == nil {
-			odjsonrt.EndDirectDecode(dec, end)
+		if end, err = v.odjsonParseV2(data, p, sc, true); err == nil {
+			odjsonrt.EndDirectDecodeAt(dec, p, end)
 		}
 	} else {
 		err = v.odjsonParseFrom(dec, sc)

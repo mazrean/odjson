@@ -132,8 +132,8 @@ cd bench && go test -bench . -count 5 ./ab/
 ```
 
 `ab` covers all four host libraries; the sonic and go-json rows are what settle
-whether odjson wins their small unmarshal (sonic's by 1.15x, go-json's by
-1.12x) and loses everything else on them (it does, by the floor).
+whether odjson wins their small unmarshal (sonic's by 1.16x, go-json's by
+1.06x) and loses everything else on them (it does, by the floor).
 
 ## `shapes`
 
@@ -149,7 +149,7 @@ the generated codec still pays for itself on that shape:
 | `twitter`, `small` | the README's payloads, as the reference rows |
 | `twitter-compact`, `page-12k-indented` | whitespace |
 | `page-3k`, `page-12k`, `page-100k` | one top-level object at the sizes between the two fixtures |
-| `array-items`, `array-pages`, `map-items` | a top-level `[]T` / `map[string]T` of a generated type, which the direct path does not cover; the element size puts `array-items` under `odjsonrt.WholeValue`'s threshold and `array-pages` over it |
+| `array-items`, `array-pages`, `map-items` | a top-level `[]T` / `map[string]T` of a generated type, so every generated value sits below the top level; the element size puts `array-items` under `odjsonrt.WholeValue`'s threshold and `array-pages` over it, which matters on the public path |
 | `generic` | the same document decoded into `any` |
 | `text-*` | strings of ASCII, Latin-1, Cyrillic, CJK, Hangul, emoji, and escape-heavy content |
 | `unique-strings` | strings that never repeat, so the decoder's string cache never hits |
@@ -205,7 +205,7 @@ on field-dense ones, so the value-driven form was kept; the token-driven
 later measurement in `ab` showed a single `ReadValue` plus a trusted byte
 parser winning on small ones, which is what `odjsonrt.WholeValue` now selects
 below 4 KiB, and the direct path in `odjsonrt/direct.go` now bypasses both
-for a top-level value under a plain `json.Marshal` / `json.Unmarshal`. Keep it
+for any value under a plain `json.Marshal` / `json.Unmarshal`. Keep it
 as the record
 behind `docs/internals.md`'s "what the drop-in path costs" section; delete it
 only together with that section.
