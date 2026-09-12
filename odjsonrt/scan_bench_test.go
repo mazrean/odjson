@@ -157,3 +157,38 @@ func BenchmarkNonASCIITwitter(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkAppendQuotedTwitter writes every string of the twitter document
+// back out, once per StringMode: the encoder's counterpart of
+// BenchmarkScanStringTwitter.
+func BenchmarkAppendQuotedTwitter(b *testing.B) {
+	data, err := os.ReadFile("../bench/testdata/twitter.json")
+	if err != nil {
+		b.Skip(err)
+	}
+	var strs []string
+	for i := 1; i < len(data); i++ {
+		if data[i] == '"' {
+			s, end, err := ParseString(data, i)
+			if err != nil {
+				b.Fatal(err)
+			}
+			strs = append(strs, s)
+			i = end - 1
+		}
+	}
+	for _, m := range []struct {
+		name string
+		mode StringMode
+	}{{"html", ModeHTML}, {"stream", ModeStream}, {"v2", ModeV2}, {"v2html", ModeV2HTML}} {
+		b.Run(m.name, func(b *testing.B) {
+			buf := make([]byte, 0, len(data))
+			for b.Loop() {
+				buf = buf[:0]
+				for _, s := range strs {
+					buf = AppendStringMode(buf, s, m.mode)
+				}
+			}
+		})
+	}
+}

@@ -95,10 +95,10 @@ func appendQuoted(dst []byte, src []byte, escapeHTML, quoted bool) []byte {
 		// time scan was tried here and measured no faster: the escape set is
 		// wide enough that computing the mask costs about what eight table
 		// lookups do, and the CPU pipelines the lookups well.
-		for i < len(src) && safe[src[i]] {
+		for uint(i) < uint(len(src)) && safe[src[i]] {
 			i++
 		}
-		if i >= len(src) {
+		if uint(i) >= uint(len(src)) {
 			break
 		}
 		if !checked && src[i] >= utf8.RuneSelf {
