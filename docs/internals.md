@@ -830,6 +830,20 @@ five interleaved runs, reads twitter **434 → 380 µs (-12.5%)** and small
 **420 → 401 ns (-4.6%)**, both at p=0.000. On single builds, unpooled, the json/v2 twitter decode
 went 474 → 418 µs and the small one 594 → 539 ns.
 
+The whole branch against `main`, four layouts a side and five
+interleaved runs (n=20), after the encoder change and the chunks:
+`json/v2` twitter decode **499 → 411 µs (-17.6%)**, small **639 → 600 ns
+(-6.1%)**, `encoding/json` twitter decode -6.1% and small -2.7% (p=0.057),
+the twitter encodes -3.9% (`encoding/json`) and -4.3% (`json/v2`), all
+others at p≤0.002; twitter's allocations per decode 2,468 → 1,037. The
+small encodes read **+4.5%** in that run, which the encoder change does
+not explain: measured on its own against the commit before it, three
+layouts a side (n=15), it reads the small encodes +1.1% and +1.4% at
+p=0.23 and p=0.15, and the twitter encodes -1.5% and -0.9%. What the
+whole branch moves is the alignment of everything after the generated
+decoders, which grew and shrank in every fixture; the small encode rows
+are where that shows, as they did in the earlier rounds.
+
 What is left is what was left before, minus the tests and the string
 allocations: the strict skip is 0.39 ns per byte skipped, the whitespace
 skip 2.5 ns per indent run, and of the 1,037 allocations a twitter decode
