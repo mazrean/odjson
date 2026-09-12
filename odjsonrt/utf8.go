@@ -43,6 +43,16 @@ func skipNonASCII(s []byte, i int) int {
 			// second byte is restricted.
 			if w&0xC0C0F0C0C0F0 == 0x8080E08080E0 && cjkLead(b) && cjkLead(byte(w>>24)) {
 				i += 6
+				// A run of such text is long: the words after the
+				// first are taken here, two sequences each, without
+				// the tests above for the other scripts.
+				for i+8 <= len(s) {
+					w = load64(s, i)
+					if w&0xC0C0F0C0C0F0 != 0x8080E08080E0 || !cjkLead(byte(w)) || !cjkLead(byte(w>>24)) {
+						break
+					}
+					i += 6
+				}
 				continue
 			}
 			// Four two byte sequences: leads at the even bytes, which must
