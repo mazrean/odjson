@@ -99,7 +99,7 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 		}
 		dst = append(dst, ']')
 	}
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -1365,7 +1365,7 @@ func odjsonOtherWrapperAppend(dst []byte, v *other.Wrapper, m odjsonrt.StringMod
 		}
 		dst = append(dst, ']')
 	}
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 

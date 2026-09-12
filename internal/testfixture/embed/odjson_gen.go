@@ -24,7 +24,7 @@ func (v *Deep) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '"', '}')
+	dst = append(dst, "\"}"...)
 	return dst, nil
 }
 
@@ -446,7 +446,7 @@ func (v *Mid) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	}
 	dst = append(dst, "\",\"mid_only\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.MidOnly))
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -937,7 +937,7 @@ func (v *LeftConflict) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '"', '}')
+	dst = append(dst, "\"}"...)
 	return dst, nil
 }
 
@@ -1357,7 +1357,7 @@ func (v *RightConflict) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte,
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '"', '}')
+	dst = append(dst, "\"}"...)
 	return dst, nil
 }
 
@@ -1772,7 +1772,7 @@ func (v *UntaggedSide) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '"', '}')
+	dst = append(dst, "\"}"...)
 	return dst, nil
 }
 
@@ -2116,7 +2116,7 @@ func (v *TaggedSide) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '"', '}')
+	dst = append(dst, "\"}"...)
 	return dst, nil
 }
 
@@ -2457,7 +2457,7 @@ func (v *PtrPart) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 	_ = err
 	dst = append(dst, "{\"ptr_only\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.PtrOnly))
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -2808,7 +2808,7 @@ func (v *Named) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 	_ = err
 	dst = append(dst, "{\"value\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Value))
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -3185,7 +3185,7 @@ func (v *Promoted) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '"')
+	dst = append(dst, "\""...)
 	if v.PtrPart != nil {
 		dst = append(dst, ",\"ptr_only\":"...)
 		dst = odjsonrt.AppendInt(dst, int64(v.PtrPart.PtrOnly))
@@ -3195,18 +3195,16 @@ func (v *Promoted) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, "\",\"named\":"...)
-	dst, err = v.Named.odjsonAppend(dst, m)
-	if err != nil {
-		return nil, err
-	}
-	dst = append(dst, ",\"own\":\""...)
+	dst = append(dst, "\",\"named\":{\"valu"...)
+	dst = append(dst, "e\":"...)
+	dst = odjsonrt.AppendInt(dst, int64(v.Named.Value))
+	dst = append(dst, "},\"own\":\""...)
 	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Own), m)
 	if err != nil {
 		return nil, err
 	}
 	dst[start] = '{'
-	dst = append(dst, '"', '}')
+	dst = append(dst, "\"}"...)
 	return dst, nil
 }
 
@@ -4115,7 +4113,7 @@ func (v *ShallowWins) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 	}
 	dst = append(dst, "\",\"shared\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Shared))
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 

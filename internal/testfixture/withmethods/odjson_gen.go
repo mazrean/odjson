@@ -20,7 +20,7 @@ func (v *Address) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '"')
+	dst = append(dst, "\""...)
 	if len(v.City) != 0 {
 		dst = append(dst, ",\"city\":\""...)
 		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.City), m)

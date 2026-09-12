@@ -443,7 +443,7 @@ func (v *lone) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	_ = err
 	dst = append(dst, "{\"flag\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.Flag))
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -821,7 +821,7 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 		}
 		dst = append(dst, ']')
 	}
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
