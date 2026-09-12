@@ -399,48 +399,61 @@ documents that each change one thing the fixtures hold fixed, and
 nativejson-benchmark's `canada.json` and `citm_catalog.json`, gen against
 plain in one process. The first run, on 2026-09-11 against the tree as it was
 (569737b), found three places where it did not; the fixes that followed are
-described after the table, and the table is the run after them, the same day
-on the same Ryzen 9 7950X, Go 1.27.1, `-count 6` for the two standard
+described after the table.
+
+The table below is a fresh run, on 2026-09-13 against `4777ed8` — the tree
+after the float formatter and the two decode rounds of 2026-09-12, so it is
+the same code the tables at the top of this page measure. Same machine as
+ever (Ryzen 9 7950X, Linux, Go 1.27.1), `-count 6` for the two standard
 libraries and `-count 3` for sonic and go-json. The ratio is plain over gen,
 so 2× means the generated codec halves the time and anything under 1× means
-it is slower than reflection; the figure in brackets is the first run's,
-where the two differ by more than the spread. Both runs predate everything
-that landed on 2026-09-12 — the float formatter and the second and third
-decode rounds — which the tables at the top of this page were re-measured
-after, so read the shapes below for **which shapes pay** and not for the size
-of the margin. Every row is within ±2% by
-`benchstat` except `dense` and `citm` (±4%) and the `canada` plain decode
-(±7%), so a ratio between 0.95× and 1.05× is read as level.
+it is slower than reflection. Every row is within ±3% by `benchstat` except
+six: the two `small` encodes, whose spread came from one outlier sample each
+and which were re-run on their own at `-count 20` (±0%, and those are the
+figures quoted, 3.82× and 3.58× against the noisy run's 3.80× and 3.55×);
+the v2 `twitter` encode (±4%) and the v1 `text-escaped` encode (±7%); the v1
+`citm` and `text-cjk` decodes (±4%); and the v1 `text-hangul` decode (±6–8%,
+the one row `benchstat` does not separate at p<0.05, which is why it reads as
+level). A ratio between 0.95× and 1.05× is read as level.
 
 | shape | v2 Marshal | v2 Unmarshal | v1 Marshal | v1 Unmarshal |
 | --- | --- | --- | --- | --- |
-| `twitter` (reference) | 3.76× | 2.13× | 3.23× (0.96×) | 1.27× |
-| `small` (reference) | 3.56× | 3.30× | 3.36× (1.12×) | 1.61× |
-| `twitter-compact` | 3.76× | 2.30× | 3.22× (0.95×) | 1.30× |
-| `page-3k` / `page-12k` / `page-100k` | 2.28× / 2.34× / 2.31× | 2.28× / 2.22× / 2.21× | 2.39× / 2.44× / 2.41× (1.39× / 1.38× / 1.34×) | 1.57× / 1.35× / 1.32× |
-| `array-items` (`[]Item`) | 2.10× (0.84×) | 2.11× (1.22×) | 2.21× (1.12×) | 1.32× |
-| `array-pages` (`[]Page`) | 2.31× (1.00×) | 2.16× (1.24×) | 2.42× (1.33×) | 1.34× |
-| `map-items` (`map[string]Item`) | 1.87× (0.83×) | 1.84× (1.17×) | 1.90× (1.11×) | 1.26× |
-| `generic` (`any`) | 1.67× | 1.44× | 2.14× (1.24×) | 2.24× |
-| `text-ascii` | 2.23× | 1.79× | 1.41× (0.93×) | 0.94× |
-| `text-cjk` (as `twitter`) | 1.71× | 1.93× | 1.25× (0.43×) | 1.05× |
-| `text-hangul` | 1.48× | 1.76× | 1.09× (0.44×) | 1.02× |
-| `text-latin` | 1.32× (0.77×) | 1.47× (0.96×) | 1.08× (0.46×) | 1.00× |
-| `text-cyrillic` | 2.16× (0.81×) | 2.19× (0.90×) | 1.69× (0.45×) | 1.03× |
-| `text-emoji` | 1.17× (0.94×) | 1.10× | 0.99× (0.46×) | 0.98× |
-| `text-escaped` | 1.46× | 1.25× | 1.09× (0.55×) | **0.82×** |
-| `unique-strings` | 2.08× | 1.53× | 1.51× (1.00×) | 1.04× |
-| `numbers` | 1.32× (1.14×) | 1.09× | 1.31× (1.15×) | **0.87×** |
-| `floats` (synthetic GeoJSON) | 1.53× (1.07×) | 1.96× | 1.55× (1.07×) | 1.32× |
-| `canada` | 1.15× (1.01×) | 1.31× | 1.15× (1.02×) | 1.07× |
-| `dense` | 4.33× (3.65×) | 3.28× | 4.31× (1.27×) | 1.39× |
-| `sparse` | 8.51× | 2.39× | 7.21× (2.70×) | 1.47× |
-| `skip` | — | 1.53× (1.68×) | — | 1.37× |
-| `citm` | 3.81× | 3.01× | 3.76× (1.14×) | 1.22× |
+| `twitter` (reference) | 3.95× | 2.92× | 3.56× | 1.34× |
+| `small` (reference) | 3.82× | 3.71× | 3.58× | 1.70× |
+| `twitter-compact` | 4.02× | 2.99× | 3.54× | 1.39× |
+| `page-3k` / `page-12k` / `page-100k` | 2.30× / 2.39× / 2.39× | 2.54× / 2.64× / 2.66× | 2.50× / 2.52× / 2.54× | 1.68× / 1.43× / 1.41× |
+| `page-12k-indented` | 2.42× | 2.49× | 2.54× | 1.37× |
+| `array-items` (`[]Item`) | 2.11× | 2.39× | 2.21× | 1.37× |
+| `array-pages` (`[]Page`) | 2.38× | 2.61× | 2.54× | 1.43× |
+| `map-items` (`map[string]Item`) | 1.85× | 2.05× | 1.88× | 1.28× |
+| `generic` (`any`) | 1.70× | 1.58× | 2.16× | 2.31× |
+| `text-ascii` | 2.91× | 2.59× | 1.88× | 1.05× |
+| `text-cjk` (as `twitter`) | 1.76× | 2.21× | 1.29× | 1.12× |
+| `text-hangul` | 1.47× | 1.90× | 1.09× | 1.03× |
+| `text-latin` | 1.59× | 1.90× | 1.31× | 1.06× |
+| `text-cyrillic` | 2.37× | 2.71× | 1.74× | 1.08× |
+| `text-emoji` | 1.54× | 1.43× | 1.23× | 1.07× |
+| `text-escaped` | 1.74× | 1.46× | 1.35× | **0.86×** |
+| `unique-strings` | 2.62× | 2.12× | 1.92× | 1.18× |
+| `numbers` | 1.37× | 1.21× | 1.34× | **0.91×** |
+| `floats` (synthetic GeoJSON) | 1.50× | 2.02× | 1.53× | 1.35× |
+| `canada` | 1.16× | 1.32× | 1.16× | 1.09× |
+| `dense` | 4.37× | 3.78× | 4.38× | 1.40× |
+| `sparse` | 8.26× | 2.69× | 7.18× | 1.55× |
+| `skip` | — | 1.94× | — | 1.40× |
+| `citm` | 3.85× | 4.06× | 3.85× | 1.32× |
 
-(`text-emoji` and `text-latin` in the v2 encode column, and `small`, were
-measured again after the last of the fixes at `-count 4`: 1.17×, 1.32× and
-272 ns; the rest of the column is the `-count 6` run.)
+**What the September 2026 work did to this table.** Against the 2026-09-11
+run, every v2 decode row moved up, which is the two decode rounds arriving
+everywhere rather than on `twitter` alone: `twitter` 2.13× → 2.92×, `citm`
+3.01× → 4.06×, `text-ascii` 1.79× → 2.59×, `dense` 3.28× → 3.78×, `skip`
+1.53× → 1.94×, and the three `page-*` sizes 2.2× → 2.5–2.7× together. The
+encode columns moved on the string heavy rows, which is the word-at-a-time
+`ModeHTML` scan: `text-ascii` 2.23× → 2.91×, `unique-strings` 2.08× → 2.62×,
+`text-emoji` 1.17× → 1.54×. The v1 decode column is flat to +0.14×, as it
+should be — nothing on the September 12 branches touched the public API path
+it stays on. The two rows still below 1× are the same two as before, and for
+the same reason: `text-escaped` (0.86×) and `numbers` (0.91×) on v1 decode.
 
 What held from the start: the ratios do not depend on document size
 (`page-3k` to `page-100k` are flat), on whitespace (`twitter-compact`,
@@ -459,7 +472,7 @@ What did not hold, and what was done about it:
   `WriteValue` re-validates and reformats what `odjsonAppend` produced — the
   public API ceiling measured above, seen from the other side. The direct
   path now takes a value at any depth (see "The direct path"): `[]Item` reads
-  2.10× / 2.11×, `map[string]Item` 1.87× / 1.84×, and `[]Page` 2.31× / 2.16×.
+  2.11× / 2.39×, `map[string]Item` 1.85× / 2.05×, and `[]Page` 2.38× / 2.61×.
   The map rows sit below the slice rows because json/v2's reflection writes
   a map's members through its own fast path and the map keys are still its
   work either way.
@@ -468,11 +481,11 @@ What did not hold, and what was done about it:
   `Marshal` calls the same `MarshalJSONTo`, but with its own flag word, which
   the direct path declined, so every v1 encode paid the reformat. The path
   now recognises that word and writes `ModeV2HTML`, which is what the
-  reformat made of the public path's bytes. `twitter` reads 3.23×, `small`
-  3.36×, the `text-*` rows 0.99–1.69×, and every v1 encode row is now at or
-  above 1×. v1 *decode* stays on the public path — its flags allow invalid
+  reformat made of the public path's bytes. `twitter` reads 3.56×, `small`
+  3.58×, the `text-*` rows 1.09–1.88×, and every v1 encode row is now above
+  1×. v1 *decode* stays on the public path — its flags allow invalid
   UTF-8 and duplicate names, which the strict parsers refuse — so those rows
-  are unchanged, `text-escaped` (0.82×) and `numbers` (0.87×) among them.
+  are unchanged, `text-escaped` (0.86×) and `numbers` (0.91×) among them.
 - **Non-ASCII text outside the CJK three byte range was slower than
   reflection.** The fused UTF-8 scan in `odjsonrt/utf8.go` settled only
   three byte sequences with leads E1–EC and EE–EF on its own and handed
@@ -481,15 +494,16 @@ What did not hold, and what was done about it:
   sequence length, four two byte or two four byte sequences per word, a
   word of accented Latin text is taken whole (`swarLatin`), and a lone two
   or four byte sequence among ASCII is settled in place. Cyrillic reads
-  2.16× / 2.19×, Latin 1.32× / 1.47×, emoji 1.17× / 1.10×; Latin stays below
-  ASCII (2.23×) because an accent every few bytes still ends each word scan
+  2.37× / 2.71×, Latin 1.59× / 1.90×, emoji 1.54× / 1.43×; Latin stays below
+  ASCII (2.91×) because an accent every few bytes still ends each word scan
   early.
 - **Full precision floats were level, and are not any more.** On 2026-09-11
   `canada` and the synthetic `floats` encoded at 1.01–1.07× on both
   libraries and `numbers` at 1.14×: the short decimal path declined them
   and both sides then ran `strconv`'s shortest formatting, which was the
-  whole cost. The three encode rows in the table are from 2026-09-12, after
-  `odjsonrt/ftoa.go` stopped calling `strconv` (see "Float formatting"):
+  whole cost. The three encode rows in the table — `floats` 1.50×, `numbers`
+  1.37×, `canada` 1.16× — postdate `odjsonrt/ftoa.go` dropping `strconv`
+  (see "Float formatting"), which was measured on 2026-09-12 like this:
   against the tree of the day before, the generated side reads `floats`
   −28%, `numbers` −15% (four `-randlayout` builds a side, five interleaved
   runs, n=20, p=0.000) and `canada` −12% (`-count 5`, one layout each
@@ -504,14 +518,20 @@ What did not hold, and what was done about it:
   instead of a two-word argument and accepting every short decimal rather
   than 93% of them, which is where `small`'s encode went from 290 to 272 ns.
 
-sonic and go-json behave as the floor predicts on every shape: the generated
-codec is slower on all 25 encode rows on sonic (0.13–0.63×) and on 24 of 25
-on go-json (0.23–0.81×, with `generic` level at 1.07×), and on most decode
-rows; the exceptions are the ones the README already names, `small`
-(1.13× / 1.07×), and shapes of the same kind, `dense` (1.32× / 1.01×) and
-`sparse` (1.16× on sonic), where the document is mostly member names and the
+sonic and go-json behave as the floor predicts on every shape, in the
+2026-09-13 run as in the first one: the generated codec is slower on all 25
+encode rows on sonic (0.14–0.74×) and on 24 of 25 on go-json (0.27–0.90×,
+`generic` the single exception at 1.11×), and on most decode rows. The decode
+exceptions are the ones the README already names, `small` (1.15× on sonic /
+1.11× on go-json), and shapes of the same kind, `dense` (1.40× / 1.12×) and
+`sparse` (1.39× / 1.07×), where the document is mostly member names and the
 skip-and-validate pass they make before calling `UnmarshalJSON` is cheap
-relative to their own decode.
+relative to their own decode; go-json adds `floats` (1.23×) and `generic`
+(1.18×) to that list, and sonic sits level on the three `page-*` sizes,
+`array-pages`, `citm` and `skip` (0.98–1.02×). Both remain far behind what
+the same decoder does under `json/v2`, which is the point of the floor
+section: on `twitter` their decode rows read 0.80× and 0.80× against
+2.92×.
 
 A parallel audit the same day measured the same top-level-only scope from the
 other direction (`Marshal([]T)` of twitter 1.23× slower, `MarshalWrite` 1.62×
