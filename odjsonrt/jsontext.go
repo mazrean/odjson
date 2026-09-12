@@ -141,7 +141,10 @@ func AddUnknownName(c *StringCache, names [][]byte, name []byte) [][]byte {
 // object's names dropped. Only a decoder that returns normally calls it; a
 // failed decode leaves its names for [PutStringCache] to clear.
 func EndUnknownNames(c *StringCache, names [][]byte, mark int) {
-	if c != nil {
+	// An object that added nothing has nothing to clear, and the published
+	// list already ends at its mark: every nested object restored that on
+	// its way out. Most objects add nothing, so most skip the two stores.
+	if c != nil && len(names) > mark {
 		// The names alias the document; clearing them keeps a pooled
 		// cache from holding on to it.
 		clear(names[mark:])
