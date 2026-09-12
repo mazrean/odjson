@@ -53,11 +53,43 @@ func BenchmarkSkipRetweeted(b *testing.B) {
 	}
 }
 
+// spaced rewrites an indented document the way json.dumps writes one: on
+// one line, with ", " and ": " between its tokens. Strings are copied
+// whole, so their contents are left alone.
+func spaced(data []byte) []byte {
+	out := make([]byte, 0, len(data))
+	for i := 0; i < len(data); i++ {
+		switch c := data[i]; {
+		case c == '"':
+			end, _, _, err := scanString(data, i)
+			if err != nil {
+				panic(err)
+			}
+			out = append(out, data[i:end]...)
+			i = end - 1
+		case c == ',' || c == ':':
+			out = append(out, c, ' ')
+		case spaceSet[c]:
+		default:
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 func BenchmarkSkipSpaceTwitter(b *testing.B) {
 	data, err := os.ReadFile("../bench/testdata/twitter.json")
 	if err != nil {
 		b.Skip(err)
 	}
+	b.Run("indented", func(b *testing.B) { benchSkipSpace(b, data) })
+	b.Run("spaced", func(b *testing.B) { benchSkipSpace(b, spaced(data)) })
+}
+
+// benchSkipSpace calls SkipSpace at the start of every whitespace run that
+// reaches skipSpaceSlow in a decode: the runs after a colon are settled by
+// AfterName and left out.
+func benchSkipSpace(b *testing.B, data []byte) {
 	var starts []int
 	for i := 1; i < len(data); i++ {
 		if spaceSet[data[i]] && !spaceSet[data[i-1]] && data[i-1] != ':' {

@@ -800,7 +800,7 @@ the order it was built:
 | **word loads through a sub-slice of exact extent** (`load64`, `load32`): one bounds test per word instead of two | strict skip 122.9 → 114.1 µs, whitespace runs 73.7 → 62.6 µs, `scanStringStrict` 121.3 → 110.3 µs |
 | **indices tested against the length unsigned** (`uint(p) < uint(len(data))`) throughout the runtime, and the same emitted by the generator: one compare settles the test and the index | runtime bounds tests 120 → 80, `bench/gen`'s generated file 1106 → 514; whitespace runs 62.6 → 58.7 µs, `scanStringStrict` 110.3 → 108.3 |
 | a **short plain string settled on its first word** (`shortString`): when the lowest lane the stop mask reports holds the closing quote, nothing the scan cares about stood before it, so a body of up to seven plain bytes costs no call. It takes the word rather than loading it, because with the load inside it costs 100 against the inliner's 80. A **member name of up to fifteen bytes settled on two words** (`shortName`) the same way: 26% of twitter's names end in the first word and 43% in the second | strict skip 113.2 → 108.0 µs, then 107.3 → 104.0 |
-| `skipSpaceSlow` takes the **indent path first**, the one-space test at its top having lost every caller to `AfterName`, and tests the byte the run ended on with one compare before the table loop | whitespace runs (those that still reach it) 41.9 → 40.4 µs |
+| `skipSpaceSlow` takes the **indent path first**, the space after a colon having lost every caller to `AfterName`, and tests the byte the run ended on with one compare before the table loop; the one-space test stays, after it, for the `", "` of a document written on one line, which a first cut dropped and which then cost +54% on that shape | whitespace runs that still reach it: indented twitter 44.8 → 38.5 µs, the same document rewritten with `", "` 21.6 → 23.1 |
 | a **run of CJK text taken word by word** in `skipNonASCII`, without going back through the other scripts' patterns every six bytes | non-ASCII runs 19.1 → 16.5 µs |
 | `EndUnknownNames` **skipped for an object that added no unknown name**, which is most of them | — |
 
@@ -821,8 +821,8 @@ decode **490 → 447 µs (-8.8%)** after the first seven changes and
 The `encoding/json` decodes read -5.0% / -4.9% in the first batch and
 level / -1.6% in the second, against a floor, from the marshal rows the
 stack cannot touch, of +2.6% and -2.3%: the v1 rows sit inside it, the
-json/v2 rows well above. In one process, the json/v2 twitter decode went
-474 → 418 µs and the small one 594 → 539 ns.
+json/v2 rows well above. On single builds, unpooled, the json/v2 twitter decode
+went 474 → 418 µs and the small one 594 → 539 ns.
 
 What is left is what was left before, minus the tests: the strict skip
 is 0.39 ns per byte skipped, the whitespace skip 2.5 ns per indent run,

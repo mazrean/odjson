@@ -29,9 +29,7 @@ func skipSpaceSlow(data []byte, p int) int {
 	// a space is the first non-space byte, exactly, a word of nothing but
 	// spaces reports eight, and the second word counts only when the first
 	// was all spaces. Run lengths vary from line to line, so a loop that
-	// tests each word mispredicts on most of them; this does not. The one
-	// space after a colon, once the commonest run, no longer arrives here:
-	// AfterName settles it in every caller.
+	// tests each word mispredicts on most of them; this does not.
 	if uint(p+17) <= uint(len(data)) && data[p] == '\n' {
 		n0 := bits.TrailingZeros64(load64(data, p+1)^allSpaces) / 8
 		n1 := bits.TrailingZeros64(load64(data, p+9)^allSpaces) / 8
@@ -42,6 +40,15 @@ func skipSpaceSlow(data []byte, p int) int {
 		if uint(p) < uint(len(data)) && data[p] > ' ' {
 			return p
 		}
+	}
+	// The one space of a document written with ", " and ": " between its
+	// tokens (json.dumps, most pretty printers on one line) is settled by
+	// the next byte: p+1 is a constant offset, not a value computed from
+	// the data, so nothing waits on a scan. The space after a colon no
+	// longer arrives here, AfterName having settled it in every caller,
+	// which is why the indent path comes first.
+	if uint(p+1) < uint(len(data)) && data[p] == ' ' && data[p+1] > ' ' {
+		return p + 1
 	}
 	for uint(p) < uint(len(data)) && spaceSet[data[p]] {
 		p++
