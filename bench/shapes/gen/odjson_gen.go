@@ -138,12 +138,12 @@ func (v *Item) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Item")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -329,10 +329,10 @@ func (v *Item) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 			if np33, ok34 := odjsonrt.ParseNull(data, p); ok34 {
 				p = np33
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.Active = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.Active = false
 					p += 5
 				} else {
@@ -349,13 +349,13 @@ func (v *Item) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 				p = np36
 				v.Tags = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]string")
 				}
 				p++
 				s38 := v.Tags[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s38) == 0 {
@@ -376,7 +376,7 @@ func (v *Item) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						s38 = append(s38, e39)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -401,7 +401,7 @@ func (v *Item) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 				p = np43
 				v.Attrs = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -410,7 +410,7 @@ func (v *Item) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					m45 = make(map[string]string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -434,7 +434,7 @@ func (v *Item) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						m45[sc.Make(k46)] = mv47
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -471,7 +471,7 @@ func (v *Item) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -496,12 +496,12 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		*v = Item{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Item")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -735,10 +735,10 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 				p = np82
 				v.Active = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.Active = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.Active = false
 					p += 5
 				} else {
@@ -759,13 +759,13 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 				p = np85
 				v.Tags = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]string")
 				}
 				p++
 				s87 := v.Tags[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s87) == 0 {
@@ -787,7 +787,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						s87 = append(s87, e88)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -816,7 +816,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 				p = np92
 				v.Attrs = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -829,7 +829,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					seen97 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -866,7 +866,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						m94[sc.Make(k95)] = mv96
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -915,7 +915,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -1158,13 +1158,13 @@ func (v *Item) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 				vp123 = np124
 				v.Tags = nil
 			} else {
-				if vp123 >= len(val122) || val122[vp123] != '[' {
+				if uint(vp123) >= uint(len(val122)) || val122[vp123] != '[' {
 					return odjsonrt.ErrType(val122, vp123, "[]string")
 				}
 				vp123++
 				s126 := v.Tags[:0]
 				vp123 = odjsonrt.SkipSpace(val122, vp123)
-				if vp123 < len(val122) && val122[vp123] == ']' {
+				if uint(vp123) < uint(len(val122)) && val122[vp123] == ']' {
 					vp123++
 				} else {
 					if cap(s126) == 0 {
@@ -1186,7 +1186,7 @@ func (v *Item) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						s126 = append(s126, e127)
 						vp123 = odjsonrt.SkipSpace(val122, vp123)
-						if vp123 >= len(val122) {
+						if uint(vp123) >= uint(len(val122)) {
 							return odjsonrt.ErrSyntax(val122, vp123, "unexpected end of JSON input")
 						}
 						if val122[vp123] == ',' {
@@ -1218,7 +1218,7 @@ func (v *Item) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 				vp132 = np133
 				v.Attrs = nil
 			} else {
-				if vp132 >= len(val131) || val131[vp132] != '{' {
+				if uint(vp132) >= uint(len(val131)) || val131[vp132] != '{' {
 					return odjsonrt.ErrType(val131, vp132, "map[string]string")
 				}
 				vp132++
@@ -1227,7 +1227,7 @@ func (v *Item) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					m135 = make(map[string]string)
 				}
 				vp132 = odjsonrt.SkipSpace(val131, vp132)
-				if vp132 < len(val131) && val131[vp132] == '}' {
+				if uint(vp132) < uint(len(val131)) && val131[vp132] == '}' {
 					vp132++
 				} else {
 					for {
@@ -1252,7 +1252,7 @@ func (v *Item) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						m135[sc.Make(k136)] = mv137
 						vp132 = odjsonrt.SkipSpace(val131, vp132)
-						if vp132 >= len(val131) {
+						if uint(vp132) >= uint(len(val131)) {
 							return odjsonrt.ErrSyntax(val131, vp132, "unexpected end of JSON input")
 						}
 						if val131[vp132] == ',' {
@@ -1402,12 +1402,12 @@ func (v *Owner) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Owner")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -1498,7 +1498,7 @@ func (v *Owner) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -1523,12 +1523,12 @@ func (v *Owner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		*v = Owner{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Owner")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -1646,7 +1646,7 @@ func (v *Owner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -1907,12 +1907,12 @@ func (v *Page) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Page")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -1962,13 +1962,13 @@ func (v *Page) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 				p = np172
 				v.Items = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Item")
 				}
 				p++
 				s174 := v.Items[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s174) == 0 {
@@ -1982,7 +1982,7 @@ func (v *Page) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						s174 = append(s174, e175)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -2037,7 +2037,7 @@ func (v *Page) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -2062,12 +2062,12 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		*v = Page{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Page")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -2125,13 +2125,13 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 				p = np185
 				v.Items = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Item")
 				}
 				p++
 				s187 := v.Items[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s187) == 0 {
@@ -2145,7 +2145,7 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						s187 = append(s187, e188)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -2218,7 +2218,7 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -2484,12 +2484,12 @@ func (v *Text) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Text")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -2522,13 +2522,13 @@ func (v *Text) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 				p = np205
 				v.Lines = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]string")
 				}
 				p++
 				s207 := v.Lines[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s207) == 0 {
@@ -2549,7 +2549,7 @@ func (v *Text) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						s207 = append(s207, e208)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -2577,7 +2577,7 @@ func (v *Text) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -2602,12 +2602,12 @@ func (v *Text) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		*v = Text{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Text")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -2648,13 +2648,13 @@ func (v *Text) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 				p = np212
 				v.Lines = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]string")
 				}
 				p++
 				s214 := v.Lines[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s214) == 0 {
@@ -2676,7 +2676,7 @@ func (v *Text) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						s214 = append(s214, e215)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -2712,7 +2712,7 @@ func (v *Text) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -2786,13 +2786,13 @@ func (v *Text) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 				vp220 = np221
 				v.Lines = nil
 			} else {
-				if vp220 >= len(val219) || val219[vp220] != '[' {
+				if uint(vp220) >= uint(len(val219)) || val219[vp220] != '[' {
 					return odjsonrt.ErrType(val219, vp220, "[]string")
 				}
 				vp220++
 				s223 := v.Lines[:0]
 				vp220 = odjsonrt.SkipSpace(val219, vp220)
-				if vp220 < len(val219) && val219[vp220] == ']' {
+				if uint(vp220) < uint(len(val219)) && val219[vp220] == ']' {
 					vp220++
 				} else {
 					if cap(s223) == 0 {
@@ -2814,7 +2814,7 @@ func (v *Text) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						s223 = append(s223, e224)
 						vp220 = odjsonrt.SkipSpace(val219, vp220)
-						if vp220 >= len(val219) {
+						if uint(vp220) >= uint(len(val219)) {
 							return odjsonrt.ErrSyntax(val219, vp220, "unexpected end of JSON input")
 						}
 						if val219[vp220] == ',' {
@@ -2963,12 +2963,12 @@ func (v *IDs) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "IDs")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -3001,13 +3001,13 @@ func (v *IDs) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 				p = np229
 				v.Values = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]string")
 				}
 				p++
 				s231 := v.Values[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s231) == 0 {
@@ -3028,7 +3028,7 @@ func (v *IDs) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 						}
 						s231 = append(s231, e232)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -3056,7 +3056,7 @@ func (v *IDs) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -3081,12 +3081,12 @@ func (v *IDs) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 		*v = IDs{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "IDs")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -3127,13 +3127,13 @@ func (v *IDs) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 				p = np236
 				v.Values = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]string")
 				}
 				p++
 				s238 := v.Values[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s238) == 0 {
@@ -3155,7 +3155,7 @@ func (v *IDs) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 						}
 						s238 = append(s238, e239)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -3191,7 +3191,7 @@ func (v *IDs) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -3265,13 +3265,13 @@ func (v *IDs) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 				vp244 = np245
 				v.Values = nil
 			} else {
-				if vp244 >= len(val243) || val243[vp244] != '[' {
+				if uint(vp244) >= uint(len(val243)) || val243[vp244] != '[' {
 					return odjsonrt.ErrType(val243, vp244, "[]string")
 				}
 				vp244++
 				s247 := v.Values[:0]
 				vp244 = odjsonrt.SkipSpace(val243, vp244)
-				if vp244 < len(val243) && val243[vp244] == ']' {
+				if uint(vp244) < uint(len(val243)) && val243[vp244] == ']' {
 					vp244++
 				} else {
 					if cap(s247) == 0 {
@@ -3293,7 +3293,7 @@ func (v *IDs) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 						}
 						s247 = append(s247, e248)
 						vp244 = odjsonrt.SkipSpace(val243, vp244)
-						if vp244 >= len(val243) {
+						if uint(vp244) >= uint(len(val243)) {
 							return odjsonrt.ErrSyntax(val243, vp244, "unexpected end of JSON input")
 						}
 						if val243[vp244] == ',' {
@@ -3430,12 +3430,12 @@ func (v *Generic) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Generic")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -3483,7 +3483,7 @@ func (v *Generic) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -3508,12 +3508,12 @@ func (v *Generic) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		*v = Generic{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Generic")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -3577,7 +3577,7 @@ func (v *Generic) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -3871,12 +3871,12 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Numbers")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -3954,13 +3954,13 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 				p = np269
 				v.I64 = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]int64")
 				}
 				p++
 				s271 := v.I64[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s271) == 0 {
@@ -3986,7 +3986,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						s271 = append(s271, e272)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4011,13 +4011,13 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 				p = np279
 				v.U64 = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]uint64")
 				}
 				p++
 				s281 := v.U64[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s281) == 0 {
@@ -4043,7 +4043,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						s281 = append(s281, e282)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4068,13 +4068,13 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 				p = np289
 				v.I16 = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]int16")
 				}
 				p++
 				s291 := v.I16[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s291) == 0 {
@@ -4100,7 +4100,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						s291 = append(s291, e292)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4125,13 +4125,13 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 				p = np299
 				v.F32 = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]float32")
 				}
 				p++
 				s301 := v.F32[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s301) == 0 {
@@ -4157,7 +4157,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						s301 = append(s301, e302)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4182,13 +4182,13 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 				p = np309
 				v.F64 = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]float64")
 				}
 				p++
 				s311 := v.F64[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s311) == 0 {
@@ -4214,7 +4214,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						s311 = append(s311, e312)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4239,13 +4239,13 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 				p = np319
 				v.Sci = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]float64")
 				}
 				p++
 				s321 := v.Sci[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s321) == 0 {
@@ -4271,7 +4271,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						s321 = append(s321, e322)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4299,7 +4299,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -4324,12 +4324,12 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		*v = Numbers{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Numbers")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -4415,13 +4415,13 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np329
 				v.I64 = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]int64")
 				}
 				p++
 				s331 := v.I64[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s331) == 0 {
@@ -4448,7 +4448,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						s331 = append(s331, e332)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4477,13 +4477,13 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np339
 				v.U64 = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]uint64")
 				}
 				p++
 				s341 := v.U64[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s341) == 0 {
@@ -4510,7 +4510,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						s341 = append(s341, e342)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4539,13 +4539,13 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np349
 				v.I16 = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]int16")
 				}
 				p++
 				s351 := v.I16[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s351) == 0 {
@@ -4572,7 +4572,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						s351 = append(s351, e352)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4601,13 +4601,13 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np359
 				v.F32 = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]float32")
 				}
 				p++
 				s361 := v.F32[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s361) == 0 {
@@ -4634,7 +4634,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						s361 = append(s361, e362)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4663,13 +4663,13 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np369
 				v.F64 = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]float64")
 				}
 				p++
 				s371 := v.F64[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s371) == 0 {
@@ -4696,7 +4696,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						s371 = append(s371, e372)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4725,13 +4725,13 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np379
 				v.Sci = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]float64")
 				}
 				p++
 				s381 := v.Sci[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s381) == 0 {
@@ -4758,7 +4758,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						s381 = append(s381, e382)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -4794,7 +4794,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -4888,13 +4888,13 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 				vp390 = np391
 				v.I64 = nil
 			} else {
-				if vp390 >= len(val389) || val389[vp390] != '[' {
+				if uint(vp390) >= uint(len(val389)) || val389[vp390] != '[' {
 					return odjsonrt.ErrType(val389, vp390, "[]int64")
 				}
 				vp390++
 				s393 := v.I64[:0]
 				vp390 = odjsonrt.SkipSpace(val389, vp390)
-				if vp390 < len(val389) && val389[vp390] == ']' {
+				if uint(vp390) < uint(len(val389)) && val389[vp390] == ']' {
 					vp390++
 				} else {
 					if cap(s393) == 0 {
@@ -4921,7 +4921,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						s393 = append(s393, e394)
 						vp390 = odjsonrt.SkipSpace(val389, vp390)
-						if vp390 >= len(val389) {
+						if uint(vp390) >= uint(len(val389)) {
 							return odjsonrt.ErrSyntax(val389, vp390, "unexpected end of JSON input")
 						}
 						if val389[vp390] == ',' {
@@ -4953,13 +4953,13 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 				vp402 = np403
 				v.U64 = nil
 			} else {
-				if vp402 >= len(val401) || val401[vp402] != '[' {
+				if uint(vp402) >= uint(len(val401)) || val401[vp402] != '[' {
 					return odjsonrt.ErrType(val401, vp402, "[]uint64")
 				}
 				vp402++
 				s405 := v.U64[:0]
 				vp402 = odjsonrt.SkipSpace(val401, vp402)
-				if vp402 < len(val401) && val401[vp402] == ']' {
+				if uint(vp402) < uint(len(val401)) && val401[vp402] == ']' {
 					vp402++
 				} else {
 					if cap(s405) == 0 {
@@ -4986,7 +4986,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						s405 = append(s405, e406)
 						vp402 = odjsonrt.SkipSpace(val401, vp402)
-						if vp402 >= len(val401) {
+						if uint(vp402) >= uint(len(val401)) {
 							return odjsonrt.ErrSyntax(val401, vp402, "unexpected end of JSON input")
 						}
 						if val401[vp402] == ',' {
@@ -5018,13 +5018,13 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 				vp414 = np415
 				v.I16 = nil
 			} else {
-				if vp414 >= len(val413) || val413[vp414] != '[' {
+				if uint(vp414) >= uint(len(val413)) || val413[vp414] != '[' {
 					return odjsonrt.ErrType(val413, vp414, "[]int16")
 				}
 				vp414++
 				s417 := v.I16[:0]
 				vp414 = odjsonrt.SkipSpace(val413, vp414)
-				if vp414 < len(val413) && val413[vp414] == ']' {
+				if uint(vp414) < uint(len(val413)) && val413[vp414] == ']' {
 					vp414++
 				} else {
 					if cap(s417) == 0 {
@@ -5051,7 +5051,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						s417 = append(s417, e418)
 						vp414 = odjsonrt.SkipSpace(val413, vp414)
-						if vp414 >= len(val413) {
+						if uint(vp414) >= uint(len(val413)) {
 							return odjsonrt.ErrSyntax(val413, vp414, "unexpected end of JSON input")
 						}
 						if val413[vp414] == ',' {
@@ -5083,13 +5083,13 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 				vp426 = np427
 				v.F32 = nil
 			} else {
-				if vp426 >= len(val425) || val425[vp426] != '[' {
+				if uint(vp426) >= uint(len(val425)) || val425[vp426] != '[' {
 					return odjsonrt.ErrType(val425, vp426, "[]float32")
 				}
 				vp426++
 				s429 := v.F32[:0]
 				vp426 = odjsonrt.SkipSpace(val425, vp426)
-				if vp426 < len(val425) && val425[vp426] == ']' {
+				if uint(vp426) < uint(len(val425)) && val425[vp426] == ']' {
 					vp426++
 				} else {
 					if cap(s429) == 0 {
@@ -5116,7 +5116,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						s429 = append(s429, e430)
 						vp426 = odjsonrt.SkipSpace(val425, vp426)
-						if vp426 >= len(val425) {
+						if uint(vp426) >= uint(len(val425)) {
 							return odjsonrt.ErrSyntax(val425, vp426, "unexpected end of JSON input")
 						}
 						if val425[vp426] == ',' {
@@ -5148,13 +5148,13 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 				vp438 = np439
 				v.F64 = nil
 			} else {
-				if vp438 >= len(val437) || val437[vp438] != '[' {
+				if uint(vp438) >= uint(len(val437)) || val437[vp438] != '[' {
 					return odjsonrt.ErrType(val437, vp438, "[]float64")
 				}
 				vp438++
 				s441 := v.F64[:0]
 				vp438 = odjsonrt.SkipSpace(val437, vp438)
-				if vp438 < len(val437) && val437[vp438] == ']' {
+				if uint(vp438) < uint(len(val437)) && val437[vp438] == ']' {
 					vp438++
 				} else {
 					if cap(s441) == 0 {
@@ -5181,7 +5181,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						s441 = append(s441, e442)
 						vp438 = odjsonrt.SkipSpace(val437, vp438)
-						if vp438 >= len(val437) {
+						if uint(vp438) >= uint(len(val437)) {
 							return odjsonrt.ErrSyntax(val437, vp438, "unexpected end of JSON input")
 						}
 						if val437[vp438] == ',' {
@@ -5213,13 +5213,13 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 				vp450 = np451
 				v.Sci = nil
 			} else {
-				if vp450 >= len(val449) || val449[vp450] != '[' {
+				if uint(vp450) >= uint(len(val449)) || val449[vp450] != '[' {
 					return odjsonrt.ErrType(val449, vp450, "[]float64")
 				}
 				vp450++
 				s453 := v.Sci[:0]
 				vp450 = odjsonrt.SkipSpace(val449, vp450)
-				if vp450 < len(val449) && val449[vp450] == ']' {
+				if uint(vp450) < uint(len(val449)) && val449[vp450] == ']' {
 					vp450++
 				} else {
 					if cap(s453) == 0 {
@@ -5246,7 +5246,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						s453 = append(s453, e454)
 						vp450 = odjsonrt.SkipSpace(val449, vp450)
-						if vp450 >= len(val449) {
+						if uint(vp450) >= uint(len(val449)) {
 							return odjsonrt.ErrSyntax(val449, vp450, "unexpected end of JSON input")
 						}
 						if val449[vp450] == ',' {
@@ -5393,12 +5393,12 @@ func (v *DenseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "DenseDoc")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -5431,13 +5431,13 @@ func (v *DenseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 				p = np462
 				v.Rows = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Dense")
 				}
 				p++
 				s464 := v.Rows[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s464) == 0 {
@@ -5451,7 +5451,7 @@ func (v *DenseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 						}
 						s464 = append(s464, e465)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -5479,7 +5479,7 @@ func (v *DenseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -5504,12 +5504,12 @@ func (v *DenseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		*v = DenseDoc{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "DenseDoc")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -5550,13 +5550,13 @@ func (v *DenseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 				p = np466
 				v.Rows = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Dense")
 				}
 				p++
 				s468 := v.Rows[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s468) == 0 {
@@ -5570,7 +5570,7 @@ func (v *DenseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 						}
 						s468 = append(s468, e469)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -5606,7 +5606,7 @@ func (v *DenseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -5947,12 +5947,12 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Dense")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -6909,10 +6909,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np664, ok665 := odjsonrt.ParseNull(data, p); ok665 {
 				p = np664
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B00 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B00 = false
 					p += 5
 				} else {
@@ -6928,10 +6928,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np667, ok668 := odjsonrt.ParseNull(data, p); ok668 {
 				p = np667
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B01 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B01 = false
 					p += 5
 				} else {
@@ -6947,10 +6947,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np670, ok671 := odjsonrt.ParseNull(data, p); ok671 {
 				p = np670
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B02 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B02 = false
 					p += 5
 				} else {
@@ -6966,10 +6966,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np673, ok674 := odjsonrt.ParseNull(data, p); ok674 {
 				p = np673
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B03 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B03 = false
 					p += 5
 				} else {
@@ -6985,10 +6985,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np676, ok677 := odjsonrt.ParseNull(data, p); ok677 {
 				p = np676
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B04 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B04 = false
 					p += 5
 				} else {
@@ -7004,10 +7004,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np679, ok680 := odjsonrt.ParseNull(data, p); ok680 {
 				p = np679
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B05 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B05 = false
 					p += 5
 				} else {
@@ -7023,10 +7023,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np682, ok683 := odjsonrt.ParseNull(data, p); ok683 {
 				p = np682
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B06 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B06 = false
 					p += 5
 				} else {
@@ -7042,10 +7042,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np685, ok686 := odjsonrt.ParseNull(data, p); ok686 {
 				p = np685
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B07 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B07 = false
 					p += 5
 				} else {
@@ -7061,10 +7061,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np688, ok689 := odjsonrt.ParseNull(data, p); ok689 {
 				p = np688
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B08 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B08 = false
 					p += 5
 				} else {
@@ -7080,10 +7080,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np691, ok692 := odjsonrt.ParseNull(data, p); ok692 {
 				p = np691
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B09 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B09 = false
 					p += 5
 				} else {
@@ -7099,10 +7099,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np694, ok695 := odjsonrt.ParseNull(data, p); ok695 {
 				p = np694
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B10 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B10 = false
 					p += 5
 				} else {
@@ -7118,10 +7118,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np697, ok698 := odjsonrt.ParseNull(data, p); ok698 {
 				p = np697
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B11 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B11 = false
 					p += 5
 				} else {
@@ -7137,10 +7137,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np700, ok701 := odjsonrt.ParseNull(data, p); ok701 {
 				p = np700
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B12 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B12 = false
 					p += 5
 				} else {
@@ -7156,10 +7156,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np703, ok704 := odjsonrt.ParseNull(data, p); ok704 {
 				p = np703
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B13 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B13 = false
 					p += 5
 				} else {
@@ -7175,10 +7175,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np706, ok707 := odjsonrt.ParseNull(data, p); ok707 {
 				p = np706
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B14 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B14 = false
 					p += 5
 				} else {
@@ -7194,10 +7194,10 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			if np709, ok710 := odjsonrt.ParseNull(data, p); ok710 {
 				p = np709
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B15 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B15 = false
 					p += 5
 				} else {
@@ -7345,7 +7345,7 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -7370,12 +7370,12 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		*v = Dense{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Dense")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -8501,10 +8501,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np952
 				v.B00 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B00 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B00 = false
 					p += 5
 				} else {
@@ -8525,10 +8525,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np955
 				v.B01 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B01 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B01 = false
 					p += 5
 				} else {
@@ -8549,10 +8549,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np958
 				v.B02 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B02 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B02 = false
 					p += 5
 				} else {
@@ -8573,10 +8573,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np961
 				v.B03 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B03 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B03 = false
 					p += 5
 				} else {
@@ -8597,10 +8597,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np964
 				v.B04 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B04 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B04 = false
 					p += 5
 				} else {
@@ -8621,10 +8621,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np967
 				v.B05 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B05 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B05 = false
 					p += 5
 				} else {
@@ -8645,10 +8645,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np970
 				v.B06 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B06 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B06 = false
 					p += 5
 				} else {
@@ -8669,10 +8669,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np973
 				v.B07 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B07 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B07 = false
 					p += 5
 				} else {
@@ -8693,10 +8693,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np976
 				v.B08 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B08 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B08 = false
 					p += 5
 				} else {
@@ -8717,10 +8717,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np979
 				v.B09 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B09 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B09 = false
 					p += 5
 				} else {
@@ -8741,10 +8741,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np982
 				v.B10 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B10 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B10 = false
 					p += 5
 				} else {
@@ -8765,10 +8765,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np985
 				v.B11 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B11 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B11 = false
 					p += 5
 				} else {
@@ -8789,10 +8789,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np988
 				v.B12 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B12 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B12 = false
 					p += 5
 				} else {
@@ -8813,10 +8813,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np991
 				v.B13 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B13 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B13 = false
 					p += 5
 				} else {
@@ -8837,10 +8837,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np994
 				v.B14 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B14 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B14 = false
 					p += 5
 				} else {
@@ -8861,10 +8861,10 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np997
 				v.B15 = false
 			} else {
-				if p+4 <= len(data) && string(data[p:p+4]) == "true" {
+				if uint(p+4) <= uint(len(data)) && string(data[p:p+4]) == "true" {
 					v.B15 = true
 					p += 4
-				} else if p+5 <= len(data) && string(data[p:p+5]) == "false" {
+				} else if uint(p+5) <= uint(len(data)) && string(data[p:p+5]) == "false" {
 					v.B15 = false
 					p += 5
 				} else {
@@ -9060,7 +9060,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -10365,12 +10365,12 @@ func (v *SparseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "SparseDoc")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -10403,13 +10403,13 @@ func (v *SparseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 				p = np1161
 				v.Rows = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Sparse")
 				}
 				p++
 				s1163 := v.Rows[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s1163) == 0 {
@@ -10423,7 +10423,7 @@ func (v *SparseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 						}
 						s1163 = append(s1163, e1164)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -10451,7 +10451,7 @@ func (v *SparseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -10476,12 +10476,12 @@ func (v *SparseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 		*v = SparseDoc{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "SparseDoc")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -10522,13 +10522,13 @@ func (v *SparseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 				p = np1165
 				v.Rows = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Sparse")
 				}
 				p++
 				s1167 := v.Rows[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s1167) == 0 {
@@ -10542,7 +10542,7 @@ func (v *SparseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 						}
 						s1167 = append(s1167, e1168)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -10578,7 +10578,7 @@ func (v *SparseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -11145,12 +11145,12 @@ func (v *Sparse) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Sparse")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -12162,7 +12162,7 @@ func (v *Sparse) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -12187,12 +12187,12 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 		*v = Sparse{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Sparse")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -13380,7 +13380,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -14729,12 +14729,12 @@ func (v *Canada) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Canada")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -14789,13 +14789,13 @@ func (v *Canada) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 				p = np1871
 				v.Features = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Feature")
 				}
 				p++
 				s1873 := v.Features[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s1873) == 0 {
@@ -14809,7 +14809,7 @@ func (v *Canada) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 						}
 						s1873 = append(s1873, e1874)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -14837,7 +14837,7 @@ func (v *Canada) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -14862,12 +14862,12 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 		*v = Canada{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Canada")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -14935,13 +14935,13 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 				p = np1878
 				v.Features = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Feature")
 				}
 				p++
 				s1880 := v.Features[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s1880) == 0 {
@@ -14955,7 +14955,7 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 						}
 						s1880 = append(s1880, e1881)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -14991,7 +14991,7 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -15295,12 +15295,12 @@ func (v *Feature) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Feature")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -15361,7 +15361,7 @@ func (v *Feature) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 				p = np1896
 				v.Properties = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -15370,7 +15370,7 @@ func (v *Feature) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 					m1898 = make(map[string]string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -15394,7 +15394,7 @@ func (v *Feature) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						m1898[sc.Make(k1899)] = mv1900
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -15423,7 +15423,7 @@ func (v *Feature) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -15448,12 +15448,12 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		*v = Feature{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Feature")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -15527,7 +15527,7 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np1907
 				v.Properties = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -15540,7 +15540,7 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 					seen1912 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -15577,7 +15577,7 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						m1909[sc.Make(k1910)] = mv1911
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -15618,7 +15618,7 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -15716,7 +15716,7 @@ func (v *Feature) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 				vp1920 = np1921
 				v.Properties = nil
 			} else {
-				if vp1920 >= len(val1919) || val1919[vp1920] != '{' {
+				if uint(vp1920) >= uint(len(val1919)) || val1919[vp1920] != '{' {
 					return odjsonrt.ErrType(val1919, vp1920, "map[string]string")
 				}
 				vp1920++
@@ -15725,7 +15725,7 @@ func (v *Feature) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 					m1923 = make(map[string]string)
 				}
 				vp1920 = odjsonrt.SkipSpace(val1919, vp1920)
-				if vp1920 < len(val1919) && val1919[vp1920] == '}' {
+				if uint(vp1920) < uint(len(val1919)) && val1919[vp1920] == '}' {
 					vp1920++
 				} else {
 					for {
@@ -15750,7 +15750,7 @@ func (v *Feature) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						m1923[sc.Make(k1924)] = mv1925
 						vp1920 = odjsonrt.SkipSpace(val1919, vp1920)
-						if vp1920 >= len(val1919) {
+						if uint(vp1920) >= uint(len(val1919)) {
 							return odjsonrt.ErrSyntax(val1919, vp1920, "unexpected end of JSON input")
 						}
 						if val1919[vp1920] == ',' {
@@ -15924,12 +15924,12 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Geometry")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -15984,13 +15984,13 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 				p = np1935
 				v.Coordinates = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[][][]float64")
 				}
 				p++
 				s1937 := v.Coordinates[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s1937) == 0 {
@@ -16003,13 +16003,13 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 							p = np1939
 							e1938 = nil
 						} else {
-							if p >= len(data) || data[p] != '[' {
+							if uint(p) >= uint(len(data)) || data[p] != '[' {
 								return p, odjsonrt.ErrType(data, p, "[][]float64")
 							}
 							p++
 							s1941 := e1938[:0]
 							p = odjsonrt.SkipSpace(data, p)
-							if p < len(data) && data[p] == ']' {
+							if uint(p) < uint(len(data)) && data[p] == ']' {
 								p++
 							} else {
 								if cap(s1941) == 0 {
@@ -16022,13 +16022,13 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 										p = np1943
 										e1942 = nil
 									} else {
-										if p >= len(data) || data[p] != '[' {
+										if uint(p) >= uint(len(data)) || data[p] != '[' {
 											return p, odjsonrt.ErrType(data, p, "[]float64")
 										}
 										p++
 										s1945 := e1942[:0]
 										p = odjsonrt.SkipSpace(data, p)
-										if p < len(data) && data[p] == ']' {
+										if uint(p) < uint(len(data)) && data[p] == ']' {
 											p++
 										} else {
 											if cap(s1945) == 0 {
@@ -16054,7 +16054,7 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 												}
 												s1945 = append(s1945, e1946)
 												p = odjsonrt.SkipSpace(data, p)
-												if p >= len(data) {
+												if uint(p) >= uint(len(data)) {
 													return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 												}
 												if data[p] == ',' {
@@ -16075,7 +16075,7 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 									}
 									s1941 = append(s1941, e1942)
 									p = odjsonrt.SkipSpace(data, p)
-									if p >= len(data) {
+									if uint(p) >= uint(len(data)) {
 										return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 									}
 									if data[p] == ',' {
@@ -16096,7 +16096,7 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 						}
 						s1937 = append(s1937, e1938)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -16124,7 +16124,7 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -16149,12 +16149,12 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		*v = Geometry{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Geometry")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -16222,13 +16222,13 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 				p = np1956
 				v.Coordinates = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[][][]float64")
 				}
 				p++
 				s1958 := v.Coordinates[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s1958) == 0 {
@@ -16241,13 +16241,13 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 							p = np1960
 							e1959 = nil
 						} else {
-							if p >= len(data) || data[p] != '[' {
+							if uint(p) >= uint(len(data)) || data[p] != '[' {
 								return p, odjsonrt.ErrType(data, p, "[][]float64")
 							}
 							p++
 							s1962 := e1959[:0]
 							p = odjsonrt.SkipSpace(data, p)
-							if p < len(data) && data[p] == ']' {
+							if uint(p) < uint(len(data)) && data[p] == ']' {
 								p++
 							} else {
 								if cap(s1962) == 0 {
@@ -16260,13 +16260,13 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 										p = np1964
 										e1963 = nil
 									} else {
-										if p >= len(data) || data[p] != '[' {
+										if uint(p) >= uint(len(data)) || data[p] != '[' {
 											return p, odjsonrt.ErrType(data, p, "[]float64")
 										}
 										p++
 										s1966 := e1963[:0]
 										p = odjsonrt.SkipSpace(data, p)
-										if p < len(data) && data[p] == ']' {
+										if uint(p) < uint(len(data)) && data[p] == ']' {
 											p++
 										} else {
 											if cap(s1966) == 0 {
@@ -16293,7 +16293,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 												}
 												s1966 = append(s1966, e1967)
 												p = odjsonrt.SkipSpace(data, p)
-												if p >= len(data) {
+												if uint(p) >= uint(len(data)) {
 													return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 												}
 												if data[p] == ',' {
@@ -16314,7 +16314,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 									}
 									s1962 = append(s1962, e1963)
 									p = odjsonrt.SkipSpace(data, p)
-									if p >= len(data) {
+									if uint(p) >= uint(len(data)) {
 										return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 									}
 									if data[p] == ',' {
@@ -16335,7 +16335,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 						}
 						s1958 = append(s1958, e1959)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -16371,7 +16371,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -16465,13 +16465,13 @@ func (v *Geometry) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 				vp1977 = np1978
 				v.Coordinates = nil
 			} else {
-				if vp1977 >= len(val1976) || val1976[vp1977] != '[' {
+				if uint(vp1977) >= uint(len(val1976)) || val1976[vp1977] != '[' {
 					return odjsonrt.ErrType(val1976, vp1977, "[][][]float64")
 				}
 				vp1977++
 				s1980 := v.Coordinates[:0]
 				vp1977 = odjsonrt.SkipSpace(val1976, vp1977)
-				if vp1977 < len(val1976) && val1976[vp1977] == ']' {
+				if uint(vp1977) < uint(len(val1976)) && val1976[vp1977] == ']' {
 					vp1977++
 				} else {
 					if cap(s1980) == 0 {
@@ -16484,13 +16484,13 @@ func (v *Geometry) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 							vp1977 = np1982
 							e1981 = nil
 						} else {
-							if vp1977 >= len(val1976) || val1976[vp1977] != '[' {
+							if uint(vp1977) >= uint(len(val1976)) || val1976[vp1977] != '[' {
 								return odjsonrt.ErrType(val1976, vp1977, "[][]float64")
 							}
 							vp1977++
 							s1984 := e1981[:0]
 							vp1977 = odjsonrt.SkipSpace(val1976, vp1977)
-							if vp1977 < len(val1976) && val1976[vp1977] == ']' {
+							if uint(vp1977) < uint(len(val1976)) && val1976[vp1977] == ']' {
 								vp1977++
 							} else {
 								if cap(s1984) == 0 {
@@ -16503,13 +16503,13 @@ func (v *Geometry) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 										vp1977 = np1986
 										e1985 = nil
 									} else {
-										if vp1977 >= len(val1976) || val1976[vp1977] != '[' {
+										if uint(vp1977) >= uint(len(val1976)) || val1976[vp1977] != '[' {
 											return odjsonrt.ErrType(val1976, vp1977, "[]float64")
 										}
 										vp1977++
 										s1988 := e1985[:0]
 										vp1977 = odjsonrt.SkipSpace(val1976, vp1977)
-										if vp1977 < len(val1976) && val1976[vp1977] == ']' {
+										if uint(vp1977) < uint(len(val1976)) && val1976[vp1977] == ']' {
 											vp1977++
 										} else {
 											if cap(s1988) == 0 {
@@ -16536,7 +16536,7 @@ func (v *Geometry) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 												}
 												s1988 = append(s1988, e1989)
 												vp1977 = odjsonrt.SkipSpace(val1976, vp1977)
-												if vp1977 >= len(val1976) {
+												if uint(vp1977) >= uint(len(val1976)) {
 													return odjsonrt.ErrSyntax(val1976, vp1977, "unexpected end of JSON input")
 												}
 												if val1976[vp1977] == ',' {
@@ -16557,7 +16557,7 @@ func (v *Geometry) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 									}
 									s1984 = append(s1984, e1985)
 									vp1977 = odjsonrt.SkipSpace(val1976, vp1977)
-									if vp1977 >= len(val1976) {
+									if uint(vp1977) >= uint(len(val1976)) {
 										return odjsonrt.ErrSyntax(val1976, vp1977, "unexpected end of JSON input")
 									}
 									if val1976[vp1977] == ',' {
@@ -16578,7 +16578,7 @@ func (v *Geometry) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 						}
 						s1980 = append(s1980, e1981)
 						vp1977 = odjsonrt.SkipSpace(val1976, vp1977)
-						if vp1977 >= len(val1976) {
+						if uint(vp1977) >= uint(len(val1976)) {
 							return odjsonrt.ErrSyntax(val1976, vp1977, "unexpected end of JSON input")
 						}
 						if val1976[vp1977] == ',' {
@@ -17033,12 +17033,12 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "CitmCatalog")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -17056,7 +17056,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				if len(rest) > 6 {
 					switch rest[6] {
 					case 'n':
-						if len(rest) >= 26 && string(rest[:26]) == "\"audienceSubCategoryNames\"" {
+						if len(rest) >= 26 && string(rest[:16]) == "\"audienceSubCate" && string(rest[16:26]) == "goryNames\"" {
 							idx, p = 1, p+26
 						}
 					case 'N':
@@ -17082,7 +17082,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					idx, p = 4, p+14
 				}
 			case 't':
-				if len(rest) >= 19 && string(rest[:19]) == "\"seatCategoryNames\"" {
+				if len(rest) >= 19 && string(rest[:16]) == "\"seatCategoryNam" && string(rest[16:19]) == "es\"" {
 					idx, p = 5, p+19
 				}
 			case 'T':
@@ -17141,7 +17141,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2038
 				v.AreaNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -17150,7 +17150,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					m2040 = make(map[string]string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -17174,7 +17174,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						m2040[sc.Make(k2041)] = mv2042
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17195,7 +17195,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2046
 				v.AudienceSubCategoryNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -17204,7 +17204,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					m2048 = make(map[string]string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -17228,7 +17228,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						m2048[sc.Make(k2049)] = mv2050
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17249,7 +17249,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2054
 				v.BlockNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -17258,7 +17258,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					m2056 = make(map[string]string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -17282,7 +17282,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						m2056[sc.Make(k2057)] = mv2058
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17303,7 +17303,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2062
 				v.Events = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]Event")
 				}
 				p++
@@ -17312,7 +17312,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					m2064 = make(map[string]Event)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -17329,7 +17329,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						m2064[sc.Make(k2065)] = mv2066
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17350,13 +17350,13 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2067
 				v.Performances = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Performance")
 				}
 				p++
 				s2069 := v.Performances[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2069) == 0 {
@@ -17370,7 +17370,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						s2069 = append(s2069, e2070)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17395,7 +17395,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2071
 				v.SeatCategoryNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -17404,7 +17404,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					m2073 = make(map[string]string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -17428,7 +17428,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						m2073[sc.Make(k2074)] = mv2075
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17449,7 +17449,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2079
 				v.SubTopicNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -17458,7 +17458,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					m2081 = make(map[string]string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -17482,7 +17482,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						m2081[sc.Make(k2082)] = mv2083
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17503,7 +17503,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2087
 				v.SubjectNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -17512,7 +17512,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					m2089 = make(map[string]string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -17536,7 +17536,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						m2089[sc.Make(k2090)] = mv2091
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17557,7 +17557,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2095
 				v.TopicNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -17566,7 +17566,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					m2097 = make(map[string]string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -17590,7 +17590,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						m2097[sc.Make(k2098)] = mv2099
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17611,7 +17611,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2103
 				v.TopicSubTopics = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string][]int64")
 				}
 				p++
@@ -17620,7 +17620,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					m2105 = make(map[string][]int64)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -17636,13 +17636,13 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 							p = np2108
 							mv2107 = nil
 						} else {
-							if p >= len(data) || data[p] != '[' {
+							if uint(p) >= uint(len(data)) || data[p] != '[' {
 								return p, odjsonrt.ErrType(data, p, "[]int64")
 							}
 							p++
 							s2110 := mv2107[:0]
 							p = odjsonrt.SkipSpace(data, p)
-							if p < len(data) && data[p] == ']' {
+							if uint(p) < uint(len(data)) && data[p] == ']' {
 								p++
 							} else {
 								if cap(s2110) == 0 {
@@ -17668,7 +17668,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 									}
 									s2110 = append(s2110, e2111)
 									p = odjsonrt.SkipSpace(data, p)
-									if p >= len(data) {
+									if uint(p) >= uint(len(data)) {
 										return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 									}
 									if data[p] == ',' {
@@ -17689,7 +17689,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						m2105[sc.Make(k2106)] = mv2107
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17710,7 +17710,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2118
 				v.VenueNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -17719,7 +17719,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					m2120 = make(map[string]string)
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -17743,7 +17743,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						m2120[sc.Make(k2121)] = mv2122
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17767,7 +17767,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -17792,12 +17792,12 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 		*v = CitmCatalog{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "CitmCatalog")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -17819,7 +17819,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				if len(rest) > 6 {
 					switch rest[6] {
 					case 'n':
-						if len(rest) >= 26 && string(rest[:26]) == "\"audienceSubCategoryNames\"" {
+						if len(rest) >= 26 && string(rest[:16]) == "\"audienceSubCate" && string(rest[16:26]) == "goryNames\"" {
 							idx, p = 1, p+26
 						}
 					case 'N':
@@ -17845,7 +17845,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					idx, p = 4, p+14
 				}
 			case 't':
-				if len(rest) >= 19 && string(rest[:19]) == "\"seatCategoryNames\"" {
+				if len(rest) >= 19 && string(rest[:16]) == "\"seatCategoryNam" && string(rest[16:19]) == "es\"" {
 					idx, p = 5, p+19
 				}
 			case 'T':
@@ -17908,7 +17908,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2126
 				v.AreaNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -17921,7 +17921,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					seen2131 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -17958,7 +17958,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						m2128[sc.Make(k2129)] = mv2130
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -17983,7 +17983,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2136
 				v.AudienceSubCategoryNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -17996,7 +17996,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					seen2141 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -18033,7 +18033,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						m2138[sc.Make(k2139)] = mv2140
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -18058,7 +18058,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2146
 				v.BlockNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -18071,7 +18071,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					seen2151 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -18108,7 +18108,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						m2148[sc.Make(k2149)] = mv2150
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -18133,7 +18133,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2156
 				v.Events = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]Event")
 				}
 				p++
@@ -18146,7 +18146,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					seen2161 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -18175,7 +18175,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						m2158[sc.Make(k2159)] = mv2160
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -18200,13 +18200,13 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2163
 				v.Performances = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Performance")
 				}
 				p++
 				s2165 := v.Performances[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2165) == 0 {
@@ -18220,7 +18220,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						s2165 = append(s2165, e2166)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -18249,7 +18249,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2167
 				v.SeatCategoryNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -18262,7 +18262,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					seen2172 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -18299,7 +18299,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						m2169[sc.Make(k2170)] = mv2171
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -18324,7 +18324,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2177
 				v.SubTopicNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -18337,7 +18337,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					seen2182 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -18374,7 +18374,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						m2179[sc.Make(k2180)] = mv2181
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -18399,7 +18399,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2187
 				v.SubjectNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -18412,7 +18412,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					seen2192 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -18449,7 +18449,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						m2189[sc.Make(k2190)] = mv2191
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -18474,7 +18474,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2197
 				v.TopicNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -18487,7 +18487,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					seen2202 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -18524,7 +18524,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						m2199[sc.Make(k2200)] = mv2201
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -18549,7 +18549,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2207
 				v.TopicSubTopics = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string][]int64")
 				}
 				p++
@@ -18562,7 +18562,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					seen2212 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -18590,13 +18590,13 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 							p = np2214
 							mv2211 = nil
 						} else {
-							if p >= len(data) || data[p] != '[' {
+							if uint(p) >= uint(len(data)) || data[p] != '[' {
 								return p, odjsonrt.ErrType(data, p, "[]int64")
 							}
 							p++
 							s2216 := mv2211[:0]
 							p = odjsonrt.SkipSpace(data, p)
-							if p < len(data) && data[p] == ']' {
+							if uint(p) < uint(len(data)) && data[p] == ']' {
 								p++
 							} else {
 								if cap(s2216) == 0 {
@@ -18623,7 +18623,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 									}
 									s2216 = append(s2216, e2217)
 									p = odjsonrt.SkipSpace(data, p)
-									if p >= len(data) {
+									if uint(p) >= uint(len(data)) {
 										return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 									}
 									if data[p] == ',' {
@@ -18644,7 +18644,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						m2209[sc.Make(k2210)] = mv2211
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -18669,7 +18669,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2224
 				v.VenueNames = nil
 			} else {
-				if p >= len(data) || data[p] != '{' {
+				if uint(p) >= uint(len(data)) || data[p] != '{' {
 					return p, odjsonrt.ErrType(data, p, "map[string]string")
 				}
 				p++
@@ -18682,7 +18682,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					seen2229 = make(map[string]struct{})
 				}
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == '}' {
+				if uint(p) < uint(len(data)) && data[p] == '}' {
 					p++
 				} else {
 					for {
@@ -18719,7 +18719,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						m2226[sc.Make(k2227)] = mv2228
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -18751,7 +18751,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -18865,7 +18865,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				vp2235 = np2236
 				v.AreaNames = nil
 			} else {
-				if vp2235 >= len(val2234) || val2234[vp2235] != '{' {
+				if uint(vp2235) >= uint(len(val2234)) || val2234[vp2235] != '{' {
 					return odjsonrt.ErrType(val2234, vp2235, "map[string]string")
 				}
 				vp2235++
@@ -18874,7 +18874,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 					m2238 = make(map[string]string)
 				}
 				vp2235 = odjsonrt.SkipSpace(val2234, vp2235)
-				if vp2235 < len(val2234) && val2234[vp2235] == '}' {
+				if uint(vp2235) < uint(len(val2234)) && val2234[vp2235] == '}' {
 					vp2235++
 				} else {
 					for {
@@ -18899,7 +18899,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 						}
 						m2238[sc.Make(k2239)] = mv2240
 						vp2235 = odjsonrt.SkipSpace(val2234, vp2235)
-						if vp2235 >= len(val2234) {
+						if uint(vp2235) >= uint(len(val2234)) {
 							return odjsonrt.ErrSyntax(val2234, vp2235, "unexpected end of JSON input")
 						}
 						if val2234[vp2235] == ',' {
@@ -18927,7 +18927,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				vp2245 = np2246
 				v.AudienceSubCategoryNames = nil
 			} else {
-				if vp2245 >= len(val2244) || val2244[vp2245] != '{' {
+				if uint(vp2245) >= uint(len(val2244)) || val2244[vp2245] != '{' {
 					return odjsonrt.ErrType(val2244, vp2245, "map[string]string")
 				}
 				vp2245++
@@ -18936,7 +18936,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 					m2248 = make(map[string]string)
 				}
 				vp2245 = odjsonrt.SkipSpace(val2244, vp2245)
-				if vp2245 < len(val2244) && val2244[vp2245] == '}' {
+				if uint(vp2245) < uint(len(val2244)) && val2244[vp2245] == '}' {
 					vp2245++
 				} else {
 					for {
@@ -18961,7 +18961,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 						}
 						m2248[sc.Make(k2249)] = mv2250
 						vp2245 = odjsonrt.SkipSpace(val2244, vp2245)
-						if vp2245 >= len(val2244) {
+						if uint(vp2245) >= uint(len(val2244)) {
 							return odjsonrt.ErrSyntax(val2244, vp2245, "unexpected end of JSON input")
 						}
 						if val2244[vp2245] == ',' {
@@ -18989,7 +18989,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				vp2255 = np2256
 				v.BlockNames = nil
 			} else {
-				if vp2255 >= len(val2254) || val2254[vp2255] != '{' {
+				if uint(vp2255) >= uint(len(val2254)) || val2254[vp2255] != '{' {
 					return odjsonrt.ErrType(val2254, vp2255, "map[string]string")
 				}
 				vp2255++
@@ -18998,7 +18998,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 					m2258 = make(map[string]string)
 				}
 				vp2255 = odjsonrt.SkipSpace(val2254, vp2255)
-				if vp2255 < len(val2254) && val2254[vp2255] == '}' {
+				if uint(vp2255) < uint(len(val2254)) && val2254[vp2255] == '}' {
 					vp2255++
 				} else {
 					for {
@@ -19023,7 +19023,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 						}
 						m2258[sc.Make(k2259)] = mv2260
 						vp2255 = odjsonrt.SkipSpace(val2254, vp2255)
-						if vp2255 >= len(val2254) {
+						if uint(vp2255) >= uint(len(val2254)) {
 							return odjsonrt.ErrSyntax(val2254, vp2255, "unexpected end of JSON input")
 						}
 						if val2254[vp2255] == ',' {
@@ -19125,7 +19125,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				vp2273 = np2274
 				v.SeatCategoryNames = nil
 			} else {
-				if vp2273 >= len(val2272) || val2272[vp2273] != '{' {
+				if uint(vp2273) >= uint(len(val2272)) || val2272[vp2273] != '{' {
 					return odjsonrt.ErrType(val2272, vp2273, "map[string]string")
 				}
 				vp2273++
@@ -19134,7 +19134,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 					m2276 = make(map[string]string)
 				}
 				vp2273 = odjsonrt.SkipSpace(val2272, vp2273)
-				if vp2273 < len(val2272) && val2272[vp2273] == '}' {
+				if uint(vp2273) < uint(len(val2272)) && val2272[vp2273] == '}' {
 					vp2273++
 				} else {
 					for {
@@ -19159,7 +19159,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 						}
 						m2276[sc.Make(k2277)] = mv2278
 						vp2273 = odjsonrt.SkipSpace(val2272, vp2273)
-						if vp2273 >= len(val2272) {
+						if uint(vp2273) >= uint(len(val2272)) {
 							return odjsonrt.ErrSyntax(val2272, vp2273, "unexpected end of JSON input")
 						}
 						if val2272[vp2273] == ',' {
@@ -19187,7 +19187,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				vp2283 = np2284
 				v.SubTopicNames = nil
 			} else {
-				if vp2283 >= len(val2282) || val2282[vp2283] != '{' {
+				if uint(vp2283) >= uint(len(val2282)) || val2282[vp2283] != '{' {
 					return odjsonrt.ErrType(val2282, vp2283, "map[string]string")
 				}
 				vp2283++
@@ -19196,7 +19196,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 					m2286 = make(map[string]string)
 				}
 				vp2283 = odjsonrt.SkipSpace(val2282, vp2283)
-				if vp2283 < len(val2282) && val2282[vp2283] == '}' {
+				if uint(vp2283) < uint(len(val2282)) && val2282[vp2283] == '}' {
 					vp2283++
 				} else {
 					for {
@@ -19221,7 +19221,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 						}
 						m2286[sc.Make(k2287)] = mv2288
 						vp2283 = odjsonrt.SkipSpace(val2282, vp2283)
-						if vp2283 >= len(val2282) {
+						if uint(vp2283) >= uint(len(val2282)) {
 							return odjsonrt.ErrSyntax(val2282, vp2283, "unexpected end of JSON input")
 						}
 						if val2282[vp2283] == ',' {
@@ -19249,7 +19249,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				vp2293 = np2294
 				v.SubjectNames = nil
 			} else {
-				if vp2293 >= len(val2292) || val2292[vp2293] != '{' {
+				if uint(vp2293) >= uint(len(val2292)) || val2292[vp2293] != '{' {
 					return odjsonrt.ErrType(val2292, vp2293, "map[string]string")
 				}
 				vp2293++
@@ -19258,7 +19258,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 					m2296 = make(map[string]string)
 				}
 				vp2293 = odjsonrt.SkipSpace(val2292, vp2293)
-				if vp2293 < len(val2292) && val2292[vp2293] == '}' {
+				if uint(vp2293) < uint(len(val2292)) && val2292[vp2293] == '}' {
 					vp2293++
 				} else {
 					for {
@@ -19283,7 +19283,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 						}
 						m2296[sc.Make(k2297)] = mv2298
 						vp2293 = odjsonrt.SkipSpace(val2292, vp2293)
-						if vp2293 >= len(val2292) {
+						if uint(vp2293) >= uint(len(val2292)) {
 							return odjsonrt.ErrSyntax(val2292, vp2293, "unexpected end of JSON input")
 						}
 						if val2292[vp2293] == ',' {
@@ -19311,7 +19311,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				vp2303 = np2304
 				v.TopicNames = nil
 			} else {
-				if vp2303 >= len(val2302) || val2302[vp2303] != '{' {
+				if uint(vp2303) >= uint(len(val2302)) || val2302[vp2303] != '{' {
 					return odjsonrt.ErrType(val2302, vp2303, "map[string]string")
 				}
 				vp2303++
@@ -19320,7 +19320,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 					m2306 = make(map[string]string)
 				}
 				vp2303 = odjsonrt.SkipSpace(val2302, vp2303)
-				if vp2303 < len(val2302) && val2302[vp2303] == '}' {
+				if uint(vp2303) < uint(len(val2302)) && val2302[vp2303] == '}' {
 					vp2303++
 				} else {
 					for {
@@ -19345,7 +19345,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 						}
 						m2306[sc.Make(k2307)] = mv2308
 						vp2303 = odjsonrt.SkipSpace(val2302, vp2303)
-						if vp2303 >= len(val2302) {
+						if uint(vp2303) >= uint(len(val2302)) {
 							return odjsonrt.ErrSyntax(val2302, vp2303, "unexpected end of JSON input")
 						}
 						if val2302[vp2303] == ',' {
@@ -19373,7 +19373,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				vp2313 = np2314
 				v.TopicSubTopics = nil
 			} else {
-				if vp2313 >= len(val2312) || val2312[vp2313] != '{' {
+				if uint(vp2313) >= uint(len(val2312)) || val2312[vp2313] != '{' {
 					return odjsonrt.ErrType(val2312, vp2313, "map[string][]int64")
 				}
 				vp2313++
@@ -19382,7 +19382,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 					m2316 = make(map[string][]int64)
 				}
 				vp2313 = odjsonrt.SkipSpace(val2312, vp2313)
-				if vp2313 < len(val2312) && val2312[vp2313] == '}' {
+				if uint(vp2313) < uint(len(val2312)) && val2312[vp2313] == '}' {
 					vp2313++
 				} else {
 					for {
@@ -19398,13 +19398,13 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 							vp2313 = np2319
 							mv2318 = nil
 						} else {
-							if vp2313 >= len(val2312) || val2312[vp2313] != '[' {
+							if uint(vp2313) >= uint(len(val2312)) || val2312[vp2313] != '[' {
 								return odjsonrt.ErrType(val2312, vp2313, "[]int64")
 							}
 							vp2313++
 							s2321 := mv2318[:0]
 							vp2313 = odjsonrt.SkipSpace(val2312, vp2313)
-							if vp2313 < len(val2312) && val2312[vp2313] == ']' {
+							if uint(vp2313) < uint(len(val2312)) && val2312[vp2313] == ']' {
 								vp2313++
 							} else {
 								if cap(s2321) == 0 {
@@ -19431,7 +19431,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 									}
 									s2321 = append(s2321, e2322)
 									vp2313 = odjsonrt.SkipSpace(val2312, vp2313)
-									if vp2313 >= len(val2312) {
+									if uint(vp2313) >= uint(len(val2312)) {
 										return odjsonrt.ErrSyntax(val2312, vp2313, "unexpected end of JSON input")
 									}
 									if val2312[vp2313] == ',' {
@@ -19452,7 +19452,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 						}
 						m2316[sc.Make(k2317)] = mv2318
 						vp2313 = odjsonrt.SkipSpace(val2312, vp2313)
-						if vp2313 >= len(val2312) {
+						if uint(vp2313) >= uint(len(val2312)) {
 							return odjsonrt.ErrSyntax(val2312, vp2313, "unexpected end of JSON input")
 						}
 						if val2312[vp2313] == ',' {
@@ -19480,7 +19480,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				vp2330 = np2331
 				v.VenueNames = nil
 			} else {
-				if vp2330 >= len(val2329) || val2329[vp2330] != '{' {
+				if uint(vp2330) >= uint(len(val2329)) || val2329[vp2330] != '{' {
 					return odjsonrt.ErrType(val2329, vp2330, "map[string]string")
 				}
 				vp2330++
@@ -19489,7 +19489,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 					m2333 = make(map[string]string)
 				}
 				vp2330 = odjsonrt.SkipSpace(val2329, vp2330)
-				if vp2330 < len(val2329) && val2329[vp2330] == '}' {
+				if uint(vp2330) < uint(len(val2329)) && val2329[vp2330] == '}' {
 					vp2330++
 				} else {
 					for {
@@ -19514,7 +19514,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 						}
 						m2333[sc.Make(k2334)] = mv2335
 						vp2330 = odjsonrt.SkipSpace(val2329, vp2330)
-						if vp2330 >= len(val2329) {
+						if uint(vp2330) >= uint(len(val2329)) {
 							return odjsonrt.ErrSyntax(val2329, vp2330, "unexpected end of JSON input")
 						}
 						if val2329[vp2330] == ',' {
@@ -19721,12 +19721,12 @@ func (v *Event) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Event")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -19878,13 +19878,13 @@ func (v *Event) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				p = np2360
 				v.SubTopicIds = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]int64")
 				}
 				p++
 				s2362 := v.SubTopicIds[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2362) == 0 {
@@ -19910,7 +19910,7 @@ func (v *Event) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 						}
 						s2362 = append(s2362, e2363)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -19975,13 +19975,13 @@ func (v *Event) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 				p = np2380
 				v.TopicIds = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]int64")
 				}
 				p++
 				s2382 := v.TopicIds[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2382) == 0 {
@@ -20007,7 +20007,7 @@ func (v *Event) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 						}
 						s2382 = append(s2382, e2383)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -20035,7 +20035,7 @@ func (v *Event) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -20060,12 +20060,12 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		*v = Event{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Event")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -20245,13 +20245,13 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np2409
 				v.SubTopicIds = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]int64")
 				}
 				p++
 				s2411 := v.SubTopicIds[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2411) == 0 {
@@ -20278,7 +20278,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 						}
 						s2411 = append(s2411, e2412)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -20357,13 +20357,13 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 				p = np2429
 				v.TopicIds = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]int64")
 				}
 				p++
 				s2431 := v.TopicIds[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2431) == 0 {
@@ -20390,7 +20390,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 						}
 						s2431 = append(s2431, e2432)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -20426,7 +20426,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -20616,13 +20616,13 @@ func (v *Event) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 				vp2458 = np2459
 				v.SubTopicIds = nil
 			} else {
-				if vp2458 >= len(val2457) || val2457[vp2458] != '[' {
+				if uint(vp2458) >= uint(len(val2457)) || val2457[vp2458] != '[' {
 					return odjsonrt.ErrType(val2457, vp2458, "[]int64")
 				}
 				vp2458++
 				s2461 := v.SubTopicIds[:0]
 				vp2458 = odjsonrt.SkipSpace(val2457, vp2458)
-				if vp2458 < len(val2457) && val2457[vp2458] == ']' {
+				if uint(vp2458) < uint(len(val2457)) && val2457[vp2458] == ']' {
 					vp2458++
 				} else {
 					if cap(s2461) == 0 {
@@ -20649,7 +20649,7 @@ func (v *Event) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 						}
 						s2461 = append(s2461, e2462)
 						vp2458 = odjsonrt.SkipSpace(val2457, vp2458)
-						if vp2458 >= len(val2457) {
+						if uint(vp2458) >= uint(len(val2457)) {
 							return odjsonrt.ErrSyntax(val2457, vp2458, "unexpected end of JSON input")
 						}
 						if val2457[vp2458] == ',' {
@@ -20737,13 +20737,13 @@ func (v *Event) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 				vp2484 = np2485
 				v.TopicIds = nil
 			} else {
-				if vp2484 >= len(val2483) || val2483[vp2484] != '[' {
+				if uint(vp2484) >= uint(len(val2483)) || val2483[vp2484] != '[' {
 					return odjsonrt.ErrType(val2483, vp2484, "[]int64")
 				}
 				vp2484++
 				s2487 := v.TopicIds[:0]
 				vp2484 = odjsonrt.SkipSpace(val2483, vp2484)
-				if vp2484 < len(val2483) && val2483[vp2484] == ']' {
+				if uint(vp2484) < uint(len(val2483)) && val2483[vp2484] == ']' {
 					vp2484++
 				} else {
 					if cap(s2487) == 0 {
@@ -20770,7 +20770,7 @@ func (v *Event) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 						}
 						s2487 = append(s2487, e2488)
 						vp2484 = odjsonrt.SkipSpace(val2483, vp2484)
-						if vp2484 >= len(val2483) {
+						if uint(vp2484) >= uint(len(val2483)) {
 							return odjsonrt.ErrSyntax(val2483, vp2484, "unexpected end of JSON input")
 						}
 						if val2483[vp2484] == ',' {
@@ -21002,12 +21002,12 @@ func (v *Performance) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Performance")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -21170,13 +21170,13 @@ func (v *Performance) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2520
 				v.Prices = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Price")
 				}
 				p++
 				s2522 := v.Prices[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2522) == 0 {
@@ -21190,7 +21190,7 @@ func (v *Performance) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						s2522 = append(s2522, e2523)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -21215,13 +21215,13 @@ func (v *Performance) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 				p = np2524
 				v.SeatCategories = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]SeatCategory")
 				}
 				p++
 				s2526 := v.SeatCategories[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2526) == 0 {
@@ -21235,7 +21235,7 @@ func (v *Performance) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						s2526 = append(s2526, e2527)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -21310,7 +21310,7 @@ func (v *Performance) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -21335,12 +21335,12 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 		*v = Performance{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Performance")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -21531,13 +21531,13 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2564
 				v.Prices = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Price")
 				}
 				p++
 				s2566 := v.Prices[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2566) == 0 {
@@ -21551,7 +21551,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						s2566 = append(s2566, e2567)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -21580,13 +21580,13 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 				p = np2568
 				v.SeatCategories = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]SeatCategory")
 				}
 				p++
 				s2570 := v.SeatCategories[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2570) == 0 {
@@ -21600,7 +21600,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						s2570 = append(s2570, e2571)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -21698,7 +21698,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -22126,12 +22126,12 @@ func (v *Price) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Price")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -22146,7 +22146,7 @@ func (v *Price) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 					idx, p = 0, p+8
 				}
 			case 'u':
-				if len(rest) >= 23 && string(rest[:23]) == "\"audienceSubCategoryId\"" {
+				if len(rest) >= 23 && string(rest[:16]) == "\"audienceSubCate" && string(rest[16:23]) == "goryId\"" {
 					idx, p = 1, p+23
 				}
 			case 'e':
@@ -22232,7 +22232,7 @@ func (v *Price) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -22257,12 +22257,12 @@ func (v *Price) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		*v = Price{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Price")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -22281,7 +22281,7 @@ func (v *Price) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					idx, p = 0, p+8
 				}
 			case 'u':
-				if len(rest) >= 23 && string(rest[:23]) == "\"audienceSubCategoryId\"" {
+				if len(rest) >= 23 && string(rest[:16]) == "\"audienceSubCate" && string(rest[16:23]) == "goryId\"" {
 					idx, p = 1, p+23
 				}
 			case 'e':
@@ -22390,7 +22390,7 @@ func (v *Price) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -22650,12 +22650,12 @@ func (v *SeatCategory) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache)
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "SeatCategory")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -22699,13 +22699,13 @@ func (v *SeatCategory) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache)
 				p = np2663
 				v.Areas = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Area")
 				}
 				p++
 				s2665 := v.Areas[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2665) == 0 {
@@ -22719,7 +22719,7 @@ func (v *SeatCategory) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache)
 						}
 						s2665 = append(s2665, e2666)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -22763,7 +22763,7 @@ func (v *SeatCategory) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache)
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -22788,12 +22788,12 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 		*v = SeatCategory{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "SeatCategory")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -22845,13 +22845,13 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 				p = np2673
 				v.Areas = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]Area")
 				}
 				p++
 				s2675 := v.Areas[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2675) == 0 {
@@ -22865,7 +22865,7 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 						}
 						s2675 = append(s2675, e2676)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -22922,7 +22922,7 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -23165,12 +23165,12 @@ func (v *Area) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Area")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -23230,13 +23230,13 @@ func (v *Area) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 				p = np2694
 				v.BlockIds = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]int64")
 				}
 				p++
 				s2696 := v.BlockIds[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2696) == 0 {
@@ -23262,7 +23262,7 @@ func (v *Area) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						s2696 = append(s2696, e2697)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -23290,7 +23290,7 @@ func (v *Area) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -23315,12 +23315,12 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		*v = Area{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Area")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -23393,13 +23393,13 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 				p = np2710
 				v.BlockIds = nil
 			} else {
-				if p >= len(data) || data[p] != '[' {
+				if uint(p) >= uint(len(data)) || data[p] != '[' {
 					return p, odjsonrt.ErrType(data, p, "[]int64")
 				}
 				p++
 				s2712 := v.BlockIds[:0]
 				p = odjsonrt.SkipSpace(data, p)
-				if p < len(data) && data[p] == ']' {
+				if uint(p) < uint(len(data)) && data[p] == ']' {
 					p++
 				} else {
 					if cap(s2712) == 0 {
@@ -23426,7 +23426,7 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						s2712 = append(s2712, e2713)
 						p = odjsonrt.SkipSpace(data, p)
-						if p >= len(data) {
+						if uint(p) >= uint(len(data)) {
 							return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 						}
 						if data[p] == ',' {
@@ -23462,7 +23462,7 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -23556,13 +23556,13 @@ func (v *Area) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 				vp2723 = np2724
 				v.BlockIds = nil
 			} else {
-				if vp2723 >= len(val2722) || val2722[vp2723] != '[' {
+				if uint(vp2723) >= uint(len(val2722)) || val2722[vp2723] != '[' {
 					return odjsonrt.ErrType(val2722, vp2723, "[]int64")
 				}
 				vp2723++
 				s2726 := v.BlockIds[:0]
 				vp2723 = odjsonrt.SkipSpace(val2722, vp2723)
-				if vp2723 < len(val2722) && val2722[vp2723] == ']' {
+				if uint(vp2723) < uint(len(val2722)) && val2722[vp2723] == ']' {
 					vp2723++
 				} else {
 					if cap(s2726) == 0 {
@@ -23589,7 +23589,7 @@ func (v *Area) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						s2726 = append(s2726, e2727)
 						vp2723 = odjsonrt.SkipSpace(val2722, vp2723)
-						if vp2723 >= len(val2722) {
+						if uint(vp2723) >= uint(len(val2722)) {
 							return odjsonrt.ErrSyntax(val2722, vp2723, "unexpected end of JSON input")
 						}
 						if val2722[vp2723] == ',' {

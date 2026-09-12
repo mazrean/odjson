@@ -33,10 +33,20 @@ func (c ctx) parseNull(np, ok *ast.Ident) ast.Stmt {
 // at renders data[pos].
 func (c ctx) at() ast.Expr { return index(c.dataV(), c.posV()) }
 
-// atEnd renders pos >= len(data).
+// atEnd renders uint(pos) >= uint(len(data)), and inRange its negation.
+// The unsigned form is deliberate: the compiler cannot see that pos is
+// not negative, so after a signed test the index data[pos] keeps a bounds
+// test of its own, while the one unsigned compare settles both.
 func (c ctx) atEnd() ast.Expr {
-	return bin(c.posV(), token.GEQ, call(id("len"), c.dataV()))
+	return bin(toUint(c.posV()), token.GEQ, toUint(call(id("len"), c.dataV())))
 }
+
+func (c ctx) inRange() ast.Expr {
+	return bin(toUint(c.posV()), token.LSS, toUint(call(id("len"), c.dataV())))
+}
+
+// toUint renders uint(x).
+func toUint(x ast.Expr) ast.Expr { return call(id("uint"), x) }
 
 // errSyntax renders odjsonrt.ErrSyntax(data, pos, msg).
 func (c ctx) errSyntax(msg string) ast.Expr {
@@ -69,7 +79,7 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 	})
 	g.emit(b, incr(p))
 	g.emit(b, c.skipSpace())
-	g.ifStmt(b, nil, and(bin(p, token.LSS, call(id("len"), data)), bin(c.at(), token.EQL, chr('}'))), func(b *block) {
+	g.ifStmt(b, nil, and(c.inRange(), bin(c.at(), token.EQL, chr('}'))), func(b *block) {
 		g.emit(b, ret(bin(p, token.ADD, num(1)), nilV))
 	})
 	if c.strict {
@@ -248,6 +258,10 @@ func (g *generator) rawKeys(b *block, s *analyzer.StructInfo, c ctx) {
 	g.rawKeyTree(b, cands, c, 0, nil)
 }
 
+// rawCompareChunk is the longest constant the compiler compares inline
+// (2*RegSize in cmd/compile's walkCompareString on the 64-bit targets).
+const rawCompareChunk = 16
+
 // rawCand is one name the raw match can hit: its field index and the name
 // as it appears in a document, quotes included.
 type rawCand struct {
@@ -267,7 +281,18 @@ func (g *generator) rawKeyTree(b *block, cands []rawCand, c ctx, known int, used
 		if int(l) > known {
 			conds = append(conds, bin(call(id("len"), rest), token.GEQ, num(l)))
 		}
-		conds = append(conds, bin(call(id("string"), slice(rest, nil, num(l))), token.EQL, str(k.quoted)))
+		// The comparison is emitted in pieces of at most sixteen bytes:
+		// that is the length up to which the compiler expands a compare
+		// against a constant into word loads, and a longer one is a call
+		// to memequal on every member that reaches this leaf.
+		for lo := int64(0); lo < l; lo += rawCompareChunk {
+			hi := min(lo+rawCompareChunk, l)
+			var from ast.Expr
+			if lo > 0 {
+				from = num(lo)
+			}
+			conds = append(conds, bin(call(id("string"), slice(rest, from, num(hi))), token.EQL, str(k.quoted[lo:hi])))
+		}
 		g.ifStmt(b, nil, and(conds...), func(b *block) {
 			// The name itself is not kept: the one place that needs it,
 			// the duplicate error, reads it back from kp.
@@ -542,7 +567,7 @@ func (g *generator) decode(b *block, t *analyzer.Type, target ast.Expr, c ctx) {
 			spelled := func(lit string) ast.Expr {
 				n := num(int64(len(lit)))
 				return and(
-					bin(bin(c.posV(), token.ADD, n), token.LEQ, call(id("len"), c.dataV())),
+					bin(toUint(bin(c.posV(), token.ADD, n)), token.LEQ, toUint(call(id("len"), c.dataV()))),
 					bin(call(id("string"), slice(c.dataV(), c.posV(), bin(c.posV(), token.ADD, n))), token.EQL, str(lit)))
 			}
 			s := g.ifStmt(b, nil, spelled("true"), func(b *block) {
@@ -733,7 +758,7 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 	g.expectByte(b, c, '[', t.Expr)
 	g.emit(b, define(s, slice(target, nil, num(0))))
 	g.emit(b, c.skipSpace())
-	s0 := g.ifStmt(b, nil, and(bin(c.posV(), token.LSS, call(id("len"), c.dataV())), bin(c.at(), token.EQL, chr(']'))), func(b *block) {
+	s0 := g.ifStmt(b, nil, and(c.inRange(), bin(c.at(), token.EQL, chr(']'))), func(b *block) {
 		g.emit(b, incr(c.posV()))
 	})
 	g.elseBlock(s0, func(b *block) {
@@ -775,7 +800,7 @@ func (g *generator) decodeArray(b *block, t *analyzer.Type, target ast.Expr, c c
 	g.expectByte(b, c, '[', t.Expr)
 	g.emit(b, define(i, num(0)))
 	g.emit(b, c.skipSpace())
-	s0 := g.ifStmt(b, nil, and(bin(c.posV(), token.LSS, call(id("len"), c.dataV())), bin(c.at(), token.EQL, chr(']'))), func(b *block) {
+	s0 := g.ifStmt(b, nil, and(c.inRange(), bin(c.at(), token.EQL, chr(']'))), func(b *block) {
 		g.emit(b, incr(c.posV()))
 	})
 	g.elseBlock(s0, func(b *block) {
@@ -829,7 +854,7 @@ func (g *generator) decodeMap(b *block, t *analyzer.Type, target ast.Expr, c ctx
 		})
 	}
 	g.emit(b, c.skipSpace())
-	s0 := g.ifStmt(b, nil, and(bin(c.posV(), token.LSS, call(id("len"), c.dataV())), bin(c.at(), token.EQL, chr('}'))), func(b *block) {
+	s0 := g.ifStmt(b, nil, and(c.inRange(), bin(c.at(), token.EQL, chr('}'))), func(b *block) {
 		g.emit(b, incr(c.posV()))
 	})
 	g.elseBlock(s0, func(b *block) {

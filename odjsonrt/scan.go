@@ -1,7 +1,6 @@
 package odjsonrt
 
 import (
-	"encoding/binary"
 	"math/bits"
 )
 
@@ -16,7 +15,7 @@ func SkipSpace(data []byte, p int) int {
 	// value is greater, so one comparison settles the common case. Keeping
 	// this body tiny matters: it is called between every token, and it stops
 	// being inlined the moment it grows.
-	if p < len(data) && data[p] > ' ' {
+	if uint(p) < uint(len(data)) && data[p] > ' ' {
 		return p
 	}
 	return skipSpaceSlow(data, p)
@@ -24,30 +23,37 @@ func SkipSpace(data []byte, p int) int {
 
 // skipSpaceSlow consumes an actual run of whitespace.
 func skipSpaceSlow(data []byte, p int) int {
-	// The one space after a colon is the commonest run by far, and it is
-	// settled by the next byte: p+1 is a constant offset, not a value
-	// computed from the data, so nothing waits on the word scan below.
-	if p+1 < len(data) && data[p] == ' ' && data[p+1] > ' ' {
-		return p + 1
-	}
 	// An indented document is mostly a newline followed by a run of
 	// spaces. Two words cover a run of up to sixteen, and the length is
 	// computed rather than branched on: the lowest lane that differs from
 	// a space is the first non-space byte, exactly, a word of nothing but
 	// spaces reports eight, and the second word counts only when the first
 	// was all spaces. Run lengths vary from line to line, so a loop that
-	// tests each word mispredicts on most of them; this does not. Whatever
-	// the run ends on, the loop below takes over, and it is a run of
-	// nothing but spaces when it finds a non-space byte right away.
-	if p+17 <= len(data) && data[p] == '\n' {
-		n0 := bits.TrailingZeros64(binary.LittleEndian.Uint64(data[p+1:])^allSpaces) / 8
-		n1 := bits.TrailingZeros64(binary.LittleEndian.Uint64(data[p+9:])^allSpaces) / 8
+	// tests each word mispredicts on most of them; this does not.
+	if uint(p+17) <= uint(len(data)) && data[p] == '\n' {
+		n0 := bits.TrailingZeros64(load64(data, p+1)^allSpaces) / 8
+		n1 := bits.TrailingZeros64(load64(data, p+9)^allSpaces) / 8
 		p += 1 + n0 + n1&-(n0>>3)
+		// Whatever the run ended on, one compare says whether it starts
+		// a token, which it nearly always does; the table lookup below
+		// is for the rest.
+		if uint(p) < uint(len(data)) && data[p] > ' ' {
+			return p
+		}
 	}
-	for p < len(data) && spaceSet[data[p]] {
+	// The one space of a document written with ", " and ": " between its
+	// tokens (json.dumps, most pretty printers on one line) is settled by
+	// the next byte: p+1 is a constant offset, not a value computed from
+	// the data, so nothing waits on a scan. The space after a colon no
+	// longer arrives here, AfterName having settled it in every caller,
+	// which is why the indent path comes first.
+	if uint(p+1) < uint(len(data)) && data[p] == ' ' && data[p+1] > ' ' {
+		return p + 1
+	}
+	for uint(p) < uint(len(data)) && spaceSet[data[p]] {
 		p++
 		for p+8 <= len(data) {
-			n := bits.TrailingZeros64(binary.LittleEndian.Uint64(data[p:])^allSpaces) / 8
+			n := bits.TrailingZeros64(load64(data, p)^allSpaces) / 8
 			p += n
 			if n < 8 {
 				break
@@ -71,7 +77,7 @@ func SkipValue(data []byte, p int) (int, error) {
 	stack := inline[:0]
 
 	for {
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, errUnexpectedEnd(p)
 		}
 		switch c := data[p]; c {
@@ -81,7 +87,7 @@ func SkipValue(data []byte, p int) (int, error) {
 			}
 			stack = append(stack, '}')
 			p = SkipSpace(data, p+1)
-			if p < len(data) && data[p] == '}' {
+			if uint(p) < uint(len(data)) && data[p] == '}' {
 				p++
 				stack = stack[:len(stack)-1]
 				break
@@ -97,7 +103,7 @@ func SkipValue(data []byte, p int) (int, error) {
 			}
 			stack = append(stack, ']')
 			p = SkipSpace(data, p+1)
-			if p < len(data) && data[p] == ']' {
+			if uint(p) < uint(len(data)) && data[p] == ']' {
 				p++
 				stack = stack[:len(stack)-1]
 				break
@@ -110,17 +116,17 @@ func SkipValue(data []byte, p int) (int, error) {
 			}
 			p = end
 		case 't':
-			if !hasLiteral(data, p, "true") {
+			if !isTrue(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 4
 		case 'f':
-			if !hasLiteral(data, p, "false") {
+			if !isFalse(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 5
 		case 'n':
-			if !hasLiteral(data, p, "null") {
+			if !isNull(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 4
@@ -141,7 +147,7 @@ func SkipValue(data []byte, p int) (int, error) {
 				return p, nil
 			}
 			p = SkipSpace(data, p)
-			if p >= len(data) {
+			if uint(p) >= uint(len(data)) {
 				return p, errUnexpectedEnd(p)
 			}
 			closer := stack[len(stack)-1]
@@ -172,7 +178,7 @@ func SkipValue(data []byte, p int) (int, error) {
 // scanKey scans an object member name followed by its colon and returns the
 // index of the first byte of the member value.
 func scanKey(data []byte, p int) (int, error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -182,14 +188,10 @@ func scanKey(data []byte, p int) (int, error) {
 	if err != nil {
 		return end, err
 	}
-	p = SkipSpace(data, end)
-	if p >= len(data) {
-		return p, errUnexpectedEnd(p)
+	if next := AfterName(data, end); next > 0 {
+		return next, nil
 	}
-	if data[p] != ':' {
-		return p, errChar(data, p, "after object key")
-	}
-	return SkipSpace(data, p+1), nil
+	return afterKeySlow(data, end)
 }
 
 // scanString scans the JSON string literal that starts at p (which must hold a
@@ -198,7 +200,7 @@ func scanKey(data []byte, p int) (int, error) {
 // it contains any byte >= 0x80.
 func scanString(data []byte, p int) (end int, hasEscape, nonASCII bool, err error) {
 	i := p + 1
-	for i < len(data) {
+	for uint(i) < uint(len(data)) {
 		// Consume runs of ordinary characters a word at a time. The mask also
 		// locates the byte that ended the run, so a short string costs one
 		// word test instead of a byte loop. The high bits of the consumed
@@ -206,7 +208,7 @@ func scanString(data []byte, p int) (end int, hasEscape, nonASCII bool, err erro
 		// the run is over, whether it contained non-ASCII.
 		var hi uint64
 		for i+8 <= len(data) {
-			w := binary.LittleEndian.Uint64(data[i:])
+			w := load64(data, i)
 			if m := swarStringStop(w); m != 0 {
 				k := swarIndex(m)
 				hi |= swarBelow(w, k)
@@ -217,7 +219,7 @@ func scanString(data []byte, p int) (end int, hasEscape, nonASCII bool, err erro
 			i += 8
 		}
 		nonASCII = nonASCII || hi&swarHi != 0
-		if i >= len(data) {
+		if uint(i) >= uint(len(data)) {
 			break
 		}
 		switch c := data[i]; {
@@ -226,14 +228,14 @@ func scanString(data []byte, p int) (end int, hasEscape, nonASCII bool, err erro
 		case c == '\\':
 			hasEscape = true
 			i++
-			if i >= len(data) {
+			if uint(i) >= uint(len(data)) {
 				return i, hasEscape, nonASCII, errUnexpectedEnd(i)
 			}
 			switch data[i] {
 			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
 				i++
 			case 'u':
-				if i+4 >= len(data) {
+				if uint(i+4) >= uint(len(data)) {
 					return len(data), hasEscape, nonASCII, errUnexpectedEnd(len(data))
 				}
 				for k := 1; k <= 4; k++ {
@@ -278,7 +280,7 @@ func scanNumber(data []byte, p int) (int, error) {
 // is truncated.
 func scanNumberIn[Bytes []byte | string](data Bytes, p int) (end int, ok bool) {
 	i := p
-	if i < len(data) && data[i] == '-' {
+	if uint(i) < uint(len(data)) && data[i] == '-' {
 		i++
 	}
 	// Integer part.
@@ -289,38 +291,38 @@ func scanNumberIn[Bytes []byte | string](data Bytes, p int) (end int, ok bool) {
 		i++
 	case data[i] >= '1' && data[i] <= '9':
 		i++
-		for i < len(data) && data[i] >= '0' && data[i] <= '9' {
+		for uint(i) < uint(len(data)) && data[i] >= '0' && data[i] <= '9' {
 			i++
 		}
 	default:
 		return i, false
 	}
 	// Fraction.
-	if i < len(data) && data[i] == '.' {
+	if uint(i) < uint(len(data)) && data[i] == '.' {
 		i++
-		if i >= len(data) {
+		if uint(i) >= uint(len(data)) {
 			return len(data), false
 		}
 		if data[i] < '0' || data[i] > '9' {
 			return i, false
 		}
-		for i < len(data) && data[i] >= '0' && data[i] <= '9' {
+		for uint(i) < uint(len(data)) && data[i] >= '0' && data[i] <= '9' {
 			i++
 		}
 	}
 	// Exponent.
-	if i < len(data) && (data[i] == 'e' || data[i] == 'E') {
+	if uint(i) < uint(len(data)) && (data[i] == 'e' || data[i] == 'E') {
 		i++
-		if i < len(data) && (data[i] == '+' || data[i] == '-') {
+		if uint(i) < uint(len(data)) && (data[i] == '+' || data[i] == '-') {
 			i++
 		}
-		if i >= len(data) {
+		if uint(i) >= uint(len(data)) {
 			return len(data), false
 		}
 		if data[i] < '0' || data[i] > '9' {
 			return i, false
 		}
-		for i < len(data) && data[i] >= '0' && data[i] <= '9' {
+		for uint(i) < uint(len(data)) && data[i] >= '0' && data[i] <= '9' {
 			i++
 		}
 	}
@@ -347,18 +349,13 @@ func Validate(data []byte) error {
 	return EndOfDocument(data, p)
 }
 
-// hasLiteral reports whether data continues with lit at p.
-func hasLiteral(data []byte, p int, lit string) bool {
-	if len(data)-p < len(lit) {
-		return false
-	}
-	for i := 0; i < len(lit); i++ {
-		if data[p+i] != lit[i] {
-			return false
-		}
-	}
-	return true
-}
+// isTrue, isFalse and isNull report whether the literal stands at p. Each
+// is one length test and one word compare once inlined: the compiler
+// expands a compare against a short constant into loads, where a loop over
+// the literal's bytes, however short, ran a byte at a time.
+func isTrue(data []byte, p int) bool  { return p+4 <= len(data) && string(data[p:p+4]) == "true" }
+func isFalse(data []byte, p int) bool { return p+5 <= len(data) && string(data[p:p+5]) == "false" }
+func isNull(data []byte, p int) bool  { return p+4 <= len(data) && string(data[p:p+4]) == "null" }
 
 // isHex reports whether c is an ASCII hexadecimal digit.
 func isHex(c byte) bool {

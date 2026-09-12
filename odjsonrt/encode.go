@@ -80,89 +80,119 @@ func AppendStringBytes(dst []byte, s []byte, escapeHTML bool) []byte {
 // closing one into the next, passes false. One parameter rather than a
 // wrapper, so that a string still costs a single call.
 func appendQuoted(dst []byte, src []byte, escapeHTML, quoted bool) []byte {
-	safe, safeUTF8 := &safeSet, &safeSetUTF8
-	if escapeHTML {
-		safe, safeUTF8 = &htmlSafeSet, &htmlSafeSetUTF8
-	}
-	checked, valid := false, false
-
 	if quoted {
 		dst = append(dst, '"')
 	}
 	start := 0
 	for i := 0; i < len(src); {
-		// Copy runs of bytes that need no escaping in one go. A word at a
-		// time scan was tried here and measured no faster: the escape set is
-		// wide enough that computing the mask costs about what eight table
-		// lookups do, and the CPU pipelines the lookups well.
-		for i < len(src) && safe[src[i]] {
-			i++
+		// A word at a time, as ModeV2HTML's appender does: the mask stops
+		// at every byte the table would, and at the first non-ASCII byte,
+		// which starts a run for the paths below. The two loops differ
+		// only in the mask, and the HTML one adds the angle brackets and
+		// the ampersand to it.
+		if escapeHTML {
+			for i+8 <= len(src) {
+				w := load64(src, i)
+				if m := swarUnsafeHTML(w) | w&swarHi; m != 0 {
+					i += swarIndex(m)
+					goto found
+				}
+				i += 8
+			}
+			for uint(i) < uint(len(src)) && htmlSafeSet[src[i]] {
+				i++
+			}
+		} else {
+			for i+8 <= len(src) {
+				w := load64(src, i)
+				if m := swarUnsafe(w) | w&swarHi; m != 0 {
+					i += swarIndex(m)
+					goto found
+				}
+				i += 8
+			}
+			for uint(i) < uint(len(src)) && safeSet[src[i]] {
+				i++
+			}
 		}
-		if i >= len(src) {
+	found:
+		if uint(i) >= uint(len(src)) {
 			break
 		}
-		if !checked && src[i] >= utf8.RuneSelf {
-			checked = true
-			if valid = utf8.Valid(src[i:]); valid {
-				safe = safeUTF8
+		b := src[i]
+		if b >= utf8.RuneSelf {
+			// A two byte sequence followed by ASCII, then words of
+			// accented Latin text, are settled without a call; neither
+			// can hold a line separator.
+			if b-0xC2 < 0x1E && uint(i+1) < uint(len(src)) && src[i+1]&0xC0 == 0x80 && (uint(i+2) >= uint(len(src)) || src[i+2] < utf8.RuneSelf) {
+				i += 2
+				for i+8 <= len(src) {
+					w := load64(src, i)
+					if w&swarHi == 0 || swarUnsafe(w) != 0 || (escapeHTML && swarHTMLOnly(w) != 0) || !swarLatin(w) {
+						break
+					}
+					i += 8
+				}
 				continue
 			}
-		}
-		if b := src[i]; b < utf8.RuneSelf {
-			dst = append(dst, src[start:i]...)
-			// NOTE: encoding/json emits the short \b and \f forms; the byte
-			// for byte comparison tests against json.Marshal depend on it.
-			switch b {
-			case '\\', '"':
-				dst = append(dst, '\\', b)
-			case '\b':
-				dst = append(dst, '\\', 'b')
-			case '\f':
-				dst = append(dst, '\\', 'f')
-			case '\n':
-				dst = append(dst, '\\', 'n')
-			case '\r':
-				dst = append(dst, '\\', 'r')
-			case '\t':
-				dst = append(dst, '\\', 't')
-			default:
-				dst = append(dst, '\\', 'u', '0', '0', hexDigits[b>>4], hexDigits[b&0xF])
-			}
-			i++
-			start = i
-			continue
-		}
-		if valid {
-			// The only byte >= 0x80 the table stops on is 0xE2, which always
-			// leads a three byte sequence here. U+2028 and U+2029 encode as
-			// E2 80 A8 and E2 80 A9.
-			if i+2 < len(src) && src[i+1] == 0x80 && src[i+2]&^1 == 0xA8 {
-				dst = append(dst, src[start:i]...)
-				dst = append(dst, '\\', 'u', '2', '0', '2', hexDigits[src[i+2]&0xF])
-				i += 3
-				start = i
+			// A lone four byte sequence (an emoji among ASCII) likewise: F0
+			// needs a second byte of 90-BF, F4 one of 80-8F, F1-F3 any.
+			if b-0xF0 < 5 && uint(i+3) < uint(len(src)) && src[i+1]&0xC0 == 0x80 && src[i+2]&0xC0 == 0x80 && src[i+3]&0xC0 == 0x80 &&
+				(b != 0xF0 || src[i+1] >= 0x90) && (b != 0xF4 || src[i+1] < 0x90) {
+				i += 4
 				continue
 			}
-			i += 3
+			j := skipNonASCII(src, i)
+			if j < 0 {
+				// Not UTF-8 somewhere in this run. encoding/json decodes
+				// rune by rune and writes U+FFFD for each byte it refuses,
+				// escaping a line separator on the way; the rest of the
+				// run is settled here, not by scanning it again from the
+				// next rune on.
+				for uint(i) < uint(len(src)) && src[i] >= utf8.RuneSelf {
+					r, size := utf8.DecodeRune(src[i:])
+					switch {
+					case r == utf8.RuneError && size == 1:
+						dst = append(dst, src[start:i]...)
+						dst = append(dst, replacementChar...)
+						start = i + 1
+					case r == 0x2028 || r == 0x2029:
+						dst = append(dst, src[start:i]...)
+						dst = append(dst, '\\', 'u', '2', '0', '2', hexDigits[r&0xF])
+						start = i + size
+					}
+					i += size
+				}
+				continue
+			}
+			// A valid run: only U+2028 and U+2029, E2 80 A8 and E2 80 A9,
+			// need escaping in it.
+			for k := i; k+2 < j; {
+				n := bytes.IndexByte(src[k:j-2], 0xE2)
+				if n < 0 {
+					break
+				}
+				k += n
+				if src[k+1] == 0x80 && src[k+2]&^1 == 0xA8 {
+					dst = append(dst, src[start:k]...)
+					dst = append(dst, '\\', 'u', '2', '0', '2', hexDigits[src[k+2]&0xF])
+					k += 3
+					start = k
+					continue
+				}
+				k++
+			}
+			i = j
 			continue
 		}
-		n := min(len(src)-i, utf8.UTFMax)
-		c, size := utf8.DecodeRune(src[i : i+n])
-		if c == utf8.RuneError && size == 1 {
-			dst = append(dst, src[start:i]...)
-			dst = append(dst, replacementChar...)
-			i += size
-			start = i
-			continue
-		}
-		if c == 0x2028 || c == 0x2029 {
-			dst = append(dst, src[start:i]...)
-			dst = append(dst, '\\', 'u', '2', '0', '2', hexDigits[c&0xF])
-			i += size
-			start = i
-			continue
-		}
-		i += size
+		dst = append(dst, src[start:i]...)
+		// NOTE: encoding/json emits the short \b and \f forms, which
+		// appendEscape does; the byte for byte comparison tests against
+		// json.Marshal depend on it. '<', '>' and '&' take its \u00XX
+		// default.
+		dst = appendEscape(dst, b)
+		i++
+		start = i
 	}
 	dst = append(dst, src[start:]...)
 	if quoted {

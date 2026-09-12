@@ -385,17 +385,17 @@ func appendFixed(dst []byte, neg bool, abs float64, d uint64, p int) []byte {
 	q := rest / 1e8
 	lo := digits8(rest - q*1e8)
 	hi := digits8(q)
-	binary.LittleEndian.PutUint64(buf[end-8:], lo)
-	binary.LittleEndian.PutUint64(buf[end-16:], hi)
+	binary.LittleEndian.PutUint64(buf[end-8:end], lo)
+	binary.LittleEndian.PutUint64(buf[end-16:end-8], hi)
 	if f > 16 {
-		binary.LittleEndian.PutUint64(buf[end-24:], digitZeros|('0'+top)<<56)
+		binary.LittleEndian.PutUint64(buf[end-24:end-16], digitZeros|('0'+top)<<56)
 	}
 	// The integer part ends at the point.
 	if i >= 1e8 {
-		binary.LittleEndian.PutUint64(buf[start+ip-16:], digits8(i/1e8))
+		binary.LittleEndian.PutUint64(buf[start+ip-16:start+ip-8], digits8(i/1e8))
 		i %= 1e8
 	}
-	binary.LittleEndian.PutUint64(buf[start+ip-8:], digits8(i))
+	binary.LittleEndian.PutUint64(buf[start+ip-8:start+ip], digits8(i))
 	buf[start+ip] = '.'
 
 	// Trailing zeros: leading zero bytes of the last word, then of the one
@@ -427,10 +427,10 @@ func appendFixed(dst []byte, neg bool, abs float64, d uint64, p int) []byte {
 	n := len(dst)
 	out := dst[n : n+32]
 	src := buf[from : from+32]
-	binary.LittleEndian.PutUint64(out[0:], binary.LittleEndian.Uint64(src[0:]))
-	binary.LittleEndian.PutUint64(out[8:], binary.LittleEndian.Uint64(src[8:]))
-	binary.LittleEndian.PutUint64(out[16:], binary.LittleEndian.Uint64(src[16:]))
-	binary.LittleEndian.PutUint64(out[24:], binary.LittleEndian.Uint64(src[24:]))
+	binary.LittleEndian.PutUint64(out[0:8], binary.LittleEndian.Uint64(src[0:8]))
+	binary.LittleEndian.PutUint64(out[8:16], binary.LittleEndian.Uint64(src[8:16]))
+	binary.LittleEndian.PutUint64(out[16:24], binary.LittleEndian.Uint64(src[16:24]))
+	binary.LittleEndian.PutUint64(out[24:32], binary.LittleEndian.Uint64(src[24:32]))
 	return dst[:n+end-tz-from]
 }
 
@@ -510,8 +510,8 @@ func appendExponent(dst []byte, neg bool, d uint64, p int) []byte {
 	q := rest / 1e8
 	lo := digits8(rest - q*1e8)
 	hi := digits8(q)
-	binary.LittleEndian.PutUint64(buf[end-8:], lo)
-	binary.LittleEndian.PutUint64(buf[end-16:], hi)
+	binary.LittleEndian.PutUint64(buf[end-8:end], lo)
+	binary.LittleEndian.PutUint64(buf[end-16:end-8], hi)
 	buf[end-17] = byte('0' + top)
 
 	// Trailing zeros: leading zero bytes of the last word, then of the one
@@ -552,7 +552,7 @@ func appendExponent(dst []byte, neg bool, d uint64, p int) []byte {
 	}
 	tail := uint64('e') | uint64(sign)<<8 |
 		(uint64('0'+exp/100)|uint64('0'+exp/10%10)<<8|uint64('0'+exp%10)<<16)>>(8*uint(3-l))<<16
-	binary.LittleEndian.PutUint64(buf[n:], tail)
+	binary.LittleEndian.PutUint64(buf[n:n+8], tail)
 	n += 2 + l
 
 	if neg {
@@ -565,9 +565,9 @@ func appendExponent(dst []byte, neg bool, d uint64, p int) []byte {
 	k := len(dst)
 	out := dst[k : k+32]
 	src := buf[from : from+32]
-	binary.LittleEndian.PutUint64(out[0:], binary.LittleEndian.Uint64(src[0:]))
-	binary.LittleEndian.PutUint64(out[8:], binary.LittleEndian.Uint64(src[8:]))
-	binary.LittleEndian.PutUint64(out[16:], binary.LittleEndian.Uint64(src[16:]))
-	binary.LittleEndian.PutUint64(out[24:], binary.LittleEndian.Uint64(src[24:]))
+	binary.LittleEndian.PutUint64(out[0:8], binary.LittleEndian.Uint64(src[0:8]))
+	binary.LittleEndian.PutUint64(out[8:16], binary.LittleEndian.Uint64(src[8:16]))
+	binary.LittleEndian.PutUint64(out[16:24], binary.LittleEndian.Uint64(src[16:24]))
+	binary.LittleEndian.PutUint64(out[24:32], binary.LittleEndian.Uint64(src[24:32]))
 	return dst[:k+n-from]
 }

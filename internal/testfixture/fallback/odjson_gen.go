@@ -85,12 +85,12 @@ func (v *Fallbacks) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 	if np, ok := odjsonrt.ParseNull(data, p); ok {
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Fallbacks")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	for {
@@ -295,7 +295,7 @@ func (v *Fallbacks) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {
@@ -320,12 +320,12 @@ func (v *Fallbacks) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 		*v = Fallbacks{}
 		return np, nil
 	}
-	if p >= len(data) || data[p] != '{' {
+	if uint(p) >= uint(len(data)) || data[p] != '{' {
 		return p, odjsonrt.ErrType(data, p, "Fallbacks")
 	}
 	p++
 	p = odjsonrt.SkipSpace(data, p)
-	if p < len(data) && data[p] == '}' {
+	if uint(p) < uint(len(data)) && data[p] == '}' {
 		return p + 1, nil
 	}
 	var seen [1]uint64
@@ -587,7 +587,7 @@ func (v *Fallbacks) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 			}
 		}
 		p = odjsonrt.SkipSpace(data, p)
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, odjsonrt.ErrSyntax(data, p, "unexpected end of JSON input")
 		}
 		switch data[p] {

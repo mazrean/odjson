@@ -2,7 +2,6 @@ package odjsonrt
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"unicode/utf8"
 	"unsafe"
@@ -146,8 +145,8 @@ func appendQuotedStream(dst []byte, src []byte, quoted bool) []byte {
 		// Two words per iteration: the loads are independent, so the CPU
 		// overlaps them and the scan runs close to load throughput.
 		for i+16 <= len(src) {
-			w0 := binary.LittleEndian.Uint64(src[i:])
-			w1 := binary.LittleEndian.Uint64(src[i+8:])
+			w0 := load64(src, i)
+			w1 := load64(src, i+8)
 			if m0 := swarUnsafe(w0); m0 != 0 {
 				i += swarIndex(m0)
 				goto found
@@ -159,18 +158,18 @@ func appendQuotedStream(dst []byte, src []byte, quoted bool) []byte {
 			i += 16
 		}
 		for i+8 <= len(src) {
-			w := binary.LittleEndian.Uint64(src[i:])
+			w := load64(src, i)
 			if m := swarUnsafe(w); m != 0 {
 				i += swarIndex(m)
 				goto found
 			}
 			i += 8
 		}
-		for i < len(src) && streamSafeSet[src[i]] {
+		for uint(i) < uint(len(src)) && streamSafeSet[src[i]] {
 			i++
 		}
 	found:
-		if i >= len(src) {
+		if uint(i) >= uint(len(src)) {
 			break
 		}
 		dst = append(dst, src[start:i]...)
@@ -244,8 +243,8 @@ func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, erro
 	start := 0
 	for i := 0; i < len(src); {
 		for i+16 <= len(src) {
-			w0 := binary.LittleEndian.Uint64(src[i:])
-			w1 := binary.LittleEndian.Uint64(src[i+8:])
+			w0 := load64(src, i)
+			w1 := load64(src, i+8)
 			if m0 := swarUnsafe(w0) | w0&swarHi; m0 != 0 {
 				i += swarIndex(m0)
 				goto found
@@ -257,7 +256,7 @@ func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, erro
 			i += 16
 		}
 		for i+8 <= len(src) {
-			w := binary.LittleEndian.Uint64(src[i:])
+			w := load64(src, i)
 			if m := swarUnsafe(w) | w&swarHi; m != 0 {
 				i += swarIndex(m)
 				goto found
@@ -266,11 +265,11 @@ func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, erro
 		}
 		// safeSet is false for every byte >= 0x80, so this stops where the
 		// word scan would have.
-		for i < len(src) && safeSet[src[i]] {
+		for uint(i) < uint(len(src)) && safeSet[src[i]] {
 			i++
 		}
 	found:
-		if i >= len(src) {
+		if uint(i) >= uint(len(src)) {
 			break
 		}
 		if b := src[i]; b >= utf8.RuneSelf {
@@ -281,9 +280,9 @@ func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, erro
 			// swarLatin), which would otherwise stop the scan at every
 			// letter; the first word without a non-ASCII byte hands back
 			// to the scan above.
-			if b-0xC2 < 0x1E && i+1 < len(src) && src[i+1]&0xC0 == 0x80 {
+			if b-0xC2 < 0x1E && uint(i+1) < uint(len(src)) && src[i+1]&0xC0 == 0x80 {
 				i += 2
-				if i < len(src) && src[i] >= utf8.RuneSelf {
+				if uint(i) < uint(len(src)) && src[i] >= utf8.RuneSelf {
 					// A dense run (Cyrillic, Greek): skipNonASCII takes
 					// it a word at a time.
 					if i = skipNonASCII(src, i); i < 0 {
@@ -292,7 +291,7 @@ func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, erro
 					continue
 				}
 				for i+8 <= len(src) {
-					w := binary.LittleEndian.Uint64(src[i:])
+					w := load64(src, i)
 					if w&swarHi == 0 || swarUnsafe(w) != 0 || !swarLatin(w) {
 						break
 					}
@@ -302,7 +301,7 @@ func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, erro
 			}
 			// A lone four byte sequence (an emoji among ASCII) likewise: F0
 			// needs a second byte of 90-BF, F4 one of 80-8F, F1-F3 any.
-			if b-0xF0 < 5 && i+3 < len(src) && src[i+1]&0xC0 == 0x80 && src[i+2]&0xC0 == 0x80 && src[i+3]&0xC0 == 0x80 &&
+			if b-0xF0 < 5 && uint(i+3) < uint(len(src)) && src[i+1]&0xC0 == 0x80 && src[i+2]&0xC0 == 0x80 && src[i+3]&0xC0 == 0x80 &&
 				(b != 0xF0 || src[i+1] >= 0x90) && (b != 0xF4 || src[i+1] < 0x90) {
 				i += 4
 				continue
@@ -343,6 +342,16 @@ func swarUnsafeHTML(w uint64) uint64 {
 	return (ctrl | quote | esc | angle | amp) &^ w & swarHi
 }
 
+// swarHTMLOnly reports which lanes of w hold the three bytes the HTML modes
+// escape on top of the others: '<', '>' (one test, since they differ in
+// one bit) and '&'. ModeHTML's appender adds it to [swarUnsafe] where the
+// two modes share a loop.
+func swarHTMLOnly(w uint64) uint64 {
+	angle := ((w | swarLo*0x02) ^ (swarLo * '>')) - swarLo
+	amp := (w ^ (swarLo * '&')) - swarLo
+	return (angle | amp) &^ w & swarHi
+}
+
 // appendQuotedV2HTML is the ModeV2HTML implementation: [appendQuotedStream]'s
 // escaping, plus what encoding/json's reformat adds to it under
 // PreserveRawStrings, EscapeForHTML and EscapeForJS. That reformat walks the
@@ -359,18 +368,18 @@ func appendQuotedV2HTML(dst []byte, src []byte, quoted bool) []byte {
 	start := 0
 	for i := 0; i < len(src); {
 		for i+8 <= len(src) {
-			w := binary.LittleEndian.Uint64(src[i:])
+			w := load64(src, i)
 			if m := swarUnsafeHTML(w) | w&swarHi; m != 0 {
 				i += swarIndex(m)
 				goto found
 			}
 			i += 8
 		}
-		for i < len(src) && htmlSafeSet[src[i]] {
+		for uint(i) < uint(len(src)) && htmlSafeSet[src[i]] {
 			i++
 		}
 	found:
-		if i >= len(src) {
+		if uint(i) >= uint(len(src)) {
 			break
 		}
 		b := src[i]
@@ -378,10 +387,10 @@ func appendQuotedV2HTML(dst []byte, src []byte, quoted bool) []byte {
 			// A two byte sequence followed by ASCII, then words of
 			// accented Latin text, are settled as in appendStringChecked;
 			// neither can hold a line separator.
-			if b-0xC2 < 0x1E && i+1 < len(src) && src[i+1]&0xC0 == 0x80 && (i+2 >= len(src) || src[i+2] < utf8.RuneSelf) {
+			if b-0xC2 < 0x1E && uint(i+1) < uint(len(src)) && src[i+1]&0xC0 == 0x80 && (uint(i+2) >= uint(len(src)) || src[i+2] < utf8.RuneSelf) {
 				i += 2
 				for i+8 <= len(src) {
-					w := binary.LittleEndian.Uint64(src[i:])
+					w := load64(src, i)
 					if w&swarHi == 0 || swarUnsafeHTML(w) != 0 || !swarLatin(w) {
 						break
 					}
@@ -391,7 +400,7 @@ func appendQuotedV2HTML(dst []byte, src []byte, quoted bool) []byte {
 			}
 			// A lone four byte sequence (an emoji among ASCII) likewise: F0
 			// needs a second byte of 90-BF, F4 one of 80-8F, F1-F3 any.
-			if b-0xF0 < 5 && i+3 < len(src) && src[i+1]&0xC0 == 0x80 && src[i+2]&0xC0 == 0x80 && src[i+3]&0xC0 == 0x80 &&
+			if b-0xF0 < 5 && uint(i+3) < uint(len(src)) && src[i+1]&0xC0 == 0x80 && src[i+2]&0xC0 == 0x80 && src[i+3]&0xC0 == 0x80 &&
 				(b != 0xF0 || src[i+1] >= 0x90) && (b != 0xF4 || src[i+1] < 0x90) {
 				i += 4
 				continue
@@ -403,7 +412,7 @@ func appendQuotedV2HTML(dst []byte, src []byte, quoted bool) []byte {
 				// is still escaped, and the bad byte itself stays in the
 				// pending copy. The rest of the run is settled here, not
 				// by scanning it again from the next rune on.
-				for i < len(src) && src[i] >= utf8.RuneSelf {
+				for uint(i) < uint(len(src)) && src[i] >= utf8.RuneSelf {
 					r, size := utf8.DecodeRune(src[i:])
 					if r == 0x2028 || r == 0x2029 {
 						dst = append(dst, src[start:i]...)

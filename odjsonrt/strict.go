@@ -52,13 +52,58 @@ func quoteName(name []byte) string {
 	return string(b)
 }
 
+// shortString settles the string literal at p, which holds the opening
+// quote, when its body is at most seven plain ASCII bytes: the closing
+// quote is then in w, the word after the opening quote, and the word test
+// the scan would start with is the whole scan. It returns the index past
+// the closing quote, or 0 for any other literal, which the scan then
+// takes; a string never ends at 0. Member names and short values are most
+// of a document's strings, and each one was a call into scanStringStrict.
+// The caller loads the word, after checking that it exists: with the load
+// inside, the function is past the inliner's budget.
+func shortString(w uint64, p int) int {
+	if m := swarStringStop(w) | w&swarHi; m != 0 {
+		// The lowest lane is at or before the first byte the scan would
+		// stop on, so when it holds the quote nothing else stood before
+		// it.
+		if k := swarIndex(m); byte(w>>(8*uint(k))) == '"' {
+			return p + 2 + k
+		}
+	}
+	return 0
+}
+
+// shortName is [shortString] over two words, for member names: those of
+// up to fifteen plain bytes are most of them (twitter: 26% within the
+// first word, 43% within the second), and the scan takes the rest. The
+// second word is only looked at when the first held nothing of interest,
+// so shortString's reasoning about the lowest lane holds for it too. It
+// is a call, and a cheaper one than the scan; with the loads inside it
+// cannot inline.
+func shortName(data []byte, p int) int {
+	if uint(p+17) <= uint(len(data)) {
+		w, q := load64(data, p+1), p
+		if swarStringStop(w)|w&swarHi == 0 {
+			w, q = load64(data, p+9), p+8
+		}
+		return shortString(w, q)
+	}
+	if uint(p+9) <= uint(len(data)) {
+		return shortString(load64(data, p+1), p)
+	}
+	return 0
+}
+
 // parseStringBytesStrict is [ParseStringBytes] under json/v2's rules.
 func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next int, err error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return nil, false, p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
 		return nil, false, p, ErrType(data, p, "string")
+	}
+	if end := shortName(data, p); end > 0 {
+		return data[p+1 : end-1], true, end, nil
 	}
 	end, hasEscape, _, err := scanStringStrict(data, p)
 	if err != nil {
@@ -81,6 +126,9 @@ func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next in
 // [SkipValueStrict] uses, so a skipped string with escapes is checked in
 // place instead of being unescaped into a buffer nobody reads.
 func skipStringStrict(data []byte, p int) (int, error) {
+	// No shortString here: the values a skip meets are long more often
+	// than the names are, and the test cost more on those than it saved
+	// on the short ones (the retweeted_status skip +1.4%).
 	end, hasEscape, _, err := scanStringStrict(data, p)
 	if err != nil {
 		return end, err
@@ -97,19 +145,19 @@ func skipStringStrict(data []byte, p int) (int, error) {
 // for a body that is not UTF-8.
 func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, err error) {
 	i := p + 1
-	for i < len(data) {
+	for uint(i) < uint(len(data)) {
 		// The run of ordinary ASCII is consumed a word at a time; the mask
 		// also stops at the first non-ASCII byte, which starts a run for
 		// skipNonASCII.
 		for i+8 <= len(data) {
-			w := binary.LittleEndian.Uint64(data[i:])
+			w := load64(data, i)
 			if m := swarStringStop(w) | w&swarHi; m != 0 {
 				i += swarIndex(m)
 				break
 			}
 			i += 8
 		}
-		if i >= len(data) {
+		if uint(i) >= uint(len(data)) {
 			break
 		}
 		switch c := data[i]; {
@@ -118,14 +166,14 @@ func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, er
 		case c == '\\':
 			hasEscape = true
 			i++
-			if i >= len(data) {
+			if uint(i) >= uint(len(data)) {
 				return i, hasEscape, nonASCII, errUnexpectedEnd(i)
 			}
 			switch data[i] {
 			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
 				i++
 			case 'u':
-				if i+4 >= len(data) {
+				if uint(i+4) >= uint(len(data)) {
 					return len(data), hasEscape, nonASCII, errUnexpectedEnd(len(data))
 				}
 				for k := 1; k <= 4; k++ {
@@ -146,15 +194,15 @@ func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, er
 			// the words after it are taken whole while they are accented
 			// Latin text (see swarLatin), which would otherwise stop the
 			// scan at every letter.
-			if c-0xC2 < 0x1E && i+1 < len(data) && data[i+1]&0xC0 == 0x80 {
+			if c-0xC2 < 0x1E && uint(i+1) < uint(len(data)) && data[i+1]&0xC0 == 0x80 {
 				i += 2
-				if i < len(data) && data[i] >= utf8.RuneSelf {
+				if uint(i) < uint(len(data)) && data[i] >= utf8.RuneSelf {
 					// A dense run (Cyrillic, Greek): skipNonASCII takes
 					// it a word at a time; the ordinary path below
 					// reports what it refuses.
 				} else {
 					for i+8 <= len(data) {
-						w := binary.LittleEndian.Uint64(data[i:])
+						w := load64(data, i)
 						if w&swarHi == 0 || swarStringStop(w) != 0 || !swarLatin(w) {
 							break
 						}
@@ -215,11 +263,16 @@ func validEscapes(s []byte) bool {
 // an unpaired surrogate escape are errors rather than U+FFFD. The result is
 // interned through c when it is not nil.
 func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return "", p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
 		return "", p, ErrType(data, p, "string")
+	}
+	if uint(p+9) <= uint(len(data)) {
+		if end := shortString(load64(data, p+1), p); end > 0 {
+			return c.Make(data[p+1 : end-1]), end, nil
+		}
 	}
 	end, hasEscape, nonASCII, err := scanStringStrict(data, p)
 	if err != nil {
@@ -234,11 +287,11 @@ func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) 
 		// for the callers that would otherwise check it again.
 		return c.MakeValid(body), end, nil
 	}
-	out, ok := unquote(body, true)
+	s, ok := c.unquoteString(body, true)
 	if !ok {
 		return "", p, ErrSyntax(data, p, "invalid string literal")
 	}
-	return adoptString(out, false), end, nil
+	return s, end, nil
 }
 
 // ParseStringInnerStrict is [ParseStringInner] under json/v2's rules.
@@ -249,24 +302,22 @@ func ParseStringInnerStrict(data []byte, p int) ([]byte, int, error) {
 
 // ParseKeyStrict is [ParseKey] under json/v2's rules.
 func ParseKeyStrict(data []byte, p int) (key []byte, next int, err error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return nil, p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
 		return nil, p, errChar(data, p, "looking for beginning of object key string")
 	}
-	key, _, next, err = parseStringBytesStrict(data, p)
+	key, _, end, err := parseStringBytesStrict(data, p)
 	if err != nil {
-		return nil, next, err
+		return nil, end, err
 	}
-	next = SkipSpace(data, next)
-	if next >= len(data) {
-		return nil, next, errUnexpectedEnd(next)
+	if next = AfterName(data, end); next == 0 {
+		if next, err = afterKeySlow(data, end); err != nil {
+			return nil, next, err
+		}
 	}
-	if data[next] != ':' {
-		return nil, next, errChar(data, next, "after object key")
-	}
-	return key, SkipSpace(data, next+1), nil
+	return key, next, nil
 }
 
 // ParseBase64Strict is [ParseBase64] under json/v2's rules.
@@ -285,7 +336,7 @@ func ParseBase64Strict(data []byte, p int) ([]byte, int, error) {
 
 // ParseNumberStringStrict is [ParseNumberString] under json/v2's rules.
 func ParseNumberStringStrict(data []byte, p int) (string, int, error) {
-	if p < len(data) && data[p] == '"' {
+	if uint(p) < uint(len(data)) && data[p] == '"' {
 		s, _, next, err := parseStringBytesStrict(data, p)
 		if err != nil {
 			return "", next, err
@@ -300,7 +351,7 @@ func ParseNumberStringStrict(data []byte, p int) (string, int, error) {
 
 // ParseTextUnmarshalerStrict is [ParseTextUnmarshaler] under json/v2's rules.
 func ParseTextUnmarshalerStrict(data []byte, p int, u encoding.TextUnmarshaler) (int, error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -391,15 +442,24 @@ func nameHash(b []byte) uint64 {
 func strictKey(data []byte, p int, names [][]byte, lv *strictLevel) ([][]byte, int, error) {
 	// ParseKeyStrict's work, without its layers: the name is scanned in
 	// place, and only an escaped one is decoded.
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return names, p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
 		return names, p, errChar(data, p, "looking for beginning of object key string")
 	}
-	end, hasEscape, _, err := scanStringStrict(data, p)
-	if err != nil {
-		return names, end, err
+	// Two words settle the names of up to fifteen plain bytes, which are
+	// most of them (twitter: 26% within the first word, 43% within the
+	// second); the scan takes the rest. The second word is only looked
+	// at when the first held nothing of interest, so shortString's
+	// reasoning about the lowest lane holds for it too.
+	end := shortName(data, p)
+	hasEscape := false
+	var err error
+	if end == 0 {
+		if end, hasEscape, _, err = scanStringStrict(data, p); err != nil {
+			return names, end, err
+		}
 	}
 	name := data[p+1 : end-1]
 	if hasEscape {
@@ -409,14 +469,14 @@ func strictKey(data []byte, p int, names [][]byte, lv *strictLevel) ([][]byte, i
 		}
 		name = out
 	}
-	next := SkipSpace(data, end)
-	if next >= len(data) {
-		return names, next, errUnexpectedEnd(next)
+	// The colon and the one space an indented document puts after it are
+	// settled inline; anything else, including the errors, is a call.
+	next := AfterName(data, end)
+	if next == 0 {
+		if next, err = afterKeySlow(data, end); err != nil {
+			return names, next, err
+		}
 	}
-	if data[next] != ':' {
-		return names, next, errChar(data, next, "after object key")
-	}
-	next = SkipSpace(data, next+1)
 	h := nameHash(name)
 	w, bit := h>>62, uint64(1)<<(h>>56&63)
 	if lv.filter[w]&bit != 0 {
@@ -447,7 +507,7 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 	levels := levelsBuf[:0]
 
 	for {
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, errUnexpectedEnd(p)
 		}
 		switch c := data[p]; c {
@@ -457,7 +517,7 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 			}
 			stack = append(stack, '}')
 			p = SkipSpace(data, p+1)
-			if p < len(data) && data[p] == '}' {
+			if uint(p) < uint(len(data)) && data[p] == '}' {
 				p++
 				stack = stack[:len(stack)-1]
 				break
@@ -474,7 +534,7 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 			}
 			stack = append(stack, ']')
 			p = SkipSpace(data, p+1)
-			if p < len(data) && data[p] == ']' {
+			if uint(p) < uint(len(data)) && data[p] == ']' {
 				p++
 				stack = stack[:len(stack)-1]
 				break
@@ -487,17 +547,17 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 			}
 			p = end
 		case 't':
-			if !hasLiteral(data, p, "true") {
+			if !isTrue(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 4
 		case 'f':
-			if !hasLiteral(data, p, "false") {
+			if !isFalse(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 5
 		case 'n':
-			if !hasLiteral(data, p, "null") {
+			if !isNull(data, p) {
 				return p, errBeginValue(data, p)
 			}
 			p += 4
@@ -517,7 +577,7 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 				return p, nil
 			}
 			p = SkipSpace(data, p)
-			if p >= len(data) {
+			if uint(p) >= uint(len(data)) {
 				return p, errUnexpectedEnd(p)
 			}
 			closer := stack[len(stack)-1]

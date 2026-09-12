@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync"
 	"unicode/utf8"
+	"unsafe"
 )
 
 // This file holds the helpers behind the generated UnmarshalJSONFrom methods,
@@ -87,12 +88,32 @@ func ErrKindFrom(dec *jsontext.Decoder, goType string) error {
 }
 
 // StringCache remembers recently decoded strings so that a value that occurs
-// many times in a document, or across documents, is allocated once.
+// many times in a document, or across documents, is allocated once, and
+// carves the strings it does allocate out of shared chunks.
 //
 // encoding/json/v2 keeps the same kind of cache inside its decoder state, and
 // a decoder that lacks one allocates a string per member where json/v2 does
 // not. The cache is a direct mapped table keyed by a hash of the string's
 // first and last bytes, so a lookup costs the same for every length.
+//
+// The any decoder's interface values are built the same way: the string and
+// slice headers and the floats they point to are carved from chunks of
+// their own rather than allocated one by one (see box.go), under the same
+// retention trade.
+//
+// A string the table does not hold is not allocated on its own: it is copied
+// into the cache's current chunk of [slabSize] bytes, and a new chunk is
+// taken when the current one is used up. A document's strings then cost a
+// few allocations rather than one each, and the garbage collector has a few
+// objects to account for rather than thousands. The trade is retention: a
+// string carved from a chunk keeps the whole chunk alive for as long as it
+// is reachable, so a program that holds on to one small string from a
+// decode holds up to slabSize bytes with it, and a pooled cache, whose
+// table can refer to [stringCacheSize] strings, can pin as many chunks until
+// the pool drops it. Strings longer than [slabMax] are allocated on their
+// own, which bounds the waste at the end of a chunk. The chunks are only
+// ever carved forward and never written to again, which is what lets a
+// string be made over their bytes.
 type StringCache struct {
 	s [stringCacheSize]string
 	// valid marks the entries known to be UTF-8, which is what
@@ -106,9 +127,86 @@ type StringCache struct {
 	// object. See [UnknownNames]. It is held through a pointer, allocated
 	// on first use, so that StringCache stays a comparable type.
 	names *[][]byte
+	// slab is the chunk allocator behind [StringCache.alloc] and the
+	// scratch buffer unescaping writes into; both are allocated on first
+	// use and held through a pointer so that StringCache stays comparable.
+	slab *slab
 }
 
-const stringCacheSize = 256
+const (
+	stringCacheSize = 256
+	// slabSize is the size of the chunks strings are carved from, and
+	// slabMax the longest string carved rather than allocated on its own.
+	slabSize = 4 << 10
+	slabMax  = slabSize / 4
+	// slabScratchMax is the largest unescaping buffer a pooled cache keeps.
+	slabScratchMax = 64 << 10
+	// The header chunks of box.go, about 4 KiB each.
+	boxStrings = 256
+	boxSlices  = 128
+	boxFloats  = 512
+)
+
+// slab is the free tail of the current chunk and the unescaping scratch.
+type slab struct {
+	free    []byte
+	scratch []byte
+	// boxes holds the header chunks the any decoder's interface values
+	// point into; see box.go.
+	boxes *boxes
+}
+
+// alloc returns b as a string, carved from the cache's current chunk when
+// it fits, allocated on its own otherwise, and "" for no bytes. A nil cache
+// allocates. The carved region is never written again: free only advances,
+// and a chunk that cannot hold b is left behind with its tail unused.
+func (c *StringCache) alloc(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
+	if c == nil || len(b) > slabMax {
+		return string(b)
+	}
+	sl := c.slab
+	if sl == nil {
+		sl = new(slab)
+		c.slab = sl
+	}
+	if len(sl.free) < len(b) {
+		sl.free = make([]byte, slabSize)
+	}
+	n := copy(sl.free, b)
+	s := unsafe.String(unsafe.SliceData(sl.free), n)
+	sl.free = sl.free[n:]
+	return s
+}
+
+// unquoteString decodes the body of a string literal with escapes into a
+// string carved through [StringCache.alloc]: the unescaped bytes are built
+// in the cache's scratch buffer rather than in a fresh slice per string.
+// ok is false when the escapes are malformed. strict is unquote's.
+func (c *StringCache) unquoteString(body []byte, strict bool) (string, bool) {
+	if c == nil {
+		out, ok := unquote(body, strict)
+		if !ok {
+			return "", false
+		}
+		return adoptString(out, false), true
+	}
+	sl := c.slab
+	if sl == nil {
+		sl = new(slab)
+		c.slab = sl
+	}
+	out, ok := unquoteAppend(sl.scratch[:0], body, strict)
+	if cap(out) > cap(sl.scratch) {
+		sl.scratch = out[:0]
+	}
+	if !ok {
+		return "", false
+	}
+	return c.alloc(out), true
+}
 
 // UnknownNames hands a strict struct decoder the list it appends its
 // object's unknown member names to, and the index its own names start at:
@@ -141,7 +239,10 @@ func AddUnknownName(c *StringCache, names [][]byte, name []byte) [][]byte {
 // object's names dropped. Only a decoder that returns normally calls it; a
 // failed decode leaves its names for [PutStringCache] to clear.
 func EndUnknownNames(c *StringCache, names [][]byte, mark int) {
-	if c != nil {
+	// An object that added nothing has nothing to clear, and the published
+	// list already ends at its mark: every nested object restored that on
+	// its way out. Most objects add nothing, so most skip the two stores.
+	if c != nil && len(names) > mark {
 		// The names alias the document; clearing them keeps a pooled
 		// cache from holding on to it.
 		clear(names[mark:])
@@ -169,6 +270,11 @@ func PutStringCache(c *StringCache) {
 		clear(*c.names)
 		*c.names = (*c.names)[:0]
 	}
+	if c.slab != nil && cap(c.slab.scratch) > slabScratchMax {
+		// One document with a huge escaped string should not size the
+		// buffer every later decode carries.
+		c.slab.scratch = nil
+	}
 	stringCachePool.Put(c)
 }
 
@@ -177,12 +283,12 @@ func PutStringCache(c *StringCache) {
 func (c *StringCache) Make(b []byte) string {
 	i, ok := c.slot(b)
 	if !ok {
-		return string(b)
+		return c.alloc(b)
 	}
 	if s := c.s[i]; s == string(b) {
 		return s
 	}
-	s := string(b)
+	s := c.alloc(b)
 	c.s[i] = s
 	c.valid[i/64] &^= 1 << (i % 64)
 	return s
@@ -209,7 +315,7 @@ func (c *StringCache) MakeUTF8(b []byte) (s string, ok bool) {
 	if !utf8.Valid(b) {
 		return "", false
 	}
-	s = string(b)
+	s = c.alloc(b)
 	if cacheable {
 		c.s[i] = s
 		c.valid[i/64] |= 1 << (i % 64)
@@ -223,13 +329,13 @@ func (c *StringCache) MakeUTF8(b []byte) (s string, ok bool) {
 func (c *StringCache) MakeValid(b []byte) string {
 	i, ok := c.slot(b)
 	if !ok {
-		return string(b)
+		return c.alloc(b)
 	}
 	if s := c.s[i]; s == string(b) {
 		c.valid[i/64] |= 1 << (i % 64)
 		return s
 	}
-	s := string(b)
+	s := c.alloc(b)
 	c.s[i] = s
 	c.valid[i/64] |= 1 << (i % 64)
 	return s
@@ -269,11 +375,11 @@ func ParseStringValue(val []byte, c *StringCache) (string, error) {
 	if bytes.IndexByte(body, '\\') < 0 {
 		return c.Make(body), nil
 	}
-	out, ok := unquote(body, false)
+	s, ok := c.unquoteString(body, false)
 	if !ok {
 		return "", ErrSyntax(val, 0, "invalid string literal")
 	}
-	return adoptString(out, false), nil
+	return s, nil
 }
 
 // ParseStringWith is [ParseStringTrusted] with a string cache.
@@ -284,6 +390,11 @@ func ParseStringWith(data []byte, p int, c *StringCache) (string, int, error) {
 	if data[p] != '"' {
 		return "", p, ErrType(data, p, "string")
 	}
+	if uint(p+9) <= uint(len(data)) {
+		if end := shortString(load64(data, p+1), p); end > 0 {
+			return c.Make(data[p+1 : end-1]), end, nil
+		}
+	}
 	end, hasEscape, _, err := scanString(data, p)
 	if err != nil {
 		return "", end, err
@@ -292,11 +403,11 @@ func ParseStringWith(data []byte, p int, c *StringCache) (string, int, error) {
 	if !hasEscape {
 		return c.Make(body), end, nil
 	}
-	out, ok := unquote(body, false)
+	s, ok := c.unquoteString(body, false)
 	if !ok {
 		return "", p, ErrSyntax(data, p, "invalid string literal")
 	}
-	return adoptString(out, false), end, nil
+	return s, end, nil
 }
 
 // ParseFloatValue decodes the complete JSON value val as a float of the given

@@ -1,7 +1,6 @@
 package odjsonrt
 
 import (
-	"encoding/binary"
 	"unicode/utf8"
 )
 
@@ -31,19 +30,29 @@ import (
 // of E0, ED, F0 and F4 has a narrower range than 80-BF, and C0, C1 and F5-FF
 // never lead anything.
 func skipNonASCII(s []byte, i int) int {
-	for i < len(s) {
+	for uint(i) < uint(len(s)) {
 		b := s[i]
 		if b < utf8.RuneSelf {
 			return i
 		}
 		if i+8 <= len(s) {
-			w := binary.LittleEndian.Uint64(s[i:])
+			w := load64(s, i)
 			// Two three byte sequences. The mask keeps the top nibble of
 			// each lead and the top two bits of each continuation byte;
 			// the range test on the lead then excludes E0 and ED, whose
 			// second byte is restricted.
 			if w&0xC0C0F0C0C0F0 == 0x8080E08080E0 && cjkLead(b) && cjkLead(byte(w>>24)) {
 				i += 6
+				// A run of such text is long: the words after the
+				// first are taken here, two sequences each, without
+				// the tests above for the other scripts.
+				for i+8 <= len(s) {
+					w = load64(s, i)
+					if w&0xC0C0F0C0C0F0 != 0x8080E08080E0 || !cjkLead(byte(w)) || !cjkLead(byte(w>>24)) {
+						break
+					}
+					i += 6
+				}
 				continue
 			}
 			// Four two byte sequences: leads at the even bytes, which must
@@ -69,7 +78,7 @@ func skipNonASCII(s []byte, i int) int {
 				continue
 			}
 		} else if i+4 <= len(s) {
-			w := binary.LittleEndian.Uint32(s[i:])
+			w := load32(s, i)
 			if w&0xC0C0F0 == 0x8080E0 && cjkLead(b) {
 				i += 3
 				continue

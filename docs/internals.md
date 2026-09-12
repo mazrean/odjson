@@ -773,6 +773,87 @@ allocation the target type dictates, the string scan, and a whitespace skip
 that is already a handful of instructions per run. Each remaining candidate
 is under the layout floor, which is why this round stopped here.
 
+### The third decode round
+
+The round after that started from the same profile and found the lever
+the previous two had walked past: **bounds tests**. Every word loop in the
+scanners read its word as `binary.LittleEndian.Uint64(data[i:])`, which
+is two tests per word, the slice against the capacity and then, inside
+`encoding/binary`, the sub-slice's length against eight, though the loop
+bound had settled both; and every `p < len(data) && data[p]` kept a test
+on the index, because the compiler cannot see that `p` is not negative.
+The generated decoders had the same shape in every position test. Neither
+is visible in a profile, which charges them to the line that carries
+them. Each change was measured on its own against the one before it with
+a micro-benchmark over the twitter document (`odjsonrt/scan_bench_test.go`:
+the strict skip of the 73 `retweeted_status` values, the whitespace runs,
+`scanStringStrict` over every string, `skipNonASCII` over every run), and
+the stack as a whole with the pooled procedure below. What stayed, in
+the order it was built:
+
+| change | measured on its own |
+| --- | --- |
+| **long member names compared in sixteen byte pieces** (`internal/codegen`): the compiler expands a compare against a constant into word loads only up to sixteen bytes, and `User` has twenty names past that, each a call to `memequal` | the `User` decoder's `memequal` calls 34 → 16 |
+| `true`, `false` and `null` as **one word compare** (`isTrue`, `isFalse`, `isNull`) instead of `hasLiteral`'s byte loop, which read 1.8% flat on twitter | — |
+| the **colon after a parsed name settled inline** (`AfterName`) in `strictKey`, `ParseKey`, `ParseKeyStrict` and `scanKey`, where the one space after it reached `skipSpaceSlow` on every member | strict skip 124.4 → 122.9 µs |
+| the any decoder's **duplicate check folded into the map insert**: whether the map grew says whether the name was new, so a member costs one map operation instead of a lookup at the name and an insert at the value; the frame keeps the name's offset for the error | — |
+| **word loads through a sub-slice of exact extent** (`load64`, `load32`): one bounds test per word instead of two | strict skip 122.9 → 114.1 µs, whitespace runs 73.7 → 62.6 µs, `scanStringStrict` 121.3 → 110.3 µs |
+| **indices tested against the length unsigned** (`uint(p) < uint(len(data))`) throughout the runtime, and the same emitted by the generator: one compare settles the test and the index | runtime bounds tests 120 → 80, `bench/gen`'s generated file 1106 → 514; whitespace runs 62.6 → 58.7 µs, `scanStringStrict` 110.3 → 108.3 |
+| a **short plain string settled on its first word** (`shortString`): when the lowest lane the stop mask reports holds the closing quote, nothing the scan cares about stood before it, so a body of up to seven plain bytes costs no call. It takes the word rather than loading it, because with the load inside it costs 100 against the inliner's 80. A **member name of up to fifteen bytes settled on two words** (`shortName`) the same way: 26% of twitter's names end in the first word and 43% in the second | strict skip 113.2 → 108.0 µs, then 107.3 → 104.0 |
+| `skipSpaceSlow` takes the **indent path first**, the space after a colon having lost every caller to `AfterName`, and tests the byte the run ended on with one compare before the table loop; the one-space test stays, after it, for the `", "` of a document written on one line, which a first cut dropped and which then cost +54% on that shape | whitespace runs that still reach it: indented twitter 44.8 → 38.5 µs, the same document rewritten with `", "` 21.6 → 23.1 |
+| a **run of CJK text taken word by word** in `skipNonASCII`, without going back through the other scripts' patterns every six bytes | non-ASCII runs 19.1 → 16.5 µs |
+| `EndUnknownNames` **skipped for an object that added no unknown name**, which is most of them | — |
+| the **encoder's word loops and digit stores given the same treatment**: `load64` in `appendQuotedStream`, `appendStringBodyChecked` and `appendQuotedV2HTML`, sub-slices of exact extent under the float formatter's `PutUint64`, unsigned index tests in the byte loops; bounds tests in the encoder's files 106 → 89 | writing every twitter string once per mode: `ModeHTML` 383 → 326 µs (-14.9%, a byte loop with one test per byte gone), `ModeStream` and `ModeV2` -2%, `ModeV2HTML` level |
+| **decoded strings carved out of shared chunks** (`StringCache.alloc`): a string the table does not hold is copied into the cache's current 4 KiB chunk instead of being allocated on its own, escaped strings are unescaped into a scratch buffer the cache keeps and carved from there, and a string longer than a quarter of a chunk keeps its own allocation. The trade, stated on `StringCache`, is retention: a string pins its chunk while reachable, and a pooled cache can pin up to 256 chunks through its table until the pool drops it. Approved as a product decision on 2026-09-12, having been declined before | two layouts, five interleaved runs, against the commit before: `json/v2` twitter decode **442 → 411 µs (-7.1%)**, allocations **2,468 → 1,037**, bytes -2.3%; `encoding/json` twitter -3.4%, small -1.4%; `json/v2` small level (p=0.075). A 16 KiB chunk read the same (-0.7%, p=0.075) and pins four times as much |
+
+| the **any decoder's interface values assembled by hand** (`box.go`): the string and slice headers and the floats an `any` points to are carved from chunks of their own, and the interface is built from the type word of a real `any` and the slot's address, which is what the runtime's conversion does with a fresh allocation each. Checked at init against the conversions, and the `odjson_safe` tag selects those instead. Approved on 2026-09-12 with the chunks | two layouts, five interleaved runs, against the chunks alone: twitter's allocations per decode **1,037 → 475**, `json/v2` twitter decode level (-0.7%, p=0.25), bytes +0.5%; small, which has no `any`, +1.7% at p=0.04 and `encoding/json` twitter +2.6% at p=0.035, both the size of the layout floor. A tiny allocation costs about what the slot and the two words do; what the boxes remove is objects, not time, in a benchmark whose heap is otherwise empty |
+
+| **`ModeHTML` and `ModePlain` scanned a word at a time** (`appendQuoted`): the v1 `MarshalJSON` modes were a byte loop over a table, with a remark that a word scan had once measured no faster; on `appendQuotedV2HTML`'s structure, with `swarUnsafe` or `swarUnsafeHTML` as the mask and encoding/json's U+FFFD for a byte that is not UTF-8, the same oracle tests against `json.Marshal` pass | writing every twitter string once: `ModeHTML` 352 → 229 µs (**-35%**), `ModePlain` 356 → 216 µs (-39%); `AppendStringKinds` ascii -44%, unicode -59%, mixed and escapes -16%, invalid level. In `bench/ab`, one process, n=15: the twitter encode **with odjson under sonic 309 → 273 µs (-11.6%)** and **under go-json 571 → 518 µs (-9.2%)**, both p=0.000; the small encodes level |
+
+What did not:
+
+| candidate | result |
+| --- | --- |
+| **selecting the byte a whitespace run ended on from the words already loaded**, branch-free, so the test that it starts a token does not wait on a load through the index and a table lookup | whitespace runs 73.7 → 82.4 µs (+11%): the variable shift and the select sit on the dependent chain, where the loads were overlapped by the core |
+| **reading the scan words in place through `unsafe`**, which removes the one remaining test | the same as the sub-slice on every micro-benchmark; not kept, so the loads stay portable |
+| `shortString` on the **string values the strict skip meets** | strict skip +1.4%: 45% of twitter's string values are longer than fifteen bytes, and those pay for the test |
+| `skipStringStrict`'s body spelled into `SkipValueStrict`, one call less per skipped string | strict skip level |
+
+The stack against `main`, pooled over four `-randlayout` builds a side and
+five interleaved runs (n=20), in two separate batches: `json/v2` twitter
+decode **490 → 447 µs (-8.8%)** after the first seven changes and
+**491 → 432 µs (-12.0%)** with all of them, `json/v2` small decode
+**634 → 608 ns (-4.2%)** and **631 → 602 ns (-4.7%)**, all at p=0.000.
+The `encoding/json` decodes read -5.0% / -4.9% in the first batch and
+level / -1.6% in the second, against a floor, from the marshal rows the
+stack cannot touch, of +2.6% and -2.3%: the v1 rows sit inside it, the
+json/v2 rows well above. The v1 rows are two thirds `encoding/json`'s own
+validation pass, which hides what happens behind it: the generated
+`UnmarshalJSON` called directly, base against stack over two layouts and
+five interleaved runs, reads twitter **434 → 380 µs (-12.5%)** and small
+**420 → 401 ns (-4.6%)**, both at p=0.000. On single builds, unpooled, the json/v2 twitter decode
+went 474 → 418 µs and the small one 594 → 539 ns.
+
+The whole branch against `main`, four layouts a side and five
+interleaved runs (n=20), after the encoder change and the chunks:
+`json/v2` twitter decode **499 → 411 µs (-17.6%)**, small **639 → 600 ns
+(-6.1%)**, `encoding/json` twitter decode -6.1% and small -2.7% (p=0.057),
+the twitter encodes -3.9% (`encoding/json`) and -4.3% (`json/v2`), all
+others at p≤0.002; twitter's allocations per decode 2,468 → 1,037. The
+small encodes read **+4.5%** in that run, which the encoder change does
+not explain: measured on its own against the commit before it, three
+layouts a side (n=15), it reads the small encodes +1.1% and +1.4% at
+p=0.23 and p=0.15, and the twitter encodes -1.5% and -0.9%. What the
+whole branch moves is the alignment of everything after the generated
+decoders, which grew and shrank in every fixture; the small encode rows
+are where that shows, as they did in the earlier rounds.
+
+What is left is what was left before, minus the tests and the
+allocations: the strict skip is 0.39 ns per byte skipped, the whitespace
+skip 2.5 ns per indent run, and the 475 allocations a twitter decode now
+makes are the maps, the `[]any` arrays and the struct slices the target
+type dictates.
+
 ## Measurement notes
 
 All figures on this page were re-measured together on an AMD Ryzen 9 7950X,
