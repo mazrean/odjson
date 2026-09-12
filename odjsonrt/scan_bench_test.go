@@ -180,7 +180,7 @@ func BenchmarkAppendQuotedTwitter(b *testing.B) {
 	for _, m := range []struct {
 		name string
 		mode StringMode
-	}{{"html", ModeHTML}, {"stream", ModeStream}, {"v2", ModeV2}, {"v2html", ModeV2HTML}} {
+	}{{"html", ModeHTML}, {"plain", ModePlain}, {"stream", ModeStream}, {"v2", ModeV2}, {"v2html", ModeV2HTML}} {
 		b.Run(m.name, func(b *testing.B) {
 			buf := make([]byte, 0, len(data))
 			for b.Loop() {

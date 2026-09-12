@@ -808,6 +808,8 @@ the order it was built:
 
 | the **any decoder's interface values assembled by hand** (`box.go`): the string and slice headers and the floats an `any` points to are carved from chunks of their own, and the interface is built from the type word of a real `any` and the slot's address, which is what the runtime's conversion does with a fresh allocation each. Checked at init against the conversions, and the `odjson_safe` tag selects those instead. Approved on 2026-09-12 with the chunks | two layouts, five interleaved runs, against the chunks alone: twitter's allocations per decode **1,037 → 475**, `json/v2` twitter decode level (-0.7%, p=0.25), bytes +0.5%; small, which has no `any`, +1.7% at p=0.04 and `encoding/json` twitter +2.6% at p=0.035, both the size of the layout floor. A tiny allocation costs about what the slot and the two words do; what the boxes remove is objects, not time, in a benchmark whose heap is otherwise empty |
 
+| **`ModeHTML` and `ModePlain` scanned a word at a time** (`appendQuoted`): the v1 `MarshalJSON` modes were a byte loop over a table, with a remark that a word scan had once measured no faster; on `appendQuotedV2HTML`'s structure, with `swarUnsafe` or `swarUnsafeHTML` as the mask and encoding/json's U+FFFD for a byte that is not UTF-8, the same oracle tests against `json.Marshal` pass | writing every twitter string once: `ModeHTML` 352 → 229 µs (**-35%**), `ModePlain` 356 → 216 µs (-39%); `AppendStringKinds` ascii -44%, unicode -59%, mixed and escapes -16%, invalid level. In `bench/ab`, one process, n=15: the twitter encode **with odjson under sonic 309 → 273 µs (-11.6%)** and **under go-json 571 → 518 µs (-9.2%)**, both p=0.000; the small encodes level |
+
 What did not:
 
 | candidate | result |

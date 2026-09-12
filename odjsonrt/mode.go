@@ -342,6 +342,16 @@ func swarUnsafeHTML(w uint64) uint64 {
 	return (ctrl | quote | esc | angle | amp) &^ w & swarHi
 }
 
+// swarHTMLOnly reports which lanes of w hold the three bytes the HTML modes
+// escape on top of the others: '<', '>' (one test, since they differ in
+// one bit) and '&'. ModeHTML's appender adds it to [swarUnsafe] where the
+// two modes share a loop.
+func swarHTMLOnly(w uint64) uint64 {
+	angle := ((w | swarLo*0x02) ^ (swarLo * '>')) - swarLo
+	amp := (w ^ (swarLo * '&')) - swarLo
+	return (angle | amp) &^ w & swarHi
+}
+
 // appendQuotedV2HTML is the ModeV2HTML implementation: [appendQuotedStream]'s
 // escaping, plus what encoding/json's reformat adds to it under
 // PreserveRawStrings, EscapeForHTML and EscapeForJS. That reformat walks the
