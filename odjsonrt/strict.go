@@ -287,11 +287,11 @@ func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) 
 		// for the callers that would otherwise check it again.
 		return c.MakeValid(body), end, nil
 	}
-	out, ok := unquote(body, true)
+	s, ok := c.unquoteString(body, true)
 	if !ok {
 		return "", p, ErrSyntax(data, p, "invalid string literal")
 	}
-	return adoptString(out, false), end, nil
+	return s, end, nil
 }
 
 // ParseStringInnerStrict is [ParseStringInner] under json/v2's rules.

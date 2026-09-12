@@ -49,11 +49,11 @@ func ParseStringCached(data []byte, p int, c *StringCache) (string, int, error) 
 			return s, end, nil
 		}
 	}
-	out, ok := unquote(body, false)
+	s, ok := c.unquoteString(body, false)
 	if !ok {
 		return "", p, ErrSyntax(data, p, "invalid string literal")
 	}
-	return adoptString(out, false), end, nil
+	return s, end, nil
 }
 
 // adoptString turns the result of [ParseStringBytes] into a string. When the
@@ -740,7 +740,12 @@ func parseKeyString(data []byte, p int, c *StringCache, strict bool) (string, in
 // is nearly every one, costs one validation pass and one copy instead of a
 // decode and an encode per rune.
 func unquote(s []byte, strict bool) ([]byte, bool) {
-	b := make([]byte, 0, len(s)+2*utf8.UTFMax)
+	return unquoteAppend(make([]byte, 0, len(s)+2*utf8.UTFMax), s, strict)
+}
+
+// unquoteAppend is [unquote] appending to b, which a caller with a buffer
+// to reuse passes; the result is b's array when it fits.
+func unquoteAppend(b, s []byte, strict bool) ([]byte, bool) {
 	r := 0
 	for r < len(s) {
 		n := bytes.IndexByte(s[r:], '\\')
