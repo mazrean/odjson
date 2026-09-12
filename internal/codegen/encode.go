@@ -74,63 +74,33 @@ func (g *generator) encodeStruct(b *block, s *analyzer.StructInfo) {
 	// into a brace afterwards, which costs a branch and a store per
 	// object; a struct without omitempty, omitzero or a nil-able embedded
 	// pointer never needs that, and most structs are that.
-	// A string member's quotes are folded into the literals around it: the
-	// opening quote ends the member name literal and the closing one starts
-	// the next member's, so the string helper writes the body alone and two
-	// one-byte appends per string member disappear. pending says the last
-	// member written left its closing quote to whoever writes next; only an
-	// unconditional member can take it, since a conditional one may write
-	// nothing at all.
-	pending := false
-	member := func(b *block, f *analyzer.Field, sep string) {
-		if pending {
-			sep = `"` + sep
-		}
-		lit := sep + jsonString(f.JSONName, g.opts.EscapeHTML) + ":"
-		if fusableString(f) {
-			g.appendLit(b, lit+`"`)
-			g.emit(b, appendChecked(callRT("AppendStringBodyChecked", dst, call(id("string"), selector(f)), mode)))
-			g.encErr(b)
-			pending = true
-			return
-		}
-		g.appendLit(b, lit)
-		g.encodeMember(b, f)
-		pending = false
-	}
-	closing := func() string {
-		if pending {
-			return `"}`
-		}
-		return "}"
-	}
+	// Literal text is carried forward rather than written as soon as it is
+	// known, so that a string member's quotes, a small nested object's
+	// braces and the next member's name all go out as one append: pending
+	// is what the members written so far still owe the output. Only an
+	// unconditional member can take it on, since a conditional one may
+	// write nothing at all.
 	if fixed {
 		if len(s.Fields) == 0 {
 			g.emit(b, appendChars("{}"))
 			g.emit(b, ret(dst, nilV))
 			return
 		}
-		for i, f := range s.Fields {
-			sep := ","
-			if i == 0 {
-				sep = "{"
-			}
-			member(b, f, sep)
-		}
-		g.emit(b, appendChars(closing()))
+		g.appendLit(b, g.encodeFixed(b, s, v, "{")+"}")
 		g.emit(b, ret(dst, nilV))
 		return
 	}
 	start := id("start")
 	g.emit(b, define(start, call(id("len"), dst)))
+	pending := ""
 	for i, f := range s.Fields {
 		if len(conds[i]) == 0 {
-			member(b, f, ",")
+			pending = g.encodeFusedMember(b, f, v, pending+",")
 			continue
 		}
-		if pending {
-			g.emit(b, appendChars(`"`))
-			pending = false
+		if pending != "" {
+			g.appendLit(b, pending)
+			pending = ""
 		}
 		g.ifStmt(b, nil, and(conds[i]...), func(b *block) {
 			lit := "," + jsonString(f.JSONName, g.opts.EscapeHTML) + ":"
@@ -147,10 +117,10 @@ func (g *generator) encodeStruct(b *block, s *analyzer.StructInfo) {
 			g.encodeMember(b, f)
 		})
 	}
-	if pending {
+	if pending != "" {
 		// An unconditional member was written, so the object is not empty.
 		g.emit(b, assign(index(dst, start), chr('{')))
-		g.emit(b, appendChars(`"}`))
+		g.appendLit(b, pending+"}")
 		g.emit(b, ret(dst, nilV))
 		return
 	}
@@ -162,6 +132,84 @@ func (g *generator) encodeStruct(b *block, s *analyzer.StructInfo) {
 		g.emit(b, appendChars("}"))
 	})
 	g.emit(b, ret(dst, nilV))
+}
+
+// encodeFixed writes every member of s, none of which may be conditional,
+// reading the fields from base. prefix is the literal text owed before the
+// first member (the opening brace, and whatever the caller still had
+// pending); the result is the literal text owed after the last one.
+func (g *generator) encodeFixed(b *block, s *analyzer.StructInfo, base ast.Expr, prefix string) string {
+	pending := prefix
+	for i, f := range s.Fields {
+		if i > 0 {
+			pending += ","
+		}
+		pending = g.encodeFusedMember(b, f, base, pending)
+	}
+	return pending
+}
+
+// encodeFusedMember writes member f of base, preceded by lit (the literal
+// text owed so far, separator included) and the member's name. It returns
+// the literal text owed afterwards: a closing quote for a plain string, the
+// closing brace and whatever the last member owed for a nested object that
+// was spliced in, and nothing otherwise.
+func (g *generator) encodeFusedMember(b *block, f *analyzer.Field, base ast.Expr, lit string) string {
+	lit += jsonString(f.JSONName, g.opts.EscapeHTML) + ":"
+	src := selectorFrom(base, f)
+	switch {
+	case fusableString(f):
+		g.appendLit(b, lit+`"`)
+		g.emit(b, appendChecked(callRT("AppendStringBodyChecked", dst, call(id("string"), src), mode)))
+		g.encErr(b)
+		return `"`
+	case !f.AsString && g.inlinableStruct(f.Type):
+		// The nested object's members are written here, so its braces
+		// and its first member's name join this member's literal, and its
+		// last member's closing quote, if any, joins the next one's.
+		g.inlineDepth++
+		pending := g.encodeFixed(b, f.Type.Struct, src, lit+"{")
+		g.inlineDepth--
+		return pending + "}"
+	}
+	g.appendLit(b, lit)
+	if f.AsString {
+		g.encodeQuoted(b, f.Type, src, true)
+	} else {
+		g.encode(b, f.Type, src, true)
+	}
+	return ""
+}
+
+// maxInlineMembers bounds the nested structs whose members are spliced into
+// the parent's encoder instead of being reached through a call: the call
+// itself costs next to nothing, what the splice buys is the fusion of the
+// literals across the boundary, and a wide struct's body repeated in every
+// parent would cost more code than that is worth.
+const maxInlineMembers = 4
+
+// inlinableStruct reports whether a value of type t is a small, locally
+// generated struct with no conditional member and no marshaler of its own,
+// so that its encoder body can be spliced into the caller. Only one level
+// is spliced: a nested struct inside a spliced one goes through its call,
+// which is also what keeps a self-referential type finite.
+func (g *generator) inlinableStruct(t *analyzer.Type) bool {
+	if g.inlineDepth > 0 || t.Kind != analyzer.KindStruct || t.Struct == nil || !t.Struct.Local {
+		return false
+	}
+	if t.Marshaler || t.PtrMarshaler || t.TextMarshaler || t.PtrTextMarshaler {
+		return false
+	}
+	s := t.Struct
+	if len(s.Fields) == 0 || len(s.Fields) > maxInlineMembers {
+		return false
+	}
+	for _, f := range s.Fields {
+		if len(g.memberConds(f)) != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // fusableString reports whether f is written by the plain string helper, so
@@ -376,6 +424,14 @@ func (g *generator) encode(b *block, t *analyzer.Type, src ast.Expr, addressable
 			tv := id(g.tmp("sv"))
 			g.emit(b, define(tv, src))
 			src = tv
+		}
+		if g.inlinableStruct(t) {
+			// A small struct as a slice element or a map value: its
+			// members are written here rather than through its method.
+			g.inlineDepth++
+			g.appendLit(b, g.encodeFixed(b, t.Struct, src, "{")+"}")
+			g.inlineDepth--
+			return
 		}
 		if t.Struct.Local {
 			g.emit(b, appendChecked(call(sel(src, "odjsonAppend"), dst, mode)))

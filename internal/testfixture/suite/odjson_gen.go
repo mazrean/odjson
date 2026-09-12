@@ -20,7 +20,7 @@ func (v *Raw) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -344,7 +344,7 @@ func (v *Value) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 			return nil, err
 		}
 	}
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -685,7 +685,7 @@ func (v *Typed) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -1065,7 +1065,7 @@ func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 			return nil, err
 		}
 	}
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 

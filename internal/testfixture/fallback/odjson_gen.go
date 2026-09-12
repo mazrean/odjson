@@ -71,7 +71,7 @@ func (v *Fallbacks) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '"', '}')
+	dst = append(dst, "\"}"...)
 	return dst, nil
 }
 

@@ -894,7 +894,7 @@ func (v *PtrBase) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '"', '}')
+	dst = append(dst, "\"}"...)
 	return dst, nil
 }
 
@@ -1331,7 +1331,7 @@ func (v *Scalars) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '"')
+	dst = append(dst, "\""...)
 	if len(v.OmitEmptyString) != 0 {
 		dst = append(dst, ",\"oe_string\":\""...)
 		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.OmitEmptyString), m)
@@ -4738,7 +4738,7 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 	}
 	dst = append(dst, ",\"dur\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Dur))
-	dst = append(dst, '}')
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -8265,7 +8265,7 @@ func (v *Recursive) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, '"')
+	dst = append(dst, "\""...)
 	if len(v.Children) != 0 {
 		dst = append(dst, ",\"children\":"...)
 		if v.Children == nil {
