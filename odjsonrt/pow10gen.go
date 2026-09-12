@@ -17,8 +17,8 @@ import (
 // The exponents ftoa.go can ask for: see ftoaPow10Min and ftoaPow10Max in
 // ftoa.go, which must match these.
 const (
-	minExp = -6
-	maxExp = 23
+	minExp = -350
+	maxExp = 350
 )
 
 func main() {

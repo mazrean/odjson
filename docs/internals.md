@@ -412,7 +412,7 @@ where the two differ by more than the spread. Every row is within ±2% by
 | `unique-strings` | 2.08× | 1.53× | 1.51× (1.00×) | 1.04× |
 | `numbers` | 1.32× (1.14×) | 1.09× | 1.31× (1.15×) | **0.87×** |
 | `floats` (synthetic GeoJSON) | 1.53× (1.07×) | 1.96× | 1.55× (1.07×) | 1.32× |
-| `canada` | 1.22× (1.01×) | 1.31× | 1.22× (1.02×) | 1.07× |
+| `canada` | 1.15× (1.01×) | 1.31× | 1.15× (1.02×) | 1.07× |
 | `dense` | 4.33× (3.65×) | 3.28× | 4.31× (1.27×) | 1.39× |
 | `sparse` | 8.51× | 2.39× | 7.21× (2.70×) | 1.47× |
 | `skip` | — | 1.53× (1.68×) | — | 1.37× |
@@ -471,8 +471,15 @@ What did not hold, and what was done about it:
   whole cost. The three encode rows in the table are from 2026-09-12, after
   `odjsonrt/ftoa.go` stopped calling `strconv` (see "Float formatting"):
   against the tree of the day before, the generated side reads `floats`
-  −31%, `canada` −17% and `numbers` −14% (`-count 6`, p=0.002), with
-  `small` and `twitter` within layout noise (p ≥ 0.13, one layout, n=6). The short path itself had moved
+  −28%, `numbers` −15% (four `-randlayout` builds a side, five interleaved
+  runs, n=20, p=0.000) and `canada` −12% (`-count 5`, one layout each
+  side; the round-one binaries had read −17%, and the base side alone moved
+  5% between the two builds, which is the layout noise the pooling is
+  for), with
+  `small` and `twitter` within the noise of their untouched decode rows
+  (encode `small` +1.5% / +2.7% at p=0.42 / 0.06 under `json/v2` /
+  `encoding/json`, against a v1 `twitter` decode that moved +1.9% at
+  p=0.010 without being touched). The short path itself had moved
   the day before, when it started proving a candidate by one division
   instead of a two-word argument and accepting every short decimal rather
   than 93% of them, which is where `small`'s encode went from 290 to 272 ns.
@@ -614,22 +621,33 @@ at 20% of that: the rest was `formatBase10` writing digits two at a time
 into a scratch buffer, `setDigits` trimming them, and `fmtEFG` copying them
 into the output one `append` per byte. The literature on the search
 (Ryu, Schubfach, Dragonbox, Tejú Jaguá) would have shaved the 20%;
-`odjsonrt/ftoa.go` keeps the same search, done in 6.7 ns with a 30 entry
-table for the fixed-notation range, and replaced the 80%. In the
+`odjsonrt/ftoa.go` keeps the same search, done in 6.7 ns with a 701 entry
+table (the same range `strconv` covers; the fixed-notation range alone
+would need 30), and replaced the 80%. In the
 `odjsonrt` benchmarks (Ryzen 9 7950X, Go 1.27.1):
 
 | values | before | after |
 | --- | --- | --- |
-| 1024 full precision coordinates (`AppendFloatFull`) | 44 ns each (12 of them the short path declining, 32 `strconv`) | 25 ns each |
+| 1024 full precision coordinates (`AppendFloatFull`) | 44 ns each (12 of them the short path declining, 32 `strconv`) | 27 ns each (2 of them the one-place round a coordinate pays before the gate turns it away) |
 | `40.8`, `-0.1`, `0.1`, `12.99`, `139.69171` (`AppendFloatShort`) | 12 ns each | 10.6 ns each |
+| 1024 values in exponent notation, magnitudes 1e-300 to 1e300 (`AppendFloatExp`) | 27 ns each (`strconv`) | 24 ns each |
 
 What it does, and what was measured on the way there:
 
 - **The search is the paper's**, 2–3 128-bit multiplications by a rounded-up
   power of ten with two fraction bits and a sticky bit, and `pow10gen.go`
-  writes the 30 entries the fixed-notation range needs (p from −6 to 23)
-  the way `strconv`'s generator writes its 696. Exponent notation and
-  `float32` still go to `strconv`.
+  writes the 701 entries (p from −350 to 350) the way `strconv`'s generator
+  writes its 696; the fixed-notation range alone would need 30. The same
+  search serves exponent notation (|v| below 1e-6 or at least 1e21,
+  subnormals included, written by a byte loop since a document rarely
+  holds one) and `float32`, with the 23 bit mantissa and the wider interval
+  of its own. A `float32` skips the short decimal path below: that path
+  proves a decimal at float64 precision, and a float32 can have a shorter
+  one (1048576.25 is the float32 `1048576.2`). The exponent writer is the
+  fixed writer's scratch scheme with the point at a fixed place and the
+  exponent's sign and one to three digits assembled in a word without
+  branches; a first version that aligned the digit words in registers
+  with a funnel shift measured 24 ns for the writer alone, against 15.
 - **The digits become ASCII eight at a time** with three multiplications
   (`digits8`: halves, quarters, digits, each split masked so that the shift
   does not mix the lanes), verified against `strconv` on all 10^8 inputs.
@@ -653,12 +671,14 @@ What it does, and what was measured on the way there:
 - **Short decimals never reach the search.** Without a short path the
   general writer put `small`'s encode up 9–15%. The path that was there
   before (candidate `round(v·10^f)` for f = 1…7, proven by one division)
-  came back with two changes: a gate in front, one multiplication by 10^7
-  whose product is an integer for every decimal of at most seven places, so
-  a full precision value pays one round instead of seven before declining;
-  and a writer that shifts the digits into one word a digit at a time and
-  stores it whole, for the numbers of at most eight bytes that nearly all of
-  them are. The same digits through two `digits8` words and a splice read
+  came back with two changes: a gate, one multiplication by 10^7 whose
+  product is an integer for every decimal of at most seven places, so a
+  full precision value pays two rounds instead of seven before declining
+  (it sits after the one-place round rather than in front of it: in front,
+  it cost every one-place decimal a round and read `small` +2–3% above its
+  floor in the pooled measurement); and a writer that shifts the digits
+  into one word a digit at a time and stores it whole, for the numbers of
+  at most eight bytes that nearly all of them are. The same digits through two `digits8` words and a splice read
   15.6 ns per value against the old path's 12 on `small`'s three floats, and
   `small` +4%; the word-at-a-time loop reads 10.6 and `small` level.
 - **Parity is byte for byte.** `TestAppendFloatMatchesStrconv` runs 55
