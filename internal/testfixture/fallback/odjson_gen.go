@@ -14,8 +14,7 @@ import (
 func (v *Fallbacks) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"generic\":"...)
+	dst = append(dst, "{\"generic\":"...)
 	dst, err = odjsonrt.AppendAnyMode(dst, v.Generic, m)
 	if err != nil {
 		return nil, err
@@ -67,17 +66,12 @@ func (v *Fallbacks) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, err
 			return nil, err
 		}
 	}
-	dst = append(dst, ",\"plain\":"...)
-	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Plain), m)
+	dst = append(dst, ",\"plain\":\""...)
+	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Plain), m)
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, "\"}"...)
 	return dst, nil
 }
 

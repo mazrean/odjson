@@ -297,7 +297,7 @@ func calibrateDirect() (l directLayout) {
 		v := struct {
 			S string `json:"s"`
 		}{"<&> \u2028\xff\u2029\xe2\x80 \xffé日 <\u2028"}
-		want, err := jsonv1.Marshal(jsonv1.RawMessage(append(appendQuotedStream([]byte(`{"s":`), []byte(v.S)), '}')))
+		want, err := jsonv1.Marshal(jsonv1.RawMessage(append(appendQuotedStream([]byte(`{"s":`), []byte(v.S), true), '}')))
 		if err != nil {
 			return directFail("v1 reference")
 		}
@@ -440,7 +440,7 @@ func (d *directString) MarshalJSONTo(enc *jsontext.Encoder) error {
 		EndDirectEncode(enc, append(buf, '}'))
 		return nil
 	}
-	return enc.WriteValue(append(appendQuotedStream([]byte(`{"s":`), []byte(d.S)), '}'))
+	return enc.WriteValue(append(appendQuotedStream([]byte(`{"s":`), []byte(d.S), true), '}'))
 }
 
 // BeginDirectEncodeMode reports whether the next value can be appended

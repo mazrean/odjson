@@ -61,7 +61,7 @@ func AppendString(dst []byte, s string, escapeHTML bool) []byte {
 
 // AppendStringBytes is [AppendString] for a byte slice.
 func AppendStringBytes(dst []byte, s []byte, escapeHTML bool) []byte {
-	return appendQuoted(dst, s, escapeHTML)
+	return appendQuoted(dst, s, escapeHTML, true)
 }
 
 // appendQuoted is the shared implementation of [AppendString] and
@@ -74,14 +74,21 @@ func AppendStringBytes(dst []byte, s []byte, escapeHTML bool) []byte {
 // stops on 0xE2 (the lead byte of U+2028 and U+2029), otherwise it falls back
 // to decoding rune by rune so that invalid bytes become U+FFFD the way
 // encoding/json does.
-func appendQuoted(dst []byte, src []byte, escapeHTML bool) []byte {
+//
+// quoted says whether to write the surrounding quotes; a generated encoder
+// that has folded the opening quote into a longer literal, and will fold the
+// closing one into the next, passes false. One parameter rather than a
+// wrapper, so that a string still costs a single call.
+func appendQuoted(dst []byte, src []byte, escapeHTML, quoted bool) []byte {
 	safe, safeUTF8 := &safeSet, &safeSetUTF8
 	if escapeHTML {
 		safe, safeUTF8 = &htmlSafeSet, &htmlSafeSetUTF8
 	}
 	checked, valid := false, false
 
-	dst = append(dst, '"')
+	if quoted {
+		dst = append(dst, '"')
+	}
 	start := 0
 	for i := 0; i < len(src); {
 		// Copy runs of bytes that need no escaping in one go. A word at a
@@ -158,7 +165,10 @@ func appendQuoted(dst []byte, src []byte, escapeHTML bool) []byte {
 		i += size
 	}
 	dst = append(dst, src[start:]...)
-	return append(dst, '"')
+	if quoted {
+		dst = append(dst, '"')
+	}
+	return dst
 }
 
 // appendQuotedString is [appendQuoted] for a string. The conversion is a view,
@@ -166,7 +176,7 @@ func appendQuoted(dst []byte, src []byte, escapeHTML bool) []byte {
 // one would have to type switch on any(src) to read words, which boxes the
 // string header on every call.
 func appendQuotedString(dst []byte, s string, escapeHTML bool) []byte {
-	return appendQuoted(dst, unsafe.Slice(unsafe.StringData(s), len(s)), escapeHTML)
+	return appendQuoted(dst, unsafe.Slice(unsafe.StringData(s), len(s)), escapeHTML, true)
 }
 
 // AppendStringQuoted appends s as a JSON string whose content is itself a JSON
@@ -176,7 +186,7 @@ func appendQuotedString(dst []byte, s string, escapeHTML bool) []byte {
 func AppendStringQuoted(dst []byte, s string, escapeHTML bool) []byte {
 	buf := AcquireBuffer()
 	buf = appendQuotedString(buf, s, escapeHTML)
-	dst = appendQuoted(dst, buf, false)
+	dst = appendQuoted(dst, buf, false, true)
 	ReleaseBuffer(buf)
 	return dst
 }
@@ -375,7 +385,15 @@ func appendAny(dst []byte, v any, m StringMode, depth int) ([]byte, error) {
 	case bool:
 		return AppendBool(dst, x), nil
 	case string:
-		return AppendStringChecked(dst, x, m)
+		// The quotes are written here and the body called directly: the
+		// quoted helper is one unit over the inlining budget, and a string
+		// inside an any is as common as a string member on the documents
+		// that matter.
+		dst, err := AppendStringBodyChecked(append(dst, '"'), x, m)
+		if err != nil {
+			return dst, err
+		}
+		return append(dst, '"'), nil
 	case float64:
 		return AppendFloat(dst, x, 64)
 	case float32:
@@ -439,10 +457,10 @@ func appendAny(dst []byte, v any, m StringMode, depth int) ([]byte, error) {
 				}
 				first = false
 				var err error
-				if dst, err = AppendStringChecked(dst, k, m); err != nil {
+				if dst, err = AppendStringBodyChecked(append(dst, '"'), k, m); err != nil {
 					return dst, err
 				}
-				dst = append(dst, ':')
+				dst = append(dst, '"', ':')
 				if dst, err = appendAny(dst, elem, m, depth+1); err != nil {
 					return dst, err
 				}
@@ -522,5 +540,5 @@ func AppendTextMarshaler(dst []byte, m encoding.TextMarshaler, escapeHTML bool) 
 	if err != nil {
 		return dst, err
 	}
-	return appendQuoted(dst, b, escapeHTML), nil
+	return appendQuoted(dst, b, escapeHTML, true), nil
 }

@@ -15,17 +15,19 @@ func (v *Address) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 	var err error
 	_ = err
 	start := len(dst)
-	dst = append(dst, ",\"street\":"...)
-	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Street), m)
+	dst = append(dst, ",\"street\":\""...)
+	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Street), m)
 	if err != nil {
 		return nil, err
 	}
+	dst = append(dst, "\""...)
 	if len(v.City) != 0 {
-		dst = append(dst, ",\"city\":"...)
-		dst, err = odjsonrt.AppendStringChecked(dst, string(v.City), m)
+		dst = append(dst, ",\"city\":\""...)
+		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.City), m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, '"')
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
@@ -434,22 +436,24 @@ func (v *Person) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	var err error
 	_ = err
 	start := len(dst)
-	dst = append(dst, ",\"name\":"...)
-	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Name), m)
+	dst = append(dst, ",\"name\":\""...)
+	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Name), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"age\":"...)
+	dst = append(dst, "\",\"age\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Age))
 	if v.Email != nil {
 		dst = append(dst, ",\"email\":"...)
 		if v.Email == nil {
 			dst = append(dst, 'n', 'u', 'l', 'l')
 		} else {
-			dst, err = odjsonrt.AppendStringChecked(dst, string((*v.Email)), m)
+			dst = append(dst, '"')
+			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.Email)), m)
 			if err != nil {
 				return nil, err
 			}
+			dst = append(dst, '"')
 		}
 	}
 	if len(v.Tags) != 0 {
@@ -462,10 +466,12 @@ func (v *Person) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 				if i17 > 0 {
 					dst = append(dst, ',')
 				}
-				dst, err = odjsonrt.AppendStringChecked(dst, string(v.Tags[i17]), m)
+				dst = append(dst, '"')
+				dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Tags[i17]), m)
 				if err != nil {
 					return nil, err
 				}
+				dst = append(dst, '"')
 			}
 			dst = append(dst, ']')
 		}

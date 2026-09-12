@@ -34,7 +34,7 @@ func ErrDuplicateName(data []byte, p int, name []byte) error {
 }
 
 func quoteName(name []byte) string {
-	b := appendQuoted(make([]byte, 0, len(name)+2), name, false)
+	b := appendQuoted(make([]byte, 0, len(name)+2), name, false, true)
 	return string(b)
 }
 

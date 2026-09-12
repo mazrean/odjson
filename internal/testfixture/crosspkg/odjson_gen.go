@@ -16,8 +16,7 @@ import (
 func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"thing\":"...)
+	dst = append(dst, "{\"thing\":"...)
 	dst, err = odjsonOtherThingAppend(dst, &v.Thing, m)
 	if err != nil {
 		return nil, err
@@ -66,11 +65,12 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 			if i4 > 0 {
 				dst = append(dst, ',')
 			}
-			dst, err = odjsonrt.AppendStringChecked(dst, k3, m)
+			dst = append(dst, '"')
+			dst, err = odjsonrt.AppendStringBodyChecked(dst, k3, m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, ':')
+			dst = append(dst, '"', ':')
 			mv5 := v.Map[k3]
 			dst, err = odjsonOtherThingAppend(dst, &mv5, m)
 			if err != nil {
@@ -99,12 +99,7 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 		}
 		dst = append(dst, ']')
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -996,11 +991,12 @@ func odjsonOtherThingAppend(dst []byte, v *other.Thing, m odjsonrt.StringMode) (
 	dst = append(dst, ",\"id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.ID))
 	if len(v.Name) != 0 {
-		dst = append(dst, ",\"name\":"...)
-		dst, err = odjsonrt.AppendStringChecked(dst, string(v.Name), m)
+		dst = append(dst, ",\"name\":\""...)
+		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Name), m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, '"')
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
@@ -1339,8 +1335,7 @@ func odjsonOtherThingParseFrom(dec *jsontext.Decoder, v *other.Thing, sc *odjson
 func odjsonOtherWrapperAppend(dst []byte, v *other.Wrapper, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"thing\":"...)
+	dst = append(dst, "{\"thing\":"...)
 	dst, err = odjsonOtherThingAppend(dst, &v.Thing, m)
 	if err != nil {
 		return nil, err
@@ -1370,12 +1365,7 @@ func odjsonOtherWrapperAppend(dst []byte, v *other.Wrapper, m odjsonrt.StringMod
 		}
 		dst = append(dst, ']')
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 

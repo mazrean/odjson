@@ -18,11 +18,12 @@ func (v *secret) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	dst = append(dst, ",\"id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.ID))
 	if len(v.Name) != 0 {
-		dst = append(dst, ",\"name\":"...)
-		dst, err = odjsonrt.AppendStringChecked(dst, string(v.Name), m)
+		dst = append(dst, ",\"name\":\""...)
+		dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Name), m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, '"')
 	}
 	if len(dst) == start {
 		dst = append(dst, '{', '}')
@@ -440,15 +441,9 @@ func (v *secret) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *lone) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"flag\":"...)
+	dst = append(dst, "{\"flag\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.Flag))
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -796,8 +791,7 @@ func (v *lone) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"secret\":"...)
+	dst = append(dst, "{\"secret\":"...)
 	dst, err = v.Secret.odjsonAppend(dst, m)
 	if err != nil {
 		return nil, err
@@ -827,12 +821,7 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 		}
 		dst = append(dst, ']')
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 

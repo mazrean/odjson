@@ -32,6 +32,10 @@ type generator struct {
 	decls    []ast.Decl
 	comments []*ast.CommentGroup
 	line     int
+
+	// inlineDepth counts the nested struct encoders currently being spliced
+	// into their parent (see encodeFusedMember); only one level is.
+	inlineDepth int
 }
 
 // ctx names the variables a decoding fragment reads from, and how it reports
@@ -335,8 +339,12 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 }
 
 // selector renders the Go expression selecting f from the receiver variable.
-func selector(f *analyzer.Field) ast.Expr {
-	var x ast.Expr = v
+func selector(f *analyzer.Field) ast.Expr { return selectorFrom(v, f) }
+
+// selectorFrom renders the path to f from base, through the embedded structs
+// on the way.
+func selectorFrom(base ast.Expr, f *analyzer.Field) ast.Expr {
+	x := base
 	for _, s := range f.Steps {
 		x = sel(x, s.Name)
 	}
