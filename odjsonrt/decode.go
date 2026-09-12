@@ -124,8 +124,10 @@ func ParseKey(data []byte, p int) (key []byte, aliased bool, next int, err error
 	if data[p] != '"' {
 		return nil, false, p, errChar(data, p, "looking for beginning of object key string")
 	}
-	key, aliased, end, err := ParseStringBytes(data, p)
-	if err != nil {
+	end := shortName(data, p)
+	if end > 0 {
+		key, aliased = data[p+1:end-1], true
+	} else if key, aliased, end, err = ParseStringBytes(data, p); err != nil {
 		return nil, false, end, err
 	}
 	if next = AfterName(data, end); next == 0 {

@@ -73,6 +73,27 @@ func shortString(w uint64, p int) int {
 	return 0
 }
 
+// shortName is [shortString] over two words, for member names: those of
+// up to fifteen plain bytes are most of them (twitter: 26% within the
+// first word, 43% within the second), and the scan takes the rest. The
+// second word is only looked at when the first held nothing of interest,
+// so shortString's reasoning about the lowest lane holds for it too. It
+// is a call, and a cheaper one than the scan; with the loads inside it
+// cannot inline.
+func shortName(data []byte, p int) int {
+	if uint(p+17) <= uint(len(data)) {
+		w, q := load64(data, p+1), p
+		if swarStringStop(w)|w&swarHi == 0 {
+			w, q = load64(data, p+9), p+8
+		}
+		return shortString(w, q)
+	}
+	if uint(p+9) <= uint(len(data)) {
+		return shortString(load64(data, p+1), p)
+	}
+	return 0
+}
+
 // parseStringBytesStrict is [ParseStringBytes] under json/v2's rules.
 func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next int, err error) {
 	if uint(p) >= uint(len(data)) {
@@ -81,10 +102,8 @@ func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next in
 	if data[p] != '"' {
 		return nil, false, p, ErrType(data, p, "string")
 	}
-	if uint(p+9) <= uint(len(data)) {
-		if end := shortString(load64(data, p+1), p); end > 0 {
-			return data[p+1 : end-1], true, end, nil
-		}
+	if end := shortName(data, p); end > 0 {
+		return data[p+1 : end-1], true, end, nil
 	}
 	end, hasEscape, _, err := scanStringStrict(data, p)
 	if err != nil {
@@ -429,10 +448,12 @@ func strictKey(data []byte, p int, names [][]byte, lv *strictLevel) ([][]byte, i
 	if data[p] != '"' {
 		return names, p, errChar(data, p, "looking for beginning of object key string")
 	}
-	end := 0
-	if uint(p+9) <= uint(len(data)) {
-		end = shortString(load64(data, p+1), p)
-	}
+	// Two words settle the names of up to fifteen plain bytes, which are
+	// most of them (twitter: 26% within the first word, 43% within the
+	// second); the scan takes the rest. The second word is only looked
+	// at when the first held nothing of interest, so shortString's
+	// reasoning about the lowest lane holds for it too.
+	end := shortName(data, p)
 	hasEscape := false
 	var err error
 	if end == 0 {
