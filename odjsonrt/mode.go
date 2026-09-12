@@ -116,13 +116,14 @@ const (
 // escaping under ModeStream: a control byte, a quote or a backslash. Bytes
 // >= 0x80 never match, because the &^w term clears their high bit, which is
 // exactly the behaviour ModeStream wants.
+//
+// It is the same word test as swarStringStop (see swar.go for how the control
+// and quote tests share a subtraction); the two are kept as separate
+// functions only so that each stays a leaf the compiler inlines.
 func swarUnsafe(w uint64) uint64 {
-	ctrl := (w - swarLo*0x20) &^ w
-	quote := w ^ (swarLo * '"')
-	quote = (quote - swarLo) &^ quote
-	esc := w ^ (swarLo * '\\')
-	esc = (esc - swarLo) &^ esc
-	return (ctrl | quote | esc) & swarHi
+	cq := (w ^ (swarLo * 0x02)) - swarLo*0x21
+	e := (w ^ (swarLo * '\\')) - swarLo
+	return (cq | e) &^ w & swarHi
 }
 
 // appendQuotedStreamString is [appendQuotedStream] for a string. Viewing the
