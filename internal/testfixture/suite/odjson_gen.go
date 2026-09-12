@@ -15,18 +15,12 @@ import (
 func (v *Raw) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"x\":"...)
+	dst = append(dst, "{\"x\":"...)
 	dst, err = odjsonrt.AppendMarshaler(dst, v.X, m.EscapeHTML())
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -341,8 +335,7 @@ func (v *Raw) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Value) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"x\":"...)
+	dst = append(dst, "{\"x\":"...)
 	if v.X == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
@@ -351,12 +344,7 @@ func (v *Value) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 			return nil, err
 		}
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -692,18 +680,12 @@ func (v *Value) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Typed) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"x\":"...)
+	dst = append(dst, "{\"x\":"...)
 	dst, err = v.X.odjsonAppend(dst, m)
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -1010,8 +992,7 @@ func (v *Typed) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"s\":"...)
+	dst = append(dst, "{\"s\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.S), m)
 	if err != nil {
 		return nil, err
@@ -1081,12 +1062,7 @@ func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 			return nil, err
 		}
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 

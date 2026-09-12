@@ -14,8 +14,7 @@ import (
 func (v *Book) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"id\":"...)
+	dst = append(dst, "{\"id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.BookId))
 	dst = append(dst, ",\"ids\":"...)
 	if v.BookIds == nil {
@@ -121,12 +120,7 @@ func (v *Book) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 		}
 		dst = append(dst, ']')
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -1884,8 +1878,7 @@ func (v *Book) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Author) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"name\":"...)
+	dst = append(dst, "{\"name\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Name), m)
 	if err != nil {
 		return nil, err
@@ -1894,12 +1887,7 @@ func (v *Author) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	dst = odjsonrt.AppendInt(dst, int64(v.Age))
 	dst = append(dst, ",\"male\":"...)
 	dst = odjsonrt.AppendBool(dst, bool(v.Male))
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -2385,8 +2373,7 @@ func (v *Author) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *TwitterStruct) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"statuses\":"...)
+	dst = append(dst, "{\"statuses\":"...)
 	if v.Statuses == nil {
 		dst = odjsonrt.AppendNilSlice(dst, m)
 	} else {
@@ -2408,12 +2395,7 @@ func (v *TwitterStruct) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte,
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -2870,8 +2852,7 @@ func (v *TwitterStruct) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Statuses) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"coordinates\":"...)
+	dst = append(dst, "{\"coordinates\":"...)
 	if v.Coordinates == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
@@ -3003,12 +2984,7 @@ func (v *Statuses) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 			return nil, err
 		}
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -4629,8 +4605,7 @@ func (v *Statuses) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Entities) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"urls\":"...)
+	dst = append(dst, "{\"urls\":"...)
 	if v.Urls == nil {
 		dst = odjsonrt.AppendNilSlice(dst, m)
 	} else {
@@ -4687,12 +4662,7 @@ func (v *Entities) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 		}
 		dst = append(dst, ']')
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -5481,8 +5451,7 @@ func (v *Entities) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Hashtags) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"text\":"...)
+	dst = append(dst, "{\"text\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Text), m)
 	if err != nil {
 		return nil, err
@@ -5500,12 +5469,7 @@ func (v *Hashtags) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 		}
 		dst = append(dst, ']')
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -6044,8 +6008,7 @@ func (v *Hashtags) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Metadata) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"iso_language_c"...)
+	dst = append(dst, "{\"iso_language_c"...)
 	dst = append(dst, "ode\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.IsoLanguageCode), m)
 	if err != nil {
@@ -6056,12 +6019,7 @@ func (v *Metadata) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -6462,8 +6420,7 @@ func (v *Metadata) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"profile_sideba"...)
+	dst = append(dst, "{\"profile_sideba"...)
 	dst = append(dst, "r_fill_color\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.ProfileSidebarFillColor), m)
 	if err != nil {
@@ -6646,12 +6603,7 @@ func (v *User) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -9580,8 +9532,7 @@ func (v *User) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *UserEntities) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"url\":"...)
+	dst = append(dst, "{\"url\":"...)
 	dst, err = v.URL.odjsonAppend(dst, m)
 	if err != nil {
 		return nil, err
@@ -9591,12 +9542,7 @@ func (v *UserEntities) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -9947,8 +9893,7 @@ func (v *UserEntities) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *URL) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"urls\":"...)
+	dst = append(dst, "{\"urls\":"...)
 	if v.Urls == nil {
 		dst = odjsonrt.AppendNilSlice(dst, m)
 	} else {
@@ -9964,12 +9909,7 @@ func (v *URL) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 		}
 		dst = append(dst, ']')
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -10382,8 +10322,7 @@ func (v *URL) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Urls) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"expanded_url\":"...)
+	dst = append(dst, "{\"expanded_url\":"...)
 	if v.ExpandedURL == nil {
 		dst = append(dst, 'n', 'u', 'l', 'l')
 	} else {
@@ -10410,12 +10349,7 @@ func (v *Urls) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 		}
 		dst = append(dst, ']')
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -11017,8 +10951,7 @@ func (v *Urls) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Description) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"urls\":"...)
+	dst = append(dst, "{\"urls\":"...)
 	if v.Urls == nil {
 		dst = odjsonrt.AppendNilSlice(dst, m)
 	} else {
@@ -11038,12 +10971,7 @@ func (v *Description) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 		}
 		dst = append(dst, ']')
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -11499,8 +11427,7 @@ func (v *Description) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *SearchMetadata) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"max_id\":"...)
+	dst = append(dst, "{\"max_id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.MaxID))
 	dst = append(dst, ",\"since_id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.SinceID))
@@ -11536,12 +11463,7 @@ func (v *SearchMetadata) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 

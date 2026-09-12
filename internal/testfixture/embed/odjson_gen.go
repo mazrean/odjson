@@ -14,8 +14,7 @@ import (
 func (v *Deep) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"deep_only\":"...)
+	dst = append(dst, "{\"deep_only\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.DeepOnly), m)
 	if err != nil {
 		return nil, err
@@ -25,12 +24,7 @@ func (v *Deep) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -440,8 +434,7 @@ func (v *Deep) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Mid) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"deep_only\":"...)
+	dst = append(dst, "{\"deep_only\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Deep.DeepOnly), m)
 	if err != nil {
 		return nil, err
@@ -453,12 +446,7 @@ func (v *Mid) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	}
 	dst = append(dst, ",\"mid_only\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.MidOnly))
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -939,8 +927,7 @@ func (v *Mid) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *LeftConflict) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"Clash\":"...)
+	dst = append(dst, "{\"Clash\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Clash), m)
 	if err != nil {
 		return nil, err
@@ -950,12 +937,7 @@ func (v *LeftConflict) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -1365,8 +1347,7 @@ func (v *LeftConflict) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *RightConflict) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"Clash\":"...)
+	dst = append(dst, "{\"Clash\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Clash), m)
 	if err != nil {
 		return nil, err
@@ -1376,12 +1357,7 @@ func (v *RightConflict) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte,
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -1791,18 +1767,12 @@ func (v *RightConflict) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *UntaggedSide) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"Winner\":"...)
+	dst = append(dst, "{\"Winner\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Winner), m)
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -2141,18 +2111,12 @@ func (v *UntaggedSide) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *TaggedSide) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"Winner\":"...)
+	dst = append(dst, "{\"Winner\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Winner), m)
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -2491,15 +2455,9 @@ func (v *TaggedSide) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *PtrPart) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"ptr_only\":"...)
+	dst = append(dst, "{\"ptr_only\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.PtrOnly))
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -2848,15 +2806,9 @@ func (v *PtrPart) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Named) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"value\":"...)
+	dst = append(dst, "{\"value\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Value))
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -4159,20 +4111,14 @@ func (v *Promoted) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *ShallowWins) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"deep_only\":"...)
+	dst = append(dst, "{\"deep_only\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.Deep.DeepOnly), m)
 	if err != nil {
 		return nil, err
 	}
 	dst = append(dst, ",\"shared\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Shared))
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 

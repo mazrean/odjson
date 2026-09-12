@@ -59,41 +59,48 @@ func appendChecked(call ast.Expr) ast.Stmt {
 }
 
 func (g *generator) encodeStruct(b *block, s *analyzer.StructInfo) {
-	start := id("start")
 	g.emit(b, varDecl("err", id("error")))
 	g.emit(b, assign(id("_"), errV))
+	conds := make([][]ast.Expr, len(s.Fields))
+	fixed := true
+	for i, f := range s.Fields {
+		conds[i] = g.memberConds(f)
+		fixed = fixed && len(conds[i]) == 0
+	}
+	// Every member is written or none is, so the shape of the object is
+	// known here: the opening brace goes out with the first member's name
+	// and the closing one is appended unconditionally. The general form
+	// below writes a comma before every member and patches the first one
+	// into a brace afterwards, which costs a branch and a store per
+	// object; a struct without omitempty, omitzero or a nil-able embedded
+	// pointer never needs that, and most structs are that.
+	if fixed {
+		if len(s.Fields) == 0 {
+			g.emit(b, appendChars("{}"))
+			g.emit(b, ret(dst, nilV))
+			return
+		}
+		for i, f := range s.Fields {
+			sep := ","
+			if i == 0 {
+				sep = "{"
+			}
+			g.appendLit(b, sep+jsonString(f.JSONName, g.opts.EscapeHTML)+":")
+			g.encodeMember(b, f)
+		}
+		g.emit(b, appendChars("}"))
+		g.emit(b, ret(dst, nilV))
+		return
+	}
+	start := id("start")
 	g.emit(b, define(start, call(id("len"), dst)))
-	for _, f := range s.Fields {
-		var conds []ast.Expr
-		if gd := guard(f); gd != nil {
-			conds = append(conds, gd)
-		}
-		if f.OmitZero {
-			if c := g.nonZeroExpr(f.Type, selector(f)); c != nil {
-				conds = append(conds, c)
-			}
-		}
-		if f.OmitEmpty {
-			if c := nonEmptyExpr(f.Type, selector(f)); c != nil {
-				// encoding/json omits a zero number or a false bool;
-				// encoding/json/v2 only omits values that encode as "",
-				// [], {} or null, so under ModeStream they stay.
-				if alwaysKeptByV2(f.Type) {
-					c = paren(bin(call(sel(mode, "V2")), token.LOR, c))
-				}
-				conds = append(conds, c)
-			}
-		}
+	for i, f := range s.Fields {
 		body := func(b *block) {
 			g.appendLit(b, ","+jsonString(f.JSONName, g.opts.EscapeHTML)+":")
-			if f.AsString {
-				g.encodeQuoted(b, f.Type, selector(f), true)
-			} else {
-				g.encode(b, f.Type, selector(f), true)
-			}
+			g.encodeMember(b, f)
 		}
-		if len(conds) > 0 {
-			g.ifStmt(b, nil, and(conds...), body)
+		if len(conds[i]) > 0 {
+			g.ifStmt(b, nil, and(conds[i]...), body)
 		} else {
 			body(b)
 		}
@@ -106,6 +113,42 @@ func (g *generator) encodeStruct(b *block, s *analyzer.StructInfo) {
 		g.emit(b, appendChars("}"))
 	})
 	g.emit(b, ret(dst, nilV))
+}
+
+// memberConds renders the conditions under which f is written at all: the
+// embedded pointers on its path being non-nil, and omitzero / omitempty.
+// An empty result means the member is always written.
+func (g *generator) memberConds(f *analyzer.Field) []ast.Expr {
+	var conds []ast.Expr
+	if gd := guard(f); gd != nil {
+		conds = append(conds, gd)
+	}
+	if f.OmitZero {
+		if c := g.nonZeroExpr(f.Type, selector(f)); c != nil {
+			conds = append(conds, c)
+		}
+	}
+	if f.OmitEmpty {
+		if c := nonEmptyExpr(f.Type, selector(f)); c != nil {
+			// encoding/json omits a zero number or a false bool;
+			// encoding/json/v2 only omits values that encode as "",
+			// [], {} or null, so under ModeStream they stay.
+			if alwaysKeptByV2(f.Type) {
+				c = paren(bin(call(sel(mode, "V2")), token.LOR, c))
+			}
+			conds = append(conds, c)
+		}
+	}
+	return conds
+}
+
+// encodeMember writes f's value, honouring the ",string" option.
+func (g *generator) encodeMember(b *block, f *analyzer.Field) {
+	if f.AsString {
+		g.encodeQuoted(b, f.Type, selector(f), true)
+	} else {
+		g.encode(b, f.Type, selector(f), true)
+	}
 }
 
 // appendLit emits dst = append(dst, lit...), in pieces of at most sixteen

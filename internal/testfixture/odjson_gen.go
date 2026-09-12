@@ -887,18 +887,12 @@ func (v *Base) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *PtrBase) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"ptr_field\":"...)
+	dst = append(dst, "{\"ptr_field\":"...)
 	dst, err = odjsonrt.AppendStringChecked(dst, string(v.PtrField), m)
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -4424,8 +4418,7 @@ func (v *Scalars) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	dst = append(dst, ",\"bytes\":"...)
+	dst = append(dst, "{\"bytes\":"...)
 	if v.Bytes == nil {
 		dst = odjsonrt.AppendNilBytes(dst, m)
 	} else {
@@ -4728,12 +4721,7 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 	}
 	dst = append(dst, ",\"dur\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Dur))
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '}')
 	return dst, nil
 }
 
@@ -8806,13 +8794,7 @@ func (v *Recursive) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Memberless) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '{', '}')
 	return dst, nil
 }
 
@@ -9071,13 +9053,7 @@ func (v *Memberless) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Unit) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '{', '}')
 	return dst, nil
 }
 

@@ -4596,13 +4596,7 @@ func (v *Zoo) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Memberless) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '{', '}')
 	return dst, nil
 }
 
@@ -4861,13 +4855,7 @@ func (v *Memberless) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Unit) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	start := len(dst)
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst = append(dst, '{', '}')
 	return dst, nil
 }
 
