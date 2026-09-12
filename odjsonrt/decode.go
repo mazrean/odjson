@@ -600,7 +600,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 			p = SkipSpace(data, p+1)
 			if uint(p) < uint(len(data)) && data[p] == ']' {
 				p++
-				v = []any{}
+				v = sc.boxSlice([]any{})
 				break
 			}
 			// Room for a few elements up front: the arrays that reach an
@@ -622,7 +622,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 			if err != nil {
 				return nil, next, err
 			}
-			v, p = s, next
+			v, p = sc.boxString(s), next
 		case 't':
 			if !isTrue(data, p) {
 				return nil, p, errBeginValue(data, p)
@@ -652,7 +652,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 				// test keeps -0 its own value.
 				v = smallAny[i]
 			} else {
-				v = f
+				v = sc.boxFloat(f)
 			}
 			p = next
 		}
@@ -697,7 +697,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 				stack = stack[:len(stack)-1]
 				continue
 			case !isObj && data[p] == ']':
-				v = f.arr
+				v = sc.boxSlice(f.arr)
 				p++
 				stack = stack[:len(stack)-1]
 				continue

@@ -806,6 +806,8 @@ the order it was built:
 | the **encoder's word loops and digit stores given the same treatment**: `load64` in `appendQuotedStream`, `appendStringBodyChecked` and `appendQuotedV2HTML`, sub-slices of exact extent under the float formatter's `PutUint64`, unsigned index tests in the byte loops; bounds tests in the encoder's files 106 → 89 | writing every twitter string once per mode: `ModeHTML` 383 → 326 µs (-14.9%, a byte loop with one test per byte gone), `ModeStream` and `ModeV2` -2%, `ModeV2HTML` level |
 | **decoded strings carved out of shared chunks** (`StringCache.alloc`): a string the table does not hold is copied into the cache's current 4 KiB chunk instead of being allocated on its own, escaped strings are unescaped into a scratch buffer the cache keeps and carved from there, and a string longer than a quarter of a chunk keeps its own allocation. The trade, stated on `StringCache`, is retention: a string pins its chunk while reachable, and a pooled cache can pin up to 256 chunks through its table until the pool drops it. Approved as a product decision on 2026-09-12, having been declined before | two layouts, five interleaved runs, against the commit before: `json/v2` twitter decode **442 → 411 µs (-7.1%)**, allocations **2,468 → 1,037**, bytes -2.3%; `encoding/json` twitter -3.4%, small -1.4%; `json/v2` small level (p=0.075). A 16 KiB chunk read the same (-0.7%, p=0.075) and pins four times as much |
 
+| the **any decoder's interface values assembled by hand** (`box.go`): the string and slice headers and the floats an `any` points to are carved from chunks of their own, and the interface is built from the type word of a real `any` and the slot's address, which is what the runtime's conversion does with a fresh allocation each. Checked at init against the conversions, and the `odjson_safe` tag selects those instead. Approved on 2026-09-12 with the chunks | two layouts, five interleaved runs, against the chunks alone: twitter's allocations per decode **1,037 → 475**, `json/v2` twitter decode level (-0.7%, p=0.25), bytes +0.5%; small, which has no `any`, +1.7% at p=0.04 and `encoding/json` twitter +2.6% at p=0.035, both the size of the layout floor. A tiny allocation costs about what the slot and the two words do; what the boxes remove is objects, not time, in a benchmark whose heap is otherwise empty |
+
 What did not:
 
 | candidate | result |
@@ -844,11 +846,11 @@ whole branch moves is the alignment of everything after the generated
 decoders, which grew and shrank in every fixture; the small encode rows
 are where that shows, as they did in the earlier rounds.
 
-What is left is what was left before, minus the tests and the string
+What is left is what was left before, minus the tests and the
 allocations: the strict skip is 0.39 ns per byte skipped, the whitespace
-skip 2.5 ns per indent run, and of the 1,037 allocations a twitter decode
-now makes, 900 are the string boxes, maps, slices and slice headers the
-`any` fields dictate, which only an interface built by hand could remove.
+skip 2.5 ns per indent run, and the 475 allocations a twitter decode now
+makes are the maps, the `[]any` arrays and the struct slices the target
+type dictates.
 
 ## Measurement notes
 

@@ -96,6 +96,11 @@ func ErrKindFrom(dec *jsontext.Decoder, goType string) error {
 // not. The cache is a direct mapped table keyed by a hash of the string's
 // first and last bytes, so a lookup costs the same for every length.
 //
+// The any decoder's interface values are built the same way: the string and
+// slice headers and the floats they point to are carved from chunks of
+// their own rather than allocated one by one (see box.go), under the same
+// retention trade.
+//
 // A string the table does not hold is not allocated on its own: it is copied
 // into the cache's current chunk of [slabSize] bytes, and a new chunk is
 // taken when the current one is used up. A document's strings then cost a
@@ -136,12 +141,19 @@ const (
 	slabMax  = slabSize / 4
 	// slabScratchMax is the largest unescaping buffer a pooled cache keeps.
 	slabScratchMax = 64 << 10
+	// The header chunks of box.go, about 4 KiB each.
+	boxStrings = 256
+	boxSlices  = 128
+	boxFloats  = 512
 )
 
 // slab is the free tail of the current chunk and the unescaping scratch.
 type slab struct {
 	free    []byte
 	scratch []byte
+	// boxes holds the header chunks the any decoder's interface values
+	// point into; see box.go.
+	boxes *boxes
 }
 
 // alloc returns b as a string, carved from the cache's current chunk when
