@@ -236,7 +236,7 @@ func AppendFloat(dst []byte, v float64, bits int) ([]byte, error) {
 		}
 	}
 	// The number is written here rather than by strconv; see ftoa.go.
-	if format == 'f' && bits == 64 {
+	if format == 'f' && bits == 64 && abs != 0 {
 		if out, ok := appendShortFloat(dst, v < 0, abs); ok {
 			return out, nil
 		}

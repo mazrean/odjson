@@ -216,29 +216,36 @@ const roundMagic = 1.5 * (1 << 52)
 
 // appendShortFloat appends abs, with a sign when neg, if it is a decimal
 // with 1 to maxShortFrac fraction digits and fewer than nine integer
-// digits, and reports whether it did. abs is finite and not an integer.
+// digits, and reports whether it did. abs is finite, not zero and not an
+// integer.
 func appendShortFloat(dst []byte, neg bool, abs float64) ([]byte, bool) {
-	// The gate, before the search: a full precision value leaves here.
-	p := abs * 1e7
-	if !(p > 0 && p < 1e15) {
-		// Beyond where an integer is exact in a float64 and the division
-		// is a proof; or a zero, which prints its sign.
-		return dst, false
-	}
-	r := (p + roundMagic) - roundMagic
-	// A decimal's product lands within a couple of ulps of its integer;
-	// 1e-15·p is about four. One branch on the absolute value: two, on
-	// the sign of a distance that is random for the values turned away,
-	// mispredict half the time. Rounding is two floating point operations
-	// (see roundMagic).
-	if math.Abs(p-r) > 1e-15*p {
-		return dst, false
-	}
-
 	// The places, fewest first: the first candidate that parses back is
-	// the shortest.
+	// the shortest. One place is tried before anything else, since it is
+	// what most values have and the round is all they should pay.
 	for f := 1; f <= maxShortFrac; f++ {
+		if f == 2 {
+			// The gate, before the rest of the search: a full precision
+			// value leaves here, after one round instead of seven.
+			p := abs * 1e7
+			if p >= 1e15 {
+				return dst, false
+			}
+			r := (p + roundMagic) - roundMagic
+			if math.Abs(p-r) > 1e-15*p {
+				return dst, false
+			}
+		}
 		p := abs * pow10[f]
+		if p >= 1e15 {
+			// Beyond where an integer is exact in a float64 and the
+			// division is a proof.
+			return dst, false
+		}
+		// A decimal's product lands within a couple of ulps of its
+		// integer; 1e-15·p is about four. One branch on the absolute
+		// value: two, on the sign of a distance that is random for the
+		// values turned away, mispredict half the time. Rounding is two
+		// floating point operations (see roundMagic).
 		r := (p + roundMagic) - roundMagic
 		if math.Abs(p-r) > 1e-15*p || r/pow10[f] != abs {
 			continue
