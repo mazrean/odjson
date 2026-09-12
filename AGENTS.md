@@ -25,8 +25,8 @@ using the standard library, and take it off whenever you like" is the product,
 and a second entry point contradicts it.
 
 **Positioning** (measured, see `bench/`): the target is `encoding/json/v2`
-(2.1-3.6x faster on all four measurements) and `encoding/json` (3.1-3.4x on
-the two encodes, since the direct path learned v1's coder flags, and 1.2-1.6x
+(2.2-3.5x faster on all four measurements) and `encoding/json` (3.2x on
+the two encodes, since the direct path learned v1's coder flags, and 1.2-1.5x
 on the two decodes, which stay on the public API path because v1's flags
 allow what the strict parsers refuse). `github.com/bytedance/sonic` and
 `github.com/goccy/go-json` honour the v1 interfaces too and the generated code
@@ -44,11 +44,10 @@ JIT to break even there. Do not re-open either question without re-running
 `bench/floor` and `bench/ab`. In `README.md` those two libraries are
 **comparison baselines only** — their "with odjson" columns stay out of the
 tables, and the claim to keep honest is that json/v2 + odjson beats go-json on
-all four (the narrowest 1.32x, shared by the small encode and the large
-decode) and is level with sonic on three of the four (within 2% in the quoted
-run and 5% across runs, in either direction; `bench/ab` in one process reads
-1.03x slower / 1.04x slower / 1.02x faster) and 1.7x ahead on the small decode
-(1.67x in `bench/ab`). Re-measure before restating any of it.
+all four (the narrowest 1.25x, the small encode) and is level with sonic on
+three of the four (within 3% in the quoted run, all three in sonic's favour,
+and 5% across runs; `bench/ab` in one process reads 1.02x slower / level /
+1.02x slower) and 1.7x ahead on the small decode (1.67x in `bench/ab`). Re-measure before restating any of it.
 
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,
