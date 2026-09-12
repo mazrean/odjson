@@ -33,10 +33,20 @@ func (c ctx) parseNull(np, ok *ast.Ident) ast.Stmt {
 // at renders data[pos].
 func (c ctx) at() ast.Expr { return index(c.dataV(), c.posV()) }
 
-// atEnd renders pos >= len(data).
+// atEnd renders uint(pos) >= uint(len(data)), and inRange its negation.
+// The unsigned form is deliberate: the compiler cannot see that pos is
+// not negative, so after a signed test the index data[pos] keeps a bounds
+// test of its own, while the one unsigned compare settles both.
 func (c ctx) atEnd() ast.Expr {
-	return bin(c.posV(), token.GEQ, call(id("len"), c.dataV()))
+	return bin(toUint(c.posV()), token.GEQ, toUint(call(id("len"), c.dataV())))
 }
+
+func (c ctx) inRange() ast.Expr {
+	return bin(toUint(c.posV()), token.LSS, toUint(call(id("len"), c.dataV())))
+}
+
+// toUint renders uint(x).
+func toUint(x ast.Expr) ast.Expr { return call(id("uint"), x) }
 
 // errSyntax renders odjsonrt.ErrSyntax(data, pos, msg).
 func (c ctx) errSyntax(msg string) ast.Expr {
@@ -69,7 +79,7 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 	})
 	g.emit(b, incr(p))
 	g.emit(b, c.skipSpace())
-	g.ifStmt(b, nil, and(bin(p, token.LSS, call(id("len"), data)), bin(c.at(), token.EQL, chr('}'))), func(b *block) {
+	g.ifStmt(b, nil, and(c.inRange(), bin(c.at(), token.EQL, chr('}'))), func(b *block) {
 		g.emit(b, ret(bin(p, token.ADD, num(1)), nilV))
 	})
 	if c.strict {
@@ -557,7 +567,7 @@ func (g *generator) decode(b *block, t *analyzer.Type, target ast.Expr, c ctx) {
 			spelled := func(lit string) ast.Expr {
 				n := num(int64(len(lit)))
 				return and(
-					bin(bin(c.posV(), token.ADD, n), token.LEQ, call(id("len"), c.dataV())),
+					bin(toUint(bin(c.posV(), token.ADD, n)), token.LEQ, toUint(call(id("len"), c.dataV()))),
 					bin(call(id("string"), slice(c.dataV(), c.posV(), bin(c.posV(), token.ADD, n))), token.EQL, str(lit)))
 			}
 			s := g.ifStmt(b, nil, spelled("true"), func(b *block) {
@@ -748,7 +758,7 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 	g.expectByte(b, c, '[', t.Expr)
 	g.emit(b, define(s, slice(target, nil, num(0))))
 	g.emit(b, c.skipSpace())
-	s0 := g.ifStmt(b, nil, and(bin(c.posV(), token.LSS, call(id("len"), c.dataV())), bin(c.at(), token.EQL, chr(']'))), func(b *block) {
+	s0 := g.ifStmt(b, nil, and(c.inRange(), bin(c.at(), token.EQL, chr(']'))), func(b *block) {
 		g.emit(b, incr(c.posV()))
 	})
 	g.elseBlock(s0, func(b *block) {
@@ -790,7 +800,7 @@ func (g *generator) decodeArray(b *block, t *analyzer.Type, target ast.Expr, c c
 	g.expectByte(b, c, '[', t.Expr)
 	g.emit(b, define(i, num(0)))
 	g.emit(b, c.skipSpace())
-	s0 := g.ifStmt(b, nil, and(bin(c.posV(), token.LSS, call(id("len"), c.dataV())), bin(c.at(), token.EQL, chr(']'))), func(b *block) {
+	s0 := g.ifStmt(b, nil, and(c.inRange(), bin(c.at(), token.EQL, chr(']'))), func(b *block) {
 		g.emit(b, incr(c.posV()))
 	})
 	g.elseBlock(s0, func(b *block) {
@@ -844,7 +854,7 @@ func (g *generator) decodeMap(b *block, t *analyzer.Type, target ast.Expr, c ctx
 		})
 	}
 	g.emit(b, c.skipSpace())
-	s0 := g.ifStmt(b, nil, and(bin(c.posV(), token.LSS, call(id("len"), c.dataV())), bin(c.at(), token.EQL, chr('}'))), func(b *block) {
+	s0 := g.ifStmt(b, nil, and(c.inRange(), bin(c.at(), token.EQL, chr('}'))), func(b *block) {
 		g.emit(b, incr(c.posV()))
 	})
 	g.elseBlock(s0, func(b *block) {
