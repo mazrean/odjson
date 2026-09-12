@@ -33,6 +33,20 @@ func ErrDuplicateName(data []byte, p int, name []byte) error {
 	return ErrSyntax(data, p, "duplicate object member name "+quoteName(name))
 }
 
+// ErrDuplicateNameAt is [ErrDuplicateName] for a name the generated decoder
+// matched against the document's raw bytes at p and did not keep: the name
+// is read back here, on the error path alone, so that the match itself
+// stores nothing.
+func ErrDuplicateNameAt(data []byte, p int) error {
+	name, _, _, err := parseStringBytesStrict(data, p)
+	if err != nil {
+		// The match had already established the literal; this cannot
+		// happen, and the raw bytes are the next best description.
+		name = data[p:min(p+32, len(data))]
+	}
+	return ErrDuplicateName(data, p, name)
+}
+
 func quoteName(name []byte) string {
 	b := appendQuoted(make([]byte, 0, len(name)+2), name, false, true)
 	return string(b)
