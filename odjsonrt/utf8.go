@@ -1,7 +1,6 @@
 package odjsonrt
 
 import (
-	"encoding/binary"
 	"unicode/utf8"
 )
 
@@ -37,7 +36,7 @@ func skipNonASCII(s []byte, i int) int {
 			return i
 		}
 		if i+8 <= len(s) {
-			w := binary.LittleEndian.Uint64(s[i:])
+			w := load64(s, i)
 			// Two three byte sequences. The mask keeps the top nibble of
 			// each lead and the top two bits of each continuation byte;
 			// the range test on the lead then excludes E0 and ED, whose
@@ -69,7 +68,7 @@ func skipNonASCII(s []byte, i int) int {
 				continue
 			}
 		} else if i+4 <= len(s) {
-			w := binary.LittleEndian.Uint32(s[i:])
+			w := load32(s, i)
 			if w&0xC0C0F0 == 0x8080E0 && cjkLead(b) {
 				i += 3
 				continue

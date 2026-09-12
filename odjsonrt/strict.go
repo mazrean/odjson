@@ -102,7 +102,7 @@ func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, er
 		// also stops at the first non-ASCII byte, which starts a run for
 		// skipNonASCII.
 		for i+8 <= len(data) {
-			w := binary.LittleEndian.Uint64(data[i:])
+			w := load64(data, i)
 			if m := swarStringStop(w) | w&swarHi; m != 0 {
 				i += swarIndex(m)
 				break
@@ -154,7 +154,7 @@ func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, er
 					// reports what it refuses.
 				} else {
 					for i+8 <= len(data) {
-						w := binary.LittleEndian.Uint64(data[i:])
+						w := load64(data, i)
 						if w&swarHi == 0 || swarStringStop(w) != 0 || !swarLatin(w) {
 							break
 						}

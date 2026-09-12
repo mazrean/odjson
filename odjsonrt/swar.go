@@ -1,7 +1,6 @@
 package odjsonrt
 
 import (
-	"encoding/binary"
 	"math/bits"
 )
 
@@ -100,7 +99,7 @@ func swarBelow(w uint64, n int) uint64 {
 func ASCII(b []byte) bool {
 	i := 0
 	for ; i+8 <= len(b); i += 8 {
-		if binary.LittleEndian.Uint64(b[i:])&swarHi != 0 {
+		if load64(b, i)&swarHi != 0 {
 			return false
 		}
 	}

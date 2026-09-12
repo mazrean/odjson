@@ -1,7 +1,6 @@
 package odjsonrt
 
 import (
-	"encoding/binary"
 	"math/bits"
 )
 
@@ -40,14 +39,17 @@ func skipSpaceSlow(data []byte, p int) int {
 	// the run ends on, the loop below takes over, and it is a run of
 	// nothing but spaces when it finds a non-space byte right away.
 	if p+17 <= len(data) && data[p] == '\n' {
-		n0 := bits.TrailingZeros64(binary.LittleEndian.Uint64(data[p+1:])^allSpaces) / 8
-		n1 := bits.TrailingZeros64(binary.LittleEndian.Uint64(data[p+9:])^allSpaces) / 8
+		// The two words are sliced to their exact extent so that the
+		// loads carry no bounds test of their own: the one test above
+		// covers both.
+		n0 := bits.TrailingZeros64(load64(data, p+1)^allSpaces) / 8
+		n1 := bits.TrailingZeros64(load64(data, p+9)^allSpaces) / 8
 		p += 1 + n0 + n1&-(n0>>3)
 	}
 	for p < len(data) && spaceSet[data[p]] {
 		p++
 		for p+8 <= len(data) {
-			n := bits.TrailingZeros64(binary.LittleEndian.Uint64(data[p:])^allSpaces) / 8
+			n := bits.TrailingZeros64(load64(data, p)^allSpaces) / 8
 			p += n
 			if n < 8 {
 				break
@@ -202,7 +204,7 @@ func scanString(data []byte, p int) (end int, hasEscape, nonASCII bool, err erro
 		// the run is over, whether it contained non-ASCII.
 		var hi uint64
 		for i+8 <= len(data) {
-			w := binary.LittleEndian.Uint64(data[i:])
+			w := load64(data, i)
 			if m := swarStringStop(w); m != 0 {
 				k := swarIndex(m)
 				hi |= swarBelow(w, k)
