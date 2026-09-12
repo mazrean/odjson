@@ -15,7 +15,7 @@ func SkipSpace(data []byte, p int) int {
 	// value is greater, so one comparison settles the common case. Keeping
 	// this body tiny matters: it is called between every token, and it stops
 	// being inlined the moment it grows.
-	if p < len(data) && data[p] > ' ' {
+	if uint(p) < uint(len(data)) && data[p] > ' ' {
 		return p
 	}
 	return skipSpaceSlow(data, p)
@@ -26,7 +26,7 @@ func skipSpaceSlow(data []byte, p int) int {
 	// The one space after a colon is the commonest run by far, and it is
 	// settled by the next byte: p+1 is a constant offset, not a value
 	// computed from the data, so nothing waits on the word scan below.
-	if p+1 < len(data) && data[p] == ' ' && data[p+1] > ' ' {
+	if uint(p+1) < uint(len(data)) && data[p] == ' ' && data[p+1] > ' ' {
 		return p + 1
 	}
 	// An indented document is mostly a newline followed by a run of
@@ -38,7 +38,7 @@ func skipSpaceSlow(data []byte, p int) int {
 	// tests each word mispredicts on most of them; this does not. Whatever
 	// the run ends on, the loop below takes over, and it is a run of
 	// nothing but spaces when it finds a non-space byte right away.
-	if p+17 <= len(data) && data[p] == '\n' {
+	if uint(p+17) <= uint(len(data)) && data[p] == '\n' {
 		// The two words are sliced to their exact extent so that the
 		// loads carry no bounds test of their own: the one test above
 		// covers both.
@@ -46,7 +46,7 @@ func skipSpaceSlow(data []byte, p int) int {
 		n1 := bits.TrailingZeros64(load64(data, p+9)^allSpaces) / 8
 		p += 1 + n0 + n1&-(n0>>3)
 	}
-	for p < len(data) && spaceSet[data[p]] {
+	for uint(p) < uint(len(data)) && spaceSet[data[p]] {
 		p++
 		for p+8 <= len(data) {
 			n := bits.TrailingZeros64(load64(data, p)^allSpaces) / 8
@@ -73,7 +73,7 @@ func SkipValue(data []byte, p int) (int, error) {
 	stack := inline[:0]
 
 	for {
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, errUnexpectedEnd(p)
 		}
 		switch c := data[p]; c {
@@ -83,7 +83,7 @@ func SkipValue(data []byte, p int) (int, error) {
 			}
 			stack = append(stack, '}')
 			p = SkipSpace(data, p+1)
-			if p < len(data) && data[p] == '}' {
+			if uint(p) < uint(len(data)) && data[p] == '}' {
 				p++
 				stack = stack[:len(stack)-1]
 				break
@@ -99,7 +99,7 @@ func SkipValue(data []byte, p int) (int, error) {
 			}
 			stack = append(stack, ']')
 			p = SkipSpace(data, p+1)
-			if p < len(data) && data[p] == ']' {
+			if uint(p) < uint(len(data)) && data[p] == ']' {
 				p++
 				stack = stack[:len(stack)-1]
 				break
@@ -143,7 +143,7 @@ func SkipValue(data []byte, p int) (int, error) {
 				return p, nil
 			}
 			p = SkipSpace(data, p)
-			if p >= len(data) {
+			if uint(p) >= uint(len(data)) {
 				return p, errUnexpectedEnd(p)
 			}
 			closer := stack[len(stack)-1]
@@ -174,7 +174,7 @@ func SkipValue(data []byte, p int) (int, error) {
 // scanKey scans an object member name followed by its colon and returns the
 // index of the first byte of the member value.
 func scanKey(data []byte, p int) (int, error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -196,7 +196,7 @@ func scanKey(data []byte, p int) (int, error) {
 // it contains any byte >= 0x80.
 func scanString(data []byte, p int) (end int, hasEscape, nonASCII bool, err error) {
 	i := p + 1
-	for i < len(data) {
+	for uint(i) < uint(len(data)) {
 		// Consume runs of ordinary characters a word at a time. The mask also
 		// locates the byte that ended the run, so a short string costs one
 		// word test instead of a byte loop. The high bits of the consumed
@@ -215,7 +215,7 @@ func scanString(data []byte, p int) (end int, hasEscape, nonASCII bool, err erro
 			i += 8
 		}
 		nonASCII = nonASCII || hi&swarHi != 0
-		if i >= len(data) {
+		if uint(i) >= uint(len(data)) {
 			break
 		}
 		switch c := data[i]; {
@@ -224,14 +224,14 @@ func scanString(data []byte, p int) (end int, hasEscape, nonASCII bool, err erro
 		case c == '\\':
 			hasEscape = true
 			i++
-			if i >= len(data) {
+			if uint(i) >= uint(len(data)) {
 				return i, hasEscape, nonASCII, errUnexpectedEnd(i)
 			}
 			switch data[i] {
 			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
 				i++
 			case 'u':
-				if i+4 >= len(data) {
+				if uint(i+4) >= uint(len(data)) {
 					return len(data), hasEscape, nonASCII, errUnexpectedEnd(len(data))
 				}
 				for k := 1; k <= 4; k++ {
@@ -276,7 +276,7 @@ func scanNumber(data []byte, p int) (int, error) {
 // is truncated.
 func scanNumberIn[Bytes []byte | string](data Bytes, p int) (end int, ok bool) {
 	i := p
-	if i < len(data) && data[i] == '-' {
+	if uint(i) < uint(len(data)) && data[i] == '-' {
 		i++
 	}
 	// Integer part.
@@ -287,38 +287,38 @@ func scanNumberIn[Bytes []byte | string](data Bytes, p int) (end int, ok bool) {
 		i++
 	case data[i] >= '1' && data[i] <= '9':
 		i++
-		for i < len(data) && data[i] >= '0' && data[i] <= '9' {
+		for uint(i) < uint(len(data)) && data[i] >= '0' && data[i] <= '9' {
 			i++
 		}
 	default:
 		return i, false
 	}
 	// Fraction.
-	if i < len(data) && data[i] == '.' {
+	if uint(i) < uint(len(data)) && data[i] == '.' {
 		i++
-		if i >= len(data) {
+		if uint(i) >= uint(len(data)) {
 			return len(data), false
 		}
 		if data[i] < '0' || data[i] > '9' {
 			return i, false
 		}
-		for i < len(data) && data[i] >= '0' && data[i] <= '9' {
+		for uint(i) < uint(len(data)) && data[i] >= '0' && data[i] <= '9' {
 			i++
 		}
 	}
 	// Exponent.
-	if i < len(data) && (data[i] == 'e' || data[i] == 'E') {
+	if uint(i) < uint(len(data)) && (data[i] == 'e' || data[i] == 'E') {
 		i++
-		if i < len(data) && (data[i] == '+' || data[i] == '-') {
+		if uint(i) < uint(len(data)) && (data[i] == '+' || data[i] == '-') {
 			i++
 		}
-		if i >= len(data) {
+		if uint(i) >= uint(len(data)) {
 			return len(data), false
 		}
 		if data[i] < '0' || data[i] > '9' {
 			return i, false
 		}
-		for i < len(data) && data[i] >= '0' && data[i] <= '9' {
+		for uint(i) < uint(len(data)) && data[i] >= '0' && data[i] <= '9' {
 			i++
 		}
 	}

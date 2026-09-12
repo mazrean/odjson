@@ -30,7 +30,7 @@ import (
 // of E0, ED, F0 and F4 has a narrower range than 80-BF, and C0, C1 and F5-FF
 // never lead anything.
 func skipNonASCII(s []byte, i int) int {
-	for i < len(s) {
+	for uint(i) < uint(len(s)) {
 		b := s[i]
 		if b < utf8.RuneSelf {
 			return i

@@ -54,7 +54,7 @@ func quoteName(name []byte) string {
 
 // parseStringBytesStrict is [ParseStringBytes] under json/v2's rules.
 func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next int, err error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return nil, false, p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -97,7 +97,7 @@ func skipStringStrict(data []byte, p int) (int, error) {
 // for a body that is not UTF-8.
 func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, err error) {
 	i := p + 1
-	for i < len(data) {
+	for uint(i) < uint(len(data)) {
 		// The run of ordinary ASCII is consumed a word at a time; the mask
 		// also stops at the first non-ASCII byte, which starts a run for
 		// skipNonASCII.
@@ -109,7 +109,7 @@ func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, er
 			}
 			i += 8
 		}
-		if i >= len(data) {
+		if uint(i) >= uint(len(data)) {
 			break
 		}
 		switch c := data[i]; {
@@ -118,14 +118,14 @@ func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, er
 		case c == '\\':
 			hasEscape = true
 			i++
-			if i >= len(data) {
+			if uint(i) >= uint(len(data)) {
 				return i, hasEscape, nonASCII, errUnexpectedEnd(i)
 			}
 			switch data[i] {
 			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
 				i++
 			case 'u':
-				if i+4 >= len(data) {
+				if uint(i+4) >= uint(len(data)) {
 					return len(data), hasEscape, nonASCII, errUnexpectedEnd(len(data))
 				}
 				for k := 1; k <= 4; k++ {
@@ -146,9 +146,9 @@ func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, er
 			// the words after it are taken whole while they are accented
 			// Latin text (see swarLatin), which would otherwise stop the
 			// scan at every letter.
-			if c-0xC2 < 0x1E && i+1 < len(data) && data[i+1]&0xC0 == 0x80 {
+			if c-0xC2 < 0x1E && uint(i+1) < uint(len(data)) && data[i+1]&0xC0 == 0x80 {
 				i += 2
-				if i < len(data) && data[i] >= utf8.RuneSelf {
+				if uint(i) < uint(len(data)) && data[i] >= utf8.RuneSelf {
 					// A dense run (Cyrillic, Greek): skipNonASCII takes
 					// it a word at a time; the ordinary path below
 					// reports what it refuses.
@@ -215,7 +215,7 @@ func validEscapes(s []byte) bool {
 // an unpaired surrogate escape are errors rather than U+FFFD. The result is
 // interned through c when it is not nil.
 func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return "", p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -249,7 +249,7 @@ func ParseStringInnerStrict(data []byte, p int) ([]byte, int, error) {
 
 // ParseKeyStrict is [ParseKey] under json/v2's rules.
 func ParseKeyStrict(data []byte, p int) (key []byte, next int, err error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return nil, p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -283,7 +283,7 @@ func ParseBase64Strict(data []byte, p int) ([]byte, int, error) {
 
 // ParseNumberStringStrict is [ParseNumberString] under json/v2's rules.
 func ParseNumberStringStrict(data []byte, p int) (string, int, error) {
-	if p < len(data) && data[p] == '"' {
+	if uint(p) < uint(len(data)) && data[p] == '"' {
 		s, _, next, err := parseStringBytesStrict(data, p)
 		if err != nil {
 			return "", next, err
@@ -298,7 +298,7 @@ func ParseNumberStringStrict(data []byte, p int) (string, int, error) {
 
 // ParseTextUnmarshalerStrict is [ParseTextUnmarshaler] under json/v2's rules.
 func ParseTextUnmarshalerStrict(data []byte, p int, u encoding.TextUnmarshaler) (int, error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -389,7 +389,7 @@ func nameHash(b []byte) uint64 {
 func strictKey(data []byte, p int, names [][]byte, lv *strictLevel) ([][]byte, int, error) {
 	// ParseKeyStrict's work, without its layers: the name is scanned in
 	// place, and only an escaped one is decoded.
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return names, p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -445,7 +445,7 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 	levels := levelsBuf[:0]
 
 	for {
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return p, errUnexpectedEnd(p)
 		}
 		switch c := data[p]; c {
@@ -455,7 +455,7 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 			}
 			stack = append(stack, '}')
 			p = SkipSpace(data, p+1)
-			if p < len(data) && data[p] == '}' {
+			if uint(p) < uint(len(data)) && data[p] == '}' {
 				p++
 				stack = stack[:len(stack)-1]
 				break
@@ -472,7 +472,7 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 			}
 			stack = append(stack, ']')
 			p = SkipSpace(data, p+1)
-			if p < len(data) && data[p] == ']' {
+			if uint(p) < uint(len(data)) && data[p] == ']' {
 				p++
 				stack = stack[:len(stack)-1]
 				break
@@ -515,7 +515,7 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 				return p, nil
 			}
 			p = SkipSpace(data, p)
-			if p >= len(data) {
+			if uint(p) >= uint(len(data)) {
 				return p, errUnexpectedEnd(p)
 			}
 			closer := stack[len(stack)-1]

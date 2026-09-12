@@ -24,7 +24,7 @@ func ParseString(data []byte, p int) (string, int, error) {
 // ParseStringCached is [ParseString] with a string cache: a literal that
 // needed no unescaping is interned through c, which may be nil.
 func ParseStringCached(data []byte, p int, c *StringCache) (string, int, error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return "", p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -73,7 +73,7 @@ func adoptString(b []byte, aliased bool) string {
 // Escape handling matches encoding/json: unpaired surrogates and invalid
 // UTF-8 bytes decode to U+FFFD.
 func ParseStringBytes(data []byte, p int) (s []byte, aliased bool, next int, err error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return nil, false, p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -108,7 +108,7 @@ func ParseStringInner(data []byte, p int) (inner []byte, next int, err error) {
 // whitespace already consumed. As with [ParseStringBytes], aliased reports
 // whether key is a sub-slice of data.
 func ParseKey(data []byte, p int) (key []byte, aliased bool, next int, err error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return nil, false, p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -131,7 +131,7 @@ func ParseKey(data []byte, p int) (key []byte, aliased bool, next int, err error
 // member value's first byte. Generated decoders call it after matching a
 // name against the document's raw bytes; the errors are [ParseKey]'s.
 func AfterKey(data []byte, p int) (int, error) {
-	if p < len(data) && data[p] == ':' {
+	if uint(p) < uint(len(data)) && data[p] == ':' {
 		return SkipSpace(data, p+1), nil
 	}
 	return afterKeySlow(data, p)
@@ -147,7 +147,7 @@ func AfterKey(data []byte, p int) (int, error) {
 func AfterName(data []byte, p int) int {
 	// Two bytes past the colon exist in any document that is not cut off,
 	// since a comma or a bracket follows the value.
-	if p+2 < len(data) && data[p] == ':' {
+	if uint(p+2) < uint(len(data)) && data[p] == ':' {
 		if data[p+1] > ' ' {
 			return p + 1
 		}
@@ -160,7 +160,7 @@ func AfterName(data []byte, p int) int {
 
 func afterKeySlow(data []byte, p int) (int, error) {
 	p = SkipSpace(data, p)
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return p, errUnexpectedEnd(p)
 	}
 	if data[p] != ':' {
@@ -204,13 +204,13 @@ func parseIntSlow(data []byte, p int, bits int) (int64, int, error) {
 // digits, is left to the general path, which also produces the right error.
 func ParseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 	i := p
-	neg := i < len(data) && data[i] == '-'
+	neg := uint(i) < uint(len(data)) && data[i] == '-'
 	if neg {
 		i++
 	}
 	start := i
 	var u uint64
-	for i < len(data) {
+	for uint(i) < uint(len(data)) {
 		c := data[i] - '0'
 		if c > 9 {
 			break
@@ -222,7 +222,7 @@ func ParseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 	if n == 0 || n > 18 || (data[start] == '0' && n > 1) {
 		return 0, p, false
 	}
-	if i < len(data) && (data[i] == '.' || data[i] == 'e' || data[i] == 'E') {
+	if uint(i) < uint(len(data)) && (data[i] == '.' || data[i] == 'e' || data[i] == 'E') {
 		return 0, p, false
 	}
 	if neg {
@@ -293,13 +293,13 @@ var pow10f32 = [...]float32{1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e
 // malformed literal, is declined and left to the general path.
 func ParseSimpleFloat(data []byte, p int, bits int) (float64, int, bool) {
 	i := p
-	neg := i < len(data) && data[i] == '-'
+	neg := uint(i) < uint(len(data)) && data[i] == '-'
 	if neg {
 		i++
 	}
 	start := i
 	var m uint64
-	for i < len(data) {
+	for uint(i) < uint(len(data)) {
 		c := data[i] - '0'
 		if c > 9 {
 			break
@@ -312,10 +312,10 @@ func ParseSimpleFloat(data []byte, p int, bits int) (float64, int, bool) {
 		return 0, p, false
 	}
 	frac := 0
-	if i < len(data) && data[i] == '.' {
+	if uint(i) < uint(len(data)) && data[i] == '.' {
 		i++
 		fs := i
-		for i < len(data) {
+		for uint(i) < uint(len(data)) {
 			c := data[i] - '0'
 			if c > 9 {
 				break
@@ -329,7 +329,7 @@ func ParseSimpleFloat(data []byte, p int, bits int) (float64, int, bool) {
 		}
 		digits += frac
 	}
-	if digits > 19 || i < len(data) && (data[i] == 'e' || data[i] == 'E') {
+	if digits > 19 || uint(i) < uint(len(data)) && (data[i] == 'e' || data[i] == 'E') {
 		return 0, p, false
 	}
 	var f float64
@@ -355,7 +355,7 @@ func ParseSimpleFloat(data []byte, p int, bits int) (float64, int, bool) {
 // itself a valid JSON number, which is what encoding/json does for json.Number
 // fields. Any other value, or a string that is not a number, is a [TypeError].
 func ParseNumberString(data []byte, p int) (string, int, error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return "", p, errUnexpectedEnd(p)
 	}
 	if data[p] == '"' {
@@ -378,7 +378,7 @@ func ParseNumberString(data []byte, p int) (string, int, error) {
 // numberLiteral validates that a JSON number starts at p and returns the index
 // just past it. A value of another kind produces a [TypeError] naming goType.
 func numberLiteral(data []byte, p int, goType string) (int, error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return p, errUnexpectedEnd(p)
 	}
 	if c := data[p]; c != '-' && (c < '0' || c > '9') {
@@ -401,7 +401,7 @@ func ParseBool(data []byte, p int) (bool, int, error) {
 }
 
 func parseBoolSlow(data []byte, p int) (bool, int, error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return false, p, errUnexpectedEnd(p)
 	}
 	switch data[p] {
@@ -425,7 +425,7 @@ func ParseNull(data []byte, p int) (next int, ok bool) {
 	// The leading byte settles it for every value that is not null, which is
 	// almost all of them; keeping that test in the caller's inlined body is
 	// worth several percent of a decode.
-	if p < len(data) && data[p] == 'n' && isNull(data, p) {
+	if uint(p) < uint(len(data)) && data[p] == 'n' && isNull(data, p) {
 		return p + 4, true
 	}
 	return p, false
@@ -473,7 +473,7 @@ func ParseUnmarshaler(data []byte, p int, u json.Unmarshaler) (int, error) {
 // content to u.UnmarshalText. The slice may alias data and must not be
 // retained by u.
 func ParseTextUnmarshaler(data []byte, p int, u encoding.TextUnmarshaler) (int, error) {
-	if p >= len(data) {
+	if uint(p) >= uint(len(data)) {
 		return p, errUnexpectedEnd(p)
 	}
 	if data[p] != '"' {
@@ -559,7 +559,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 	var v any
 
 	for {
-		if p >= len(data) {
+		if uint(p) >= uint(len(data)) {
 			return nil, p, errUnexpectedEnd(p)
 		}
 		switch c := data[p]; c {
@@ -569,7 +569,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 			}
 			obj := make(map[string]any)
 			p = SkipSpace(data, p+1)
-			if p < len(data) && data[p] == '}' {
+			if uint(p) < uint(len(data)) && data[p] == '}' {
 				p++
 				v = obj
 				break
@@ -586,7 +586,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 				return nil, p, ErrSyntax(data, p, "exceeded max depth")
 			}
 			p = SkipSpace(data, p+1)
-			if p < len(data) && data[p] == ']' {
+			if uint(p) < uint(len(data)) && data[p] == ']' {
 				p++
 				v = []any{}
 				break
@@ -664,7 +664,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 				f.arr = append(f.arr, v)
 			}
 			p = SkipSpace(data, p)
-			if p >= len(data) {
+			if uint(p) >= uint(len(data)) {
 				return nil, p, errUnexpectedEnd(p)
 			}
 			isObj := f.obj != nil
