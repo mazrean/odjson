@@ -125,6 +125,9 @@ func (v *Item) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	return dst, nil
 }
 
+// odjsonCapItemTags remembers how long v.Tags has been, to allocate it once.
+var odjsonCapItemTags odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -200,8 +203,8 @@ func (v *Item) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -356,7 +359,7 @@ func (v *Item) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s38) == 0 {
-						s38 = make([]string, 0, 4)
+						s38 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapItemTags))
 					}
 					for {
 						var e39 string
@@ -386,6 +389,7 @@ func (v *Item) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapItemTags.Record(len(s38))
 				}
 				if s38 == nil {
 					s38 = []string{}
@@ -502,8 +506,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -514,56 +517,56 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			switch rest[3] {
 			case '"':
 				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
-					idx, key, p = 0, rest[1:3], p+4
+					idx, p = 0, p+4
 				}
 			case 'i':
 				if len(rest) >= 6 && string(rest[:6]) == "\"uuid\"" {
-					idx, key, p = 1, rest[1:5], p+6
+					idx, p = 1, p+6
 				}
 			case 'm':
 				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
-					idx, key, p = 2, rest[1:5], p+6
+					idx, p = 2, p+6
 				}
 			case 'a':
 				if len(rest) >= 7 && string(rest[:7]) == "\"email\"" {
-					idx, key, p = 3, rest[1:6], p+7
+					idx, p = 3, p+7
 				}
 			case 'e':
 				if len(rest) >= 12 && string(rest[:12]) == "\"created_at\"" {
-					idx, key, p = 4, rest[1:11], p+12
+					idx, p = 4, p+12
 				}
 			case 'o':
 				if len(rest) >= 7 && string(rest[:7]) == "\"score\"" {
-					idx, key, p = 5, rest[1:6], p+7
+					idx, p = 5, p+7
 				}
 			case 'u':
 				if len(rest) >= 7 && string(rest[:7]) == "\"count\"" {
-					idx, key, p = 6, rest[1:6], p+7
+					idx, p = 6, p+7
 				}
 			case 't':
 				switch rest[2] {
 				case 'c':
 					if len(rest) >= 8 && string(rest[:8]) == "\"active\"" {
-						idx, key, p = 7, rest[1:7], p+8
+						idx, p = 7, p+8
 					}
 				case 't':
 					if len(rest) >= 7 && string(rest[:7]) == "\"attrs\"" {
-						idx, key, p = 9, rest[1:6], p+7
+						idx, p = 9, p+7
 					}
 				}
 			case 'g':
 				if len(rest) >= 6 && string(rest[:6]) == "\"tags\"" {
-					idx, key, p = 8, rest[1:5], p+6
+					idx, p = 8, p+6
 				}
 			case 'n':
 				if len(rest) >= 7 && string(rest[:7]) == "\"owner\"" {
-					idx, key, p = 10, rest[1:6], p+7
+					idx, p = 10, p+7
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -600,7 +603,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np53, ok54 := odjsonrt.ParseNull(data, p); ok54 {
@@ -621,7 +624,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np59, ok60 := odjsonrt.ParseNull(data, p); ok60 {
@@ -637,7 +640,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 2:
 			if strict && seen[0]&(1<<2) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 2
 			if np62, ok63 := odjsonrt.ParseNull(data, p); ok63 {
@@ -653,7 +656,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 3:
 			if strict && seen[0]&(1<<3) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 3
 			if np65, ok66 := odjsonrt.ParseNull(data, p); ok66 {
@@ -669,7 +672,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 4:
 			if strict && seen[0]&(1<<4) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 4
 			if np68, ok69 := odjsonrt.ParseNull(data, p); ok69 {
@@ -683,7 +686,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 5:
 			if strict && seen[0]&(1<<5) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 5
 			if np70, ok71 := odjsonrt.ParseNull(data, p); ok71 {
@@ -704,7 +707,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 6:
 			if strict && seen[0]&(1<<6) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 6
 			if np76, ok77 := odjsonrt.ParseNull(data, p); ok77 {
@@ -725,7 +728,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 7:
 			if strict && seen[0]&(1<<7) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 7
 			if np82, ok83 := odjsonrt.ParseNull(data, p); ok83 {
@@ -749,7 +752,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 8:
 			if strict && seen[0]&(1<<8) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 8
 			if np85, ok86 := odjsonrt.ParseNull(data, p); ok86 {
@@ -766,7 +769,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s87) == 0 {
-						s87 = make([]string, 0, 4)
+						s87 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapItemTags))
 					}
 					for {
 						var e88 string
@@ -797,6 +800,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapItemTags.Record(len(s87))
 				}
 				if s87 == nil {
 					s87 = []string{}
@@ -805,7 +809,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 9:
 			if strict && seen[0]&(1<<9) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 9
 			if np92, ok93 := odjsonrt.ParseNull(data, p); ok93 {
@@ -880,7 +884,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 10:
 			if strict && seen[0]&(1<<10) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 10
 			if np102, ok103 := odjsonrt.ParseNull(data, p); ok103 {
@@ -897,12 +901,12 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -918,6 +922,7 @@ func (v *Item) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -1163,7 +1168,7 @@ func (v *Item) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp123++
 				} else {
 					if cap(s126) == 0 {
-						s126 = make([]string, 0, 4)
+						s126 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapItemTags))
 					}
 					for {
 						var e127 string
@@ -1194,6 +1199,7 @@ func (v *Item) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						return odjsonrt.ErrSyntax(val122, vp123, "after array element")
 					}
+					odjsonCapItemTags.Record(len(s126))
 				}
 				if s126 == nil {
 					s126 = []string{}
@@ -1426,8 +1432,8 @@ func (v *Owner) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -1527,8 +1533,7 @@ func (v *Owner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -1539,21 +1544,21 @@ func (v *Owner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			switch rest[1] {
 			case 'i':
 				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
-					idx, key, p = 0, rest[1:3], p+4
+					idx, p = 0, p+4
 				}
 			case 'n':
 				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
-					idx, key, p = 1, rest[1:5], p+6
+					idx, p = 1, p+6
 				}
 			case 'r':
 				if len(rest) >= 6 && string(rest[:6]) == "\"role\"" {
-					idx, key, p = 2, rest[1:5], p+6
+					idx, p = 2, p+6
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -1574,7 +1579,7 @@ func (v *Owner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np153, ok154 := odjsonrt.ParseNull(data, p); ok154 {
@@ -1595,7 +1600,7 @@ func (v *Owner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np159, ok160 := odjsonrt.ParseNull(data, p); ok160 {
@@ -1611,7 +1616,7 @@ func (v *Owner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 2:
 			if strict && seen[0]&(1<<2) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 2
 			if np162, ok163 := odjsonrt.ParseNull(data, p); ok163 {
@@ -1627,12 +1632,12 @@ func (v *Owner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -1648,6 +1653,7 @@ func (v *Owner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -1888,6 +1894,9 @@ func (v *Page) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	return dst, nil
 }
 
+// odjsonCapPageItems remembers how long v.Items has been, to allocate it once.
+var odjsonCapPageItems odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -1928,8 +1937,8 @@ func (v *Page) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -1963,7 +1972,7 @@ func (v *Page) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s174) == 0 {
-						s174 = make([]Item, 0, 4)
+						s174 = make([]Item, 0, odjsonrt.CapFor[Item](&odjsonCapPageItems))
 					}
 					for {
 						var e175 Item
@@ -1986,6 +1995,7 @@ func (v *Page) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapPageItems.Record(len(s174))
 				}
 				if s174 == nil {
 					s174 = []Item{}
@@ -2062,8 +2072,7 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -2074,21 +2083,21 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			switch rest[1] {
 			case 'i':
 				if len(rest) >= 7 && string(rest[:7]) == "\"items\"" {
-					idx, key, p = 0, rest[1:6], p+7
+					idx, p = 0, p+7
 				}
 			case 't':
 				if len(rest) >= 7 && string(rest[:7]) == "\"total\"" {
-					idx, key, p = 1, rest[1:6], p+7
+					idx, p = 1, p+7
 				}
 			case 'n':
 				if len(rest) >= 13 && string(rest[:13]) == "\"next_cursor\"" {
-					idx, key, p = 2, rest[1:12], p+13
+					idx, p = 2, p+13
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -2109,7 +2118,7 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np185, ok186 := odjsonrt.ParseNull(data, p); ok186 {
@@ -2126,7 +2135,7 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s187) == 0 {
-						s187 = make([]Item, 0, 4)
+						s187 = make([]Item, 0, odjsonrt.CapFor[Item](&odjsonCapPageItems))
 					}
 					for {
 						var e188 Item
@@ -2149,6 +2158,7 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapPageItems.Record(len(s187))
 				}
 				if s187 == nil {
 					s187 = []Item{}
@@ -2157,7 +2167,7 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np189, ok190 := odjsonrt.ParseNull(data, p); ok190 {
@@ -2178,7 +2188,7 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 2:
 			if strict && seen[0]&(1<<2) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 2
 			if np195, ok196 := odjsonrt.ParseNull(data, p); ok196 {
@@ -2194,12 +2204,12 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -2215,6 +2225,7 @@ func (v *Page) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -2291,7 +2302,7 @@ func (v *Page) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 				}
 				s198 := v.Items[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s198) == 0 {
-					s198 = make([]Item, 0, 4)
+					s198 = make([]Item, 0, odjsonrt.CapFor[Item](&odjsonCapPageItems))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e199 Item
@@ -2302,6 +2313,9 @@ func (v *Page) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s198) > 0 {
+					odjsonCapPageItems.Record(len(s198))
 				}
 				if s198 == nil {
 					s198 = []Item{}
@@ -2457,6 +2471,9 @@ func (v *Text) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	return dst, nil
 }
 
+// odjsonCapTextLines remembers how long v.Lines has been, to allocate it once.
+var odjsonCapTextLines odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -2484,8 +2501,8 @@ func (v *Text) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 			idx, p = 0, p+7
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -2515,7 +2532,7 @@ func (v *Text) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s207) == 0 {
-						s207 = make([]string, 0, 4)
+						s207 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapTextLines))
 					}
 					for {
 						var e208 string
@@ -2545,6 +2562,7 @@ func (v *Text) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapTextLines.Record(len(s207))
 				}
 				if s207 == nil {
 					s207 = []string{}
@@ -2594,8 +2612,7 @@ func (v *Text) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -2603,11 +2620,11 @@ func (v *Text) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		idx := -1
 		rest := data[p:]
 		if len(rest) >= 7 && string(rest[:7]) == "\"lines\"" {
-			idx, key, p = 0, rest[1:6], p+7
+			idx, p = 0, p+7
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -2624,7 +2641,7 @@ func (v *Text) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np212, ok213 := odjsonrt.ParseNull(data, p); ok213 {
@@ -2641,7 +2658,7 @@ func (v *Text) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s214) == 0 {
-						s214 = make([]string, 0, 4)
+						s214 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapTextLines))
 					}
 					for {
 						var e215 string
@@ -2672,6 +2689,7 @@ func (v *Text) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapTextLines.Record(len(s214))
 				}
 				if s214 == nil {
 					s214 = []string{}
@@ -2680,12 +2698,12 @@ func (v *Text) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -2701,6 +2719,7 @@ func (v *Text) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -2777,7 +2796,7 @@ func (v *Text) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp220++
 				} else {
 					if cap(s223) == 0 {
-						s223 = make([]string, 0, 4)
+						s223 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapTextLines))
 					}
 					for {
 						var e224 string
@@ -2808,6 +2827,7 @@ func (v *Text) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						return odjsonrt.ErrSyntax(val219, vp220, "after array element")
 					}
+					odjsonCapTextLines.Record(len(s223))
 				}
 				if s223 == nil {
 					s223 = []string{}
@@ -2930,6 +2950,9 @@ func (v *IDs) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	return dst, nil
 }
 
+// odjsonCapIDsValues remembers how long v.Values has been, to allocate it once.
+var odjsonCapIDsValues odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -2957,8 +2980,8 @@ func (v *IDs) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 			idx, p = 0, p+8
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -2988,7 +3011,7 @@ func (v *IDs) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s231) == 0 {
-						s231 = make([]string, 0, 4)
+						s231 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapIDsValues))
 					}
 					for {
 						var e232 string
@@ -3018,6 +3041,7 @@ func (v *IDs) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapIDsValues.Record(len(s231))
 				}
 				if s231 == nil {
 					s231 = []string{}
@@ -3067,8 +3091,7 @@ func (v *IDs) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -3076,11 +3099,11 @@ func (v *IDs) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 		idx := -1
 		rest := data[p:]
 		if len(rest) >= 8 && string(rest[:8]) == "\"values\"" {
-			idx, key, p = 0, rest[1:7], p+8
+			idx, p = 0, p+8
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -3097,7 +3120,7 @@ func (v *IDs) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np236, ok237 := odjsonrt.ParseNull(data, p); ok237 {
@@ -3114,7 +3137,7 @@ func (v *IDs) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s238) == 0 {
-						s238 = make([]string, 0, 4)
+						s238 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapIDsValues))
 					}
 					for {
 						var e239 string
@@ -3145,6 +3168,7 @@ func (v *IDs) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapIDsValues.Record(len(s238))
 				}
 				if s238 == nil {
 					s238 = []string{}
@@ -3153,12 +3177,12 @@ func (v *IDs) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -3174,6 +3198,7 @@ func (v *IDs) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -3250,7 +3275,7 @@ func (v *IDs) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					vp244++
 				} else {
 					if cap(s247) == 0 {
-						s247 = make([]string, 0, 4)
+						s247 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapIDsValues))
 					}
 					for {
 						var e248 string
@@ -3281,6 +3306,7 @@ func (v *IDs) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 						}
 						return odjsonrt.ErrSyntax(val243, vp244, "after array element")
 					}
+					odjsonCapIDsValues.Record(len(s247))
 				}
 				if s247 == nil {
 					s247 = []string{}
@@ -3421,8 +3447,8 @@ func (v *Generic) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 			idx, p = 0, p+9
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -3492,8 +3518,7 @@ func (v *Generic) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -3501,11 +3526,11 @@ func (v *Generic) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		idx := -1
 		rest := data[p:]
 		if len(rest) >= 9 && string(rest[:9]) == "\"payload\"" {
-			idx, key, p = 0, rest[1:8], p+9
+			idx, p = 0, p+9
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -3522,7 +3547,7 @@ func (v *Generic) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np255, ok256 := odjsonrt.ParseNull(data, p); ok256 {
@@ -3538,12 +3563,12 @@ func (v *Generic) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -3559,6 +3584,7 @@ func (v *Generic) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -3817,6 +3843,24 @@ func (v *Numbers) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 	return dst, nil
 }
 
+// odjsonCapNumbersI64 remembers how long v.I64 has been, to allocate it once.
+var odjsonCapNumbersI64 odjsonrt.CapHint
+
+// odjsonCapNumbersU64 remembers how long v.U64 has been, to allocate it once.
+var odjsonCapNumbersU64 odjsonrt.CapHint
+
+// odjsonCapNumbersI16 remembers how long v.I16 has been, to allocate it once.
+var odjsonCapNumbersI16 odjsonrt.CapHint
+
+// odjsonCapNumbersF32 remembers how long v.F32 has been, to allocate it once.
+var odjsonCapNumbersF32 odjsonrt.CapHint
+
+// odjsonCapNumbersF64 remembers how long v.F64 has been, to allocate it once.
+var odjsonCapNumbersF64 odjsonrt.CapHint
+
+// odjsonCapNumbersSci remembers how long v.Sci has been, to allocate it once.
+var odjsonCapNumbersSci odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -3879,8 +3923,8 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -3920,7 +3964,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 					p++
 				} else {
 					if cap(s271) == 0 {
-						s271 = make([]int64, 0, 4)
+						s271 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapNumbersI64))
 					}
 					for {
 						var e272 int64
@@ -3955,6 +3999,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersI64.Record(len(s271))
 				}
 				if s271 == nil {
 					s271 = []int64{}
@@ -3976,7 +4021,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 					p++
 				} else {
 					if cap(s281) == 0 {
-						s281 = make([]uint64, 0, 4)
+						s281 = make([]uint64, 0, odjsonrt.CapFor[uint64](&odjsonCapNumbersU64))
 					}
 					for {
 						var e282 uint64
@@ -4011,6 +4056,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersU64.Record(len(s281))
 				}
 				if s281 == nil {
 					s281 = []uint64{}
@@ -4032,7 +4078,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 					p++
 				} else {
 					if cap(s291) == 0 {
-						s291 = make([]int16, 0, 4)
+						s291 = make([]int16, 0, odjsonrt.CapFor[int16](&odjsonCapNumbersI16))
 					}
 					for {
 						var e292 int16
@@ -4067,6 +4113,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersI16.Record(len(s291))
 				}
 				if s291 == nil {
 					s291 = []int16{}
@@ -4088,7 +4135,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 					p++
 				} else {
 					if cap(s301) == 0 {
-						s301 = make([]float32, 0, 4)
+						s301 = make([]float32, 0, odjsonrt.CapFor[float32](&odjsonCapNumbersF32))
 					}
 					for {
 						var e302 float32
@@ -4123,6 +4170,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersF32.Record(len(s301))
 				}
 				if s301 == nil {
 					s301 = []float32{}
@@ -4144,7 +4192,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 					p++
 				} else {
 					if cap(s311) == 0 {
-						s311 = make([]float64, 0, 4)
+						s311 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapNumbersF64))
 					}
 					for {
 						var e312 float64
@@ -4179,6 +4227,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersF64.Record(len(s311))
 				}
 				if s311 == nil {
 					s311 = []float64{}
@@ -4200,7 +4249,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 					p++
 				} else {
 					if cap(s321) == 0 {
-						s321 = make([]float64, 0, 4)
+						s321 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapNumbersSci))
 					}
 					for {
 						var e322 float64
@@ -4235,6 +4284,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersSci.Record(len(s321))
 				}
 				if s321 == nil {
 					s321 = []float64{}
@@ -4284,8 +4334,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -4299,40 +4348,40 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 					switch rest[2] {
 					case '6':
 						if len(rest) >= 5 && string(rest[:5]) == "\"i64\"" {
-							idx, key, p = 0, rest[1:4], p+5
+							idx, p = 0, p+5
 						}
 					case '1':
 						if len(rest) >= 5 && string(rest[:5]) == "\"i16\"" {
-							idx, key, p = 2, rest[1:4], p+5
+							idx, p = 2, p+5
 						}
 					}
 				}
 			case 'u':
 				if len(rest) >= 5 && string(rest[:5]) == "\"u64\"" {
-					idx, key, p = 1, rest[1:4], p+5
+					idx, p = 1, p+5
 				}
 			case 'f':
 				if len(rest) > 2 {
 					switch rest[2] {
 					case '3':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f32\"" {
-							idx, key, p = 3, rest[1:4], p+5
+							idx, p = 3, p+5
 						}
 					case '6':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f64\"" {
-							idx, key, p = 4, rest[1:4], p+5
+							idx, p = 4, p+5
 						}
 					}
 				}
 			case 's':
 				if len(rest) >= 5 && string(rest[:5]) == "\"sci\"" {
-					idx, key, p = 5, rest[1:4], p+5
+					idx, p = 5, p+5
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -4359,7 +4408,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np329, ok330 := odjsonrt.ParseNull(data, p); ok330 {
@@ -4376,7 +4425,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 					p++
 				} else {
 					if cap(s331) == 0 {
-						s331 = make([]int64, 0, 4)
+						s331 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapNumbersI64))
 					}
 					for {
 						var e332 int64
@@ -4412,6 +4461,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersI64.Record(len(s331))
 				}
 				if s331 == nil {
 					s331 = []int64{}
@@ -4420,7 +4470,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np339, ok340 := odjsonrt.ParseNull(data, p); ok340 {
@@ -4437,7 +4487,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 					p++
 				} else {
 					if cap(s341) == 0 {
-						s341 = make([]uint64, 0, 4)
+						s341 = make([]uint64, 0, odjsonrt.CapFor[uint64](&odjsonCapNumbersU64))
 					}
 					for {
 						var e342 uint64
@@ -4473,6 +4523,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersU64.Record(len(s341))
 				}
 				if s341 == nil {
 					s341 = []uint64{}
@@ -4481,7 +4532,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		case 2:
 			if strict && seen[0]&(1<<2) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 2
 			if np349, ok350 := odjsonrt.ParseNull(data, p); ok350 {
@@ -4498,7 +4549,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 					p++
 				} else {
 					if cap(s351) == 0 {
-						s351 = make([]int16, 0, 4)
+						s351 = make([]int16, 0, odjsonrt.CapFor[int16](&odjsonCapNumbersI16))
 					}
 					for {
 						var e352 int16
@@ -4534,6 +4585,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersI16.Record(len(s351))
 				}
 				if s351 == nil {
 					s351 = []int16{}
@@ -4542,7 +4594,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		case 3:
 			if strict && seen[0]&(1<<3) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 3
 			if np359, ok360 := odjsonrt.ParseNull(data, p); ok360 {
@@ -4559,7 +4611,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 					p++
 				} else {
 					if cap(s361) == 0 {
-						s361 = make([]float32, 0, 4)
+						s361 = make([]float32, 0, odjsonrt.CapFor[float32](&odjsonCapNumbersF32))
 					}
 					for {
 						var e362 float32
@@ -4595,6 +4647,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersF32.Record(len(s361))
 				}
 				if s361 == nil {
 					s361 = []float32{}
@@ -4603,7 +4656,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		case 4:
 			if strict && seen[0]&(1<<4) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 4
 			if np369, ok370 := odjsonrt.ParseNull(data, p); ok370 {
@@ -4620,7 +4673,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 					p++
 				} else {
 					if cap(s371) == 0 {
-						s371 = make([]float64, 0, 4)
+						s371 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapNumbersF64))
 					}
 					for {
 						var e372 float64
@@ -4656,6 +4709,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersF64.Record(len(s371))
 				}
 				if s371 == nil {
 					s371 = []float64{}
@@ -4664,7 +4718,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		case 5:
 			if strict && seen[0]&(1<<5) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 5
 			if np379, ok380 := odjsonrt.ParseNull(data, p); ok380 {
@@ -4681,7 +4735,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 					p++
 				} else {
 					if cap(s381) == 0 {
-						s381 = make([]float64, 0, 4)
+						s381 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapNumbersSci))
 					}
 					for {
 						var e382 float64
@@ -4717,6 +4771,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapNumbersSci.Record(len(s381))
 				}
 				if s381 == nil {
 					s381 = []float64{}
@@ -4725,12 +4780,12 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -4746,6 +4801,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -4842,7 +4898,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 					vp390++
 				} else {
 					if cap(s393) == 0 {
-						s393 = make([]int64, 0, 4)
+						s393 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapNumbersI64))
 					}
 					for {
 						var e394 int64
@@ -4878,6 +4934,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						return odjsonrt.ErrSyntax(val389, vp390, "after array element")
 					}
+					odjsonCapNumbersI64.Record(len(s393))
 				}
 				if s393 == nil {
 					s393 = []int64{}
@@ -4906,7 +4963,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 					vp402++
 				} else {
 					if cap(s405) == 0 {
-						s405 = make([]uint64, 0, 4)
+						s405 = make([]uint64, 0, odjsonrt.CapFor[uint64](&odjsonCapNumbersU64))
 					}
 					for {
 						var e406 uint64
@@ -4942,6 +4999,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						return odjsonrt.ErrSyntax(val401, vp402, "after array element")
 					}
+					odjsonCapNumbersU64.Record(len(s405))
 				}
 				if s405 == nil {
 					s405 = []uint64{}
@@ -4970,7 +5028,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 					vp414++
 				} else {
 					if cap(s417) == 0 {
-						s417 = make([]int16, 0, 4)
+						s417 = make([]int16, 0, odjsonrt.CapFor[int16](&odjsonCapNumbersI16))
 					}
 					for {
 						var e418 int16
@@ -5006,6 +5064,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						return odjsonrt.ErrSyntax(val413, vp414, "after array element")
 					}
+					odjsonCapNumbersI16.Record(len(s417))
 				}
 				if s417 == nil {
 					s417 = []int16{}
@@ -5034,7 +5093,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 					vp426++
 				} else {
 					if cap(s429) == 0 {
-						s429 = make([]float32, 0, 4)
+						s429 = make([]float32, 0, odjsonrt.CapFor[float32](&odjsonCapNumbersF32))
 					}
 					for {
 						var e430 float32
@@ -5070,6 +5129,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						return odjsonrt.ErrSyntax(val425, vp426, "after array element")
 					}
+					odjsonCapNumbersF32.Record(len(s429))
 				}
 				if s429 == nil {
 					s429 = []float32{}
@@ -5098,7 +5158,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 					vp438++
 				} else {
 					if cap(s441) == 0 {
-						s441 = make([]float64, 0, 4)
+						s441 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapNumbersF64))
 					}
 					for {
 						var e442 float64
@@ -5134,6 +5194,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						return odjsonrt.ErrSyntax(val437, vp438, "after array element")
 					}
+					odjsonCapNumbersF64.Record(len(s441))
 				}
 				if s441 == nil {
 					s441 = []float64{}
@@ -5162,7 +5223,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 					vp450++
 				} else {
 					if cap(s453) == 0 {
-						s453 = make([]float64, 0, 4)
+						s453 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapNumbersSci))
 					}
 					for {
 						var e454 float64
@@ -5198,6 +5259,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 						}
 						return odjsonrt.ErrSyntax(val449, vp450, "after array element")
 					}
+					odjsonCapNumbersSci.Record(len(s453))
 				}
 				if s453 == nil {
 					s453 = []float64{}
@@ -5318,6 +5380,9 @@ func (v *DenseDoc) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	return dst, nil
 }
 
+// odjsonCapDenseDocRows remembers how long v.Rows has been, to allocate it once.
+var odjsonCapDenseDocRows odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -5345,8 +5410,8 @@ func (v *DenseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 			idx, p = 0, p+6
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -5376,7 +5441,7 @@ func (v *DenseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 					p++
 				} else {
 					if cap(s464) == 0 {
-						s464 = make([]Dense, 0, 4)
+						s464 = make([]Dense, 0, odjsonrt.CapFor[Dense](&odjsonCapDenseDocRows))
 					}
 					for {
 						var e465 Dense
@@ -5399,6 +5464,7 @@ func (v *DenseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapDenseDocRows.Record(len(s464))
 				}
 				if s464 == nil {
 					s464 = []Dense{}
@@ -5448,8 +5514,7 @@ func (v *DenseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -5457,11 +5522,11 @@ func (v *DenseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		idx := -1
 		rest := data[p:]
 		if len(rest) >= 6 && string(rest[:6]) == "\"rows\"" {
-			idx, key, p = 0, rest[1:5], p+6
+			idx, p = 0, p+6
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -5478,7 +5543,7 @@ func (v *DenseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np466, ok467 := odjsonrt.ParseNull(data, p); ok467 {
@@ -5495,7 +5560,7 @@ func (v *DenseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 					p++
 				} else {
 					if cap(s468) == 0 {
-						s468 = make([]Dense, 0, 4)
+						s468 = make([]Dense, 0, odjsonrt.CapFor[Dense](&odjsonCapDenseDocRows))
 					}
 					for {
 						var e469 Dense
@@ -5518,6 +5583,7 @@ func (v *DenseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapDenseDocRows.Record(len(s468))
 				}
 				if s468 == nil {
 					s468 = []Dense{}
@@ -5526,12 +5592,12 @@ func (v *DenseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -5547,6 +5613,7 @@ func (v *DenseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -5615,7 +5682,7 @@ func (v *DenseDoc) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 				}
 				s470 := v.Rows[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s470) == 0 {
-					s470 = make([]Dense, 0, 4)
+					s470 = make([]Dense, 0, odjsonrt.CapFor[Dense](&odjsonCapDenseDocRows))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e471 Dense
@@ -5626,6 +5693,9 @@ func (v *DenseDoc) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s470) > 0 {
+					odjsonCapDenseDocRows.Record(len(s470))
 				}
 				if s470 == nil {
 					s470 = []Dense{}
@@ -6197,8 +6267,8 @@ func (v *Dense) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -7310,8 +7380,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -7326,35 +7395,35 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					switch rest[1] {
 					case 'f':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f00\"" {
-							idx, key, p = 0, rest[1:4], p+5
+							idx, p = 0, p+5
 						}
 					case 'b':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b00\"" {
-							idx, key, p = 32, rest[1:4], p+5
+							idx, p = 32, p+5
 						}
 					case 'x':
 						if len(rest) >= 5 && string(rest[:5]) == "\"x00\"" {
-							idx, key, p = 48, rest[1:4], p+5
+							idx, p = 48, p+5
 						}
 					}
 				case '1':
 					switch rest[1] {
 					case 'f':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f10\"" {
-							idx, key, p = 10, rest[1:4], p+5
+							idx, p = 10, p+5
 						}
 					case 'b':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b10\"" {
-							idx, key, p = 42, rest[1:4], p+5
+							idx, p = 42, p+5
 						}
 					}
 				case '2':
 					if len(rest) >= 5 && string(rest[:5]) == "\"f20\"" {
-						idx, key, p = 20, rest[1:4], p+5
+						idx, p = 20, p+5
 					}
 				case '3':
 					if len(rest) >= 5 && string(rest[:5]) == "\"f30\"" {
-						idx, key, p = 30, rest[1:4], p+5
+						idx, p = 30, p+5
 					}
 				}
 			case '1':
@@ -7363,35 +7432,35 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					switch rest[1] {
 					case 'f':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f01\"" {
-							idx, key, p = 1, rest[1:4], p+5
+							idx, p = 1, p+5
 						}
 					case 'b':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b01\"" {
-							idx, key, p = 33, rest[1:4], p+5
+							idx, p = 33, p+5
 						}
 					case 'x':
 						if len(rest) >= 5 && string(rest[:5]) == "\"x01\"" {
-							idx, key, p = 49, rest[1:4], p+5
+							idx, p = 49, p+5
 						}
 					}
 				case '1':
 					switch rest[1] {
 					case 'f':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f11\"" {
-							idx, key, p = 11, rest[1:4], p+5
+							idx, p = 11, p+5
 						}
 					case 'b':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b11\"" {
-							idx, key, p = 43, rest[1:4], p+5
+							idx, p = 43, p+5
 						}
 					}
 				case '2':
 					if len(rest) >= 5 && string(rest[:5]) == "\"f21\"" {
-						idx, key, p = 21, rest[1:4], p+5
+						idx, p = 21, p+5
 					}
 				case '3':
 					if len(rest) >= 5 && string(rest[:5]) == "\"f31\"" {
-						idx, key, p = 31, rest[1:4], p+5
+						idx, p = 31, p+5
 					}
 				}
 			case '2':
@@ -7400,31 +7469,31 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					switch rest[2] {
 					case '0':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f02\"" {
-							idx, key, p = 2, rest[1:4], p+5
+							idx, p = 2, p+5
 						}
 					case '1':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f12\"" {
-							idx, key, p = 12, rest[1:4], p+5
+							idx, p = 12, p+5
 						}
 					case '2':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f22\"" {
-							idx, key, p = 22, rest[1:4], p+5
+							idx, p = 22, p+5
 						}
 					}
 				case 'b':
 					switch rest[2] {
 					case '0':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b02\"" {
-							idx, key, p = 34, rest[1:4], p+5
+							idx, p = 34, p+5
 						}
 					case '1':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b12\"" {
-							idx, key, p = 44, rest[1:4], p+5
+							idx, p = 44, p+5
 						}
 					}
 				case 'x':
 					if len(rest) >= 5 && string(rest[:5]) == "\"x02\"" {
-						idx, key, p = 50, rest[1:4], p+5
+						idx, p = 50, p+5
 					}
 				}
 			case '3':
@@ -7433,31 +7502,31 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					switch rest[2] {
 					case '0':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f03\"" {
-							idx, key, p = 3, rest[1:4], p+5
+							idx, p = 3, p+5
 						}
 					case '1':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f13\"" {
-							idx, key, p = 13, rest[1:4], p+5
+							idx, p = 13, p+5
 						}
 					case '2':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f23\"" {
-							idx, key, p = 23, rest[1:4], p+5
+							idx, p = 23, p+5
 						}
 					}
 				case 'b':
 					switch rest[2] {
 					case '0':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b03\"" {
-							idx, key, p = 35, rest[1:4], p+5
+							idx, p = 35, p+5
 						}
 					case '1':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b13\"" {
-							idx, key, p = 45, rest[1:4], p+5
+							idx, p = 45, p+5
 						}
 					}
 				case 'x':
 					if len(rest) >= 5 && string(rest[:5]) == "\"x03\"" {
-						idx, key, p = 51, rest[1:4], p+5
+						idx, p = 51, p+5
 					}
 				}
 			case '4':
@@ -7466,31 +7535,31 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					switch rest[2] {
 					case '0':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f04\"" {
-							idx, key, p = 4, rest[1:4], p+5
+							idx, p = 4, p+5
 						}
 					case '1':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f14\"" {
-							idx, key, p = 14, rest[1:4], p+5
+							idx, p = 14, p+5
 						}
 					case '2':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f24\"" {
-							idx, key, p = 24, rest[1:4], p+5
+							idx, p = 24, p+5
 						}
 					}
 				case 'b':
 					switch rest[2] {
 					case '0':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b04\"" {
-							idx, key, p = 36, rest[1:4], p+5
+							idx, p = 36, p+5
 						}
 					case '1':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b14\"" {
-							idx, key, p = 46, rest[1:4], p+5
+							idx, p = 46, p+5
 						}
 					}
 				case 'x':
 					if len(rest) >= 5 && string(rest[:5]) == "\"x04\"" {
-						idx, key, p = 52, rest[1:4], p+5
+						idx, p = 52, p+5
 					}
 				}
 			case '5':
@@ -7499,31 +7568,31 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					switch rest[2] {
 					case '0':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f05\"" {
-							idx, key, p = 5, rest[1:4], p+5
+							idx, p = 5, p+5
 						}
 					case '1':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f15\"" {
-							idx, key, p = 15, rest[1:4], p+5
+							idx, p = 15, p+5
 						}
 					case '2':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f25\"" {
-							idx, key, p = 25, rest[1:4], p+5
+							idx, p = 25, p+5
 						}
 					}
 				case 'b':
 					switch rest[2] {
 					case '0':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b05\"" {
-							idx, key, p = 37, rest[1:4], p+5
+							idx, p = 37, p+5
 						}
 					case '1':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b15\"" {
-							idx, key, p = 47, rest[1:4], p+5
+							idx, p = 47, p+5
 						}
 					}
 				case 'x':
 					if len(rest) >= 5 && string(rest[:5]) == "\"x05\"" {
-						idx, key, p = 53, rest[1:4], p+5
+						idx, p = 53, p+5
 					}
 				}
 			case '6':
@@ -7532,24 +7601,24 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					switch rest[2] {
 					case '0':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f06\"" {
-							idx, key, p = 6, rest[1:4], p+5
+							idx, p = 6, p+5
 						}
 					case '1':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f16\"" {
-							idx, key, p = 16, rest[1:4], p+5
+							idx, p = 16, p+5
 						}
 					case '2':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f26\"" {
-							idx, key, p = 26, rest[1:4], p+5
+							idx, p = 26, p+5
 						}
 					}
 				case 'b':
 					if len(rest) >= 5 && string(rest[:5]) == "\"b06\"" {
-						idx, key, p = 38, rest[1:4], p+5
+						idx, p = 38, p+5
 					}
 				case 'x':
 					if len(rest) >= 5 && string(rest[:5]) == "\"x06\"" {
-						idx, key, p = 54, rest[1:4], p+5
+						idx, p = 54, p+5
 					}
 				}
 			case '7':
@@ -7558,24 +7627,24 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					switch rest[2] {
 					case '0':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f07\"" {
-							idx, key, p = 7, rest[1:4], p+5
+							idx, p = 7, p+5
 						}
 					case '1':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f17\"" {
-							idx, key, p = 17, rest[1:4], p+5
+							idx, p = 17, p+5
 						}
 					case '2':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f27\"" {
-							idx, key, p = 27, rest[1:4], p+5
+							idx, p = 27, p+5
 						}
 					}
 				case 'b':
 					if len(rest) >= 5 && string(rest[:5]) == "\"b07\"" {
-						idx, key, p = 39, rest[1:4], p+5
+						idx, p = 39, p+5
 					}
 				case 'x':
 					if len(rest) >= 5 && string(rest[:5]) == "\"x07\"" {
-						idx, key, p = 55, rest[1:4], p+5
+						idx, p = 55, p+5
 					}
 				}
 			case '8':
@@ -7584,20 +7653,20 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					switch rest[1] {
 					case 'f':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f08\"" {
-							idx, key, p = 8, rest[1:4], p+5
+							idx, p = 8, p+5
 						}
 					case 'b':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b08\"" {
-							idx, key, p = 40, rest[1:4], p+5
+							idx, p = 40, p+5
 						}
 					}
 				case '1':
 					if len(rest) >= 5 && string(rest[:5]) == "\"f18\"" {
-						idx, key, p = 18, rest[1:4], p+5
+						idx, p = 18, p+5
 					}
 				case '2':
 					if len(rest) >= 5 && string(rest[:5]) == "\"f28\"" {
-						idx, key, p = 28, rest[1:4], p+5
+						idx, p = 28, p+5
 					}
 				}
 			case '9':
@@ -7606,27 +7675,27 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					switch rest[1] {
 					case 'f':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f09\"" {
-							idx, key, p = 9, rest[1:4], p+5
+							idx, p = 9, p+5
 						}
 					case 'b':
 						if len(rest) >= 5 && string(rest[:5]) == "\"b09\"" {
-							idx, key, p = 41, rest[1:4], p+5
+							idx, p = 41, p+5
 						}
 					}
 				case '1':
 					if len(rest) >= 5 && string(rest[:5]) == "\"f19\"" {
-						idx, key, p = 19, rest[1:4], p+5
+						idx, p = 19, p+5
 					}
 				case '2':
 					if len(rest) >= 5 && string(rest[:5]) == "\"f29\"" {
-						idx, key, p = 29, rest[1:4], p+5
+						idx, p = 29, p+5
 					}
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -7753,7 +7822,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np760, ok761 := odjsonrt.ParseNull(data, p); ok761 {
@@ -7774,7 +7843,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np766, ok767 := odjsonrt.ParseNull(data, p); ok767 {
@@ -7795,7 +7864,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 2:
 			if strict && seen[0]&(1<<2) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 2
 			if np772, ok773 := odjsonrt.ParseNull(data, p); ok773 {
@@ -7816,7 +7885,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 3:
 			if strict && seen[0]&(1<<3) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 3
 			if np778, ok779 := odjsonrt.ParseNull(data, p); ok779 {
@@ -7837,7 +7906,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 4:
 			if strict && seen[0]&(1<<4) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 4
 			if np784, ok785 := odjsonrt.ParseNull(data, p); ok785 {
@@ -7858,7 +7927,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 5:
 			if strict && seen[0]&(1<<5) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 5
 			if np790, ok791 := odjsonrt.ParseNull(data, p); ok791 {
@@ -7879,7 +7948,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 6:
 			if strict && seen[0]&(1<<6) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 6
 			if np796, ok797 := odjsonrt.ParseNull(data, p); ok797 {
@@ -7900,7 +7969,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 7:
 			if strict && seen[0]&(1<<7) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 7
 			if np802, ok803 := odjsonrt.ParseNull(data, p); ok803 {
@@ -7921,7 +7990,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 8:
 			if strict && seen[0]&(1<<8) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 8
 			if np808, ok809 := odjsonrt.ParseNull(data, p); ok809 {
@@ -7942,7 +8011,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 9:
 			if strict && seen[0]&(1<<9) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 9
 			if np814, ok815 := odjsonrt.ParseNull(data, p); ok815 {
@@ -7963,7 +8032,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 10:
 			if strict && seen[0]&(1<<10) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 10
 			if np820, ok821 := odjsonrt.ParseNull(data, p); ok821 {
@@ -7984,7 +8053,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 11:
 			if strict && seen[0]&(1<<11) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 11
 			if np826, ok827 := odjsonrt.ParseNull(data, p); ok827 {
@@ -8005,7 +8074,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 12:
 			if strict && seen[0]&(1<<12) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 12
 			if np832, ok833 := odjsonrt.ParseNull(data, p); ok833 {
@@ -8026,7 +8095,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 13:
 			if strict && seen[0]&(1<<13) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 13
 			if np838, ok839 := odjsonrt.ParseNull(data, p); ok839 {
@@ -8047,7 +8116,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 14:
 			if strict && seen[0]&(1<<14) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 14
 			if np844, ok845 := odjsonrt.ParseNull(data, p); ok845 {
@@ -8068,7 +8137,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 15:
 			if strict && seen[0]&(1<<15) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 15
 			if np850, ok851 := odjsonrt.ParseNull(data, p); ok851 {
@@ -8089,7 +8158,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 16:
 			if strict && seen[0]&(1<<16) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 16
 			if np856, ok857 := odjsonrt.ParseNull(data, p); ok857 {
@@ -8110,7 +8179,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 17:
 			if strict && seen[0]&(1<<17) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 17
 			if np862, ok863 := odjsonrt.ParseNull(data, p); ok863 {
@@ -8131,7 +8200,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 18:
 			if strict && seen[0]&(1<<18) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 18
 			if np868, ok869 := odjsonrt.ParseNull(data, p); ok869 {
@@ -8152,7 +8221,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 19:
 			if strict && seen[0]&(1<<19) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 19
 			if np874, ok875 := odjsonrt.ParseNull(data, p); ok875 {
@@ -8173,7 +8242,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 20:
 			if strict && seen[0]&(1<<20) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 20
 			if np880, ok881 := odjsonrt.ParseNull(data, p); ok881 {
@@ -8194,7 +8263,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 21:
 			if strict && seen[0]&(1<<21) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 21
 			if np886, ok887 := odjsonrt.ParseNull(data, p); ok887 {
@@ -8215,7 +8284,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 22:
 			if strict && seen[0]&(1<<22) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 22
 			if np892, ok893 := odjsonrt.ParseNull(data, p); ok893 {
@@ -8236,7 +8305,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 23:
 			if strict && seen[0]&(1<<23) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 23
 			if np898, ok899 := odjsonrt.ParseNull(data, p); ok899 {
@@ -8257,7 +8326,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 24:
 			if strict && seen[0]&(1<<24) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 24
 			if np904, ok905 := odjsonrt.ParseNull(data, p); ok905 {
@@ -8278,7 +8347,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 25:
 			if strict && seen[0]&(1<<25) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 25
 			if np910, ok911 := odjsonrt.ParseNull(data, p); ok911 {
@@ -8299,7 +8368,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 26:
 			if strict && seen[0]&(1<<26) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 26
 			if np916, ok917 := odjsonrt.ParseNull(data, p); ok917 {
@@ -8320,7 +8389,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 27:
 			if strict && seen[0]&(1<<27) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 27
 			if np922, ok923 := odjsonrt.ParseNull(data, p); ok923 {
@@ -8341,7 +8410,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 28:
 			if strict && seen[0]&(1<<28) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 28
 			if np928, ok929 := odjsonrt.ParseNull(data, p); ok929 {
@@ -8362,7 +8431,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 29:
 			if strict && seen[0]&(1<<29) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 29
 			if np934, ok935 := odjsonrt.ParseNull(data, p); ok935 {
@@ -8383,7 +8452,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 30:
 			if strict && seen[0]&(1<<30) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 30
 			if np940, ok941 := odjsonrt.ParseNull(data, p); ok941 {
@@ -8404,7 +8473,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 31:
 			if strict && seen[0]&(1<<31) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 31
 			if np946, ok947 := odjsonrt.ParseNull(data, p); ok947 {
@@ -8425,7 +8494,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 32:
 			if strict && seen[0]&(1<<32) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 32
 			if np952, ok953 := odjsonrt.ParseNull(data, p); ok953 {
@@ -8449,7 +8518,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 33:
 			if strict && seen[0]&(1<<33) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 33
 			if np955, ok956 := odjsonrt.ParseNull(data, p); ok956 {
@@ -8473,7 +8542,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 34:
 			if strict && seen[0]&(1<<34) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 34
 			if np958, ok959 := odjsonrt.ParseNull(data, p); ok959 {
@@ -8497,7 +8566,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 35:
 			if strict && seen[0]&(1<<35) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 35
 			if np961, ok962 := odjsonrt.ParseNull(data, p); ok962 {
@@ -8521,7 +8590,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 36:
 			if strict && seen[0]&(1<<36) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 36
 			if np964, ok965 := odjsonrt.ParseNull(data, p); ok965 {
@@ -8545,7 +8614,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 37:
 			if strict && seen[0]&(1<<37) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 37
 			if np967, ok968 := odjsonrt.ParseNull(data, p); ok968 {
@@ -8569,7 +8638,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 38:
 			if strict && seen[0]&(1<<38) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 38
 			if np970, ok971 := odjsonrt.ParseNull(data, p); ok971 {
@@ -8593,7 +8662,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 39:
 			if strict && seen[0]&(1<<39) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 39
 			if np973, ok974 := odjsonrt.ParseNull(data, p); ok974 {
@@ -8617,7 +8686,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 40:
 			if strict && seen[0]&(1<<40) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 40
 			if np976, ok977 := odjsonrt.ParseNull(data, p); ok977 {
@@ -8641,7 +8710,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 41:
 			if strict && seen[0]&(1<<41) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 41
 			if np979, ok980 := odjsonrt.ParseNull(data, p); ok980 {
@@ -8665,7 +8734,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 42:
 			if strict && seen[0]&(1<<42) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 42
 			if np982, ok983 := odjsonrt.ParseNull(data, p); ok983 {
@@ -8689,7 +8758,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 43:
 			if strict && seen[0]&(1<<43) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 43
 			if np985, ok986 := odjsonrt.ParseNull(data, p); ok986 {
@@ -8713,7 +8782,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 44:
 			if strict && seen[0]&(1<<44) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 44
 			if np988, ok989 := odjsonrt.ParseNull(data, p); ok989 {
@@ -8737,7 +8806,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 45:
 			if strict && seen[0]&(1<<45) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 45
 			if np991, ok992 := odjsonrt.ParseNull(data, p); ok992 {
@@ -8761,7 +8830,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 46:
 			if strict && seen[0]&(1<<46) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 46
 			if np994, ok995 := odjsonrt.ParseNull(data, p); ok995 {
@@ -8785,7 +8854,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 47:
 			if strict && seen[0]&(1<<47) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 47
 			if np997, ok998 := odjsonrt.ParseNull(data, p); ok998 {
@@ -8809,7 +8878,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 48:
 			if strict && seen[0]&(1<<48) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 48
 			if np1000, ok1001 := odjsonrt.ParseNull(data, p); ok1001 {
@@ -8830,7 +8899,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 49:
 			if strict && seen[0]&(1<<49) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 49
 			if np1006, ok1007 := odjsonrt.ParseNull(data, p); ok1007 {
@@ -8851,7 +8920,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 50:
 			if strict && seen[0]&(1<<50) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 50
 			if np1012, ok1013 := odjsonrt.ParseNull(data, p); ok1013 {
@@ -8872,7 +8941,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 51:
 			if strict && seen[0]&(1<<51) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 51
 			if np1018, ok1019 := odjsonrt.ParseNull(data, p); ok1019 {
@@ -8893,7 +8962,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 52:
 			if strict && seen[0]&(1<<52) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 52
 			if np1024, ok1025 := odjsonrt.ParseNull(data, p); ok1025 {
@@ -8914,7 +8983,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 53:
 			if strict && seen[0]&(1<<53) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 53
 			if np1030, ok1031 := odjsonrt.ParseNull(data, p); ok1031 {
@@ -8935,7 +9004,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 54:
 			if strict && seen[0]&(1<<54) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 54
 			if np1036, ok1037 := odjsonrt.ParseNull(data, p); ok1037 {
@@ -8956,7 +9025,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 55:
 			if strict && seen[0]&(1<<55) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 55
 			if np1042, ok1043 := odjsonrt.ParseNull(data, p); ok1043 {
@@ -8977,12 +9046,12 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -8998,6 +9067,7 @@ func (v *Dense) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -10282,6 +10352,9 @@ func (v *SparseDoc) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, err
 	return dst, nil
 }
 
+// odjsonCapSparseDocRows remembers how long v.Rows has been, to allocate it once.
+var odjsonCapSparseDocRows odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -10309,8 +10382,8 @@ func (v *SparseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 			idx, p = 0, p+6
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -10340,7 +10413,7 @@ func (v *SparseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 					p++
 				} else {
 					if cap(s1163) == 0 {
-						s1163 = make([]Sparse, 0, 4)
+						s1163 = make([]Sparse, 0, odjsonrt.CapFor[Sparse](&odjsonCapSparseDocRows))
 					}
 					for {
 						var e1164 Sparse
@@ -10363,6 +10436,7 @@ func (v *SparseDoc) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapSparseDocRows.Record(len(s1163))
 				}
 				if s1163 == nil {
 					s1163 = []Sparse{}
@@ -10412,8 +10486,7 @@ func (v *SparseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -10421,11 +10494,11 @@ func (v *SparseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 		idx := -1
 		rest := data[p:]
 		if len(rest) >= 6 && string(rest[:6]) == "\"rows\"" {
-			idx, key, p = 0, rest[1:5], p+6
+			idx, p = 0, p+6
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -10442,7 +10515,7 @@ func (v *SparseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np1165, ok1166 := odjsonrt.ParseNull(data, p); ok1166 {
@@ -10459,7 +10532,7 @@ func (v *SparseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 					p++
 				} else {
 					if cap(s1167) == 0 {
-						s1167 = make([]Sparse, 0, 4)
+						s1167 = make([]Sparse, 0, odjsonrt.CapFor[Sparse](&odjsonCapSparseDocRows))
 					}
 					for {
 						var e1168 Sparse
@@ -10482,6 +10555,7 @@ func (v *SparseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapSparseDocRows.Record(len(s1167))
 				}
 				if s1167 == nil {
 					s1167 = []Sparse{}
@@ -10490,12 +10564,12 @@ func (v *SparseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -10511,6 +10585,7 @@ func (v *SparseDoc) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -10579,7 +10654,7 @@ func (v *SparseDoc) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCa
 				}
 				s1169 := v.Rows[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s1169) == 0 {
-					s1169 = make([]Sparse, 0, 4)
+					s1169 = make([]Sparse, 0, odjsonrt.CapFor[Sparse](&odjsonCapSparseDocRows))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e1170 Sparse
@@ -10590,6 +10665,9 @@ func (v *SparseDoc) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCa
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s1169) > 0 {
+					odjsonCapSparseDocRows.Record(len(s1169))
 				}
 				if s1169 == nil {
 					s1169 = []Sparse{}
@@ -11263,8 +11341,8 @@ func (v *Sparse) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -12119,8 +12197,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -12136,83 +12213,83 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f00\"" {
-								idx, key, p = 0, rest[1:4], p+5
+								idx, p = 0, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f10\"" {
-								idx, key, p = 10, rest[1:4], p+5
+								idx, p = 10, p+5
 							}
 						}
 					case '1':
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f01\"" {
-								idx, key, p = 1, rest[1:4], p+5
+								idx, p = 1, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f11\"" {
-								idx, key, p = 11, rest[1:4], p+5
+								idx, p = 11, p+5
 							}
 						}
 					case '2':
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f02\"" {
-								idx, key, p = 2, rest[1:4], p+5
+								idx, p = 2, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f12\"" {
-								idx, key, p = 12, rest[1:4], p+5
+								idx, p = 12, p+5
 							}
 						}
 					case '3':
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f03\"" {
-								idx, key, p = 3, rest[1:4], p+5
+								idx, p = 3, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f13\"" {
-								idx, key, p = 13, rest[1:4], p+5
+								idx, p = 13, p+5
 							}
 						}
 					case '4':
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f04\"" {
-								idx, key, p = 4, rest[1:4], p+5
+								idx, p = 4, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f14\"" {
-								idx, key, p = 14, rest[1:4], p+5
+								idx, p = 14, p+5
 							}
 						}
 					case '5':
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f05\"" {
-								idx, key, p = 5, rest[1:4], p+5
+								idx, p = 5, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"f15\"" {
-								idx, key, p = 15, rest[1:4], p+5
+								idx, p = 15, p+5
 							}
 						}
 					case '6':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f06\"" {
-							idx, key, p = 6, rest[1:4], p+5
+							idx, p = 6, p+5
 						}
 					case '7':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f07\"" {
-							idx, key, p = 7, rest[1:4], p+5
+							idx, p = 7, p+5
 						}
 					case '8':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f08\"" {
-							idx, key, p = 8, rest[1:4], p+5
+							idx, p = 8, p+5
 						}
 					case '9':
 						if len(rest) >= 5 && string(rest[:5]) == "\"f09\"" {
-							idx, key, p = 9, rest[1:4], p+5
+							idx, p = 9, p+5
 						}
 					}
 				}
@@ -12223,95 +12300,95 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s00\"" {
-								idx, key, p = 16, rest[1:4], p+5
+								idx, p = 16, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s10\"" {
-								idx, key, p = 26, rest[1:4], p+5
+								idx, p = 26, p+5
 							}
 						}
 					case '1':
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s01\"" {
-								idx, key, p = 17, rest[1:4], p+5
+								idx, p = 17, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s11\"" {
-								idx, key, p = 27, rest[1:4], p+5
+								idx, p = 27, p+5
 							}
 						}
 					case '2':
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s02\"" {
-								idx, key, p = 18, rest[1:4], p+5
+								idx, p = 18, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s12\"" {
-								idx, key, p = 28, rest[1:4], p+5
+								idx, p = 28, p+5
 							}
 						}
 					case '3':
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s03\"" {
-								idx, key, p = 19, rest[1:4], p+5
+								idx, p = 19, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s13\"" {
-								idx, key, p = 29, rest[1:4], p+5
+								idx, p = 29, p+5
 							}
 						}
 					case '4':
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s04\"" {
-								idx, key, p = 20, rest[1:4], p+5
+								idx, p = 20, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s14\"" {
-								idx, key, p = 30, rest[1:4], p+5
+								idx, p = 30, p+5
 							}
 						}
 					case '5':
 						switch rest[2] {
 						case '0':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s05\"" {
-								idx, key, p = 21, rest[1:4], p+5
+								idx, p = 21, p+5
 							}
 						case '1':
 							if len(rest) >= 5 && string(rest[:5]) == "\"s15\"" {
-								idx, key, p = 31, rest[1:4], p+5
+								idx, p = 31, p+5
 							}
 						}
 					case '6':
 						if len(rest) >= 5 && string(rest[:5]) == "\"s06\"" {
-							idx, key, p = 22, rest[1:4], p+5
+							idx, p = 22, p+5
 						}
 					case '7':
 						if len(rest) >= 5 && string(rest[:5]) == "\"s07\"" {
-							idx, key, p = 23, rest[1:4], p+5
+							idx, p = 23, p+5
 						}
 					case '8':
 						if len(rest) >= 5 && string(rest[:5]) == "\"s08\"" {
-							idx, key, p = 24, rest[1:4], p+5
+							idx, p = 24, p+5
 						}
 					case '9':
 						if len(rest) >= 5 && string(rest[:5]) == "\"s09\"" {
-							idx, key, p = 25, rest[1:4], p+5
+							idx, p = 25, p+5
 						}
 					}
 				}
 			case 'n':
 				if len(rest) >= 3 && string(rest[:3]) == "\"n\"" {
-					idx, key, p = 32, rest[1:2], p+3
+					idx, p = 32, p+3
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -12392,7 +12469,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np1381, ok1382 := odjsonrt.ParseNull(data, p); ok1382 {
@@ -12422,7 +12499,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np1389, ok1390 := odjsonrt.ParseNull(data, p); ok1390 {
@@ -12452,7 +12529,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 2:
 			if strict && seen[0]&(1<<2) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 2
 			if np1397, ok1398 := odjsonrt.ParseNull(data, p); ok1398 {
@@ -12482,7 +12559,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 3:
 			if strict && seen[0]&(1<<3) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 3
 			if np1405, ok1406 := odjsonrt.ParseNull(data, p); ok1406 {
@@ -12512,7 +12589,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 4:
 			if strict && seen[0]&(1<<4) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 4
 			if np1413, ok1414 := odjsonrt.ParseNull(data, p); ok1414 {
@@ -12542,7 +12619,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 5:
 			if strict && seen[0]&(1<<5) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 5
 			if np1421, ok1422 := odjsonrt.ParseNull(data, p); ok1422 {
@@ -12572,7 +12649,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 6:
 			if strict && seen[0]&(1<<6) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 6
 			if np1429, ok1430 := odjsonrt.ParseNull(data, p); ok1430 {
@@ -12602,7 +12679,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 7:
 			if strict && seen[0]&(1<<7) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 7
 			if np1437, ok1438 := odjsonrt.ParseNull(data, p); ok1438 {
@@ -12632,7 +12709,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 8:
 			if strict && seen[0]&(1<<8) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 8
 			if np1445, ok1446 := odjsonrt.ParseNull(data, p); ok1446 {
@@ -12662,7 +12739,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 9:
 			if strict && seen[0]&(1<<9) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 9
 			if np1453, ok1454 := odjsonrt.ParseNull(data, p); ok1454 {
@@ -12692,7 +12769,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 10:
 			if strict && seen[0]&(1<<10) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 10
 			if np1461, ok1462 := odjsonrt.ParseNull(data, p); ok1462 {
@@ -12722,7 +12799,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 11:
 			if strict && seen[0]&(1<<11) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 11
 			if np1469, ok1470 := odjsonrt.ParseNull(data, p); ok1470 {
@@ -12752,7 +12829,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 12:
 			if strict && seen[0]&(1<<12) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 12
 			if np1477, ok1478 := odjsonrt.ParseNull(data, p); ok1478 {
@@ -12782,7 +12859,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 13:
 			if strict && seen[0]&(1<<13) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 13
 			if np1485, ok1486 := odjsonrt.ParseNull(data, p); ok1486 {
@@ -12812,7 +12889,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 14:
 			if strict && seen[0]&(1<<14) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 14
 			if np1493, ok1494 := odjsonrt.ParseNull(data, p); ok1494 {
@@ -12842,7 +12919,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 15:
 			if strict && seen[0]&(1<<15) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 15
 			if np1501, ok1502 := odjsonrt.ParseNull(data, p); ok1502 {
@@ -12872,7 +12949,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 16:
 			if strict && seen[0]&(1<<16) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 16
 			if np1509, ok1510 := odjsonrt.ParseNull(data, p); ok1510 {
@@ -12897,7 +12974,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 17:
 			if strict && seen[0]&(1<<17) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 17
 			if np1514, ok1515 := odjsonrt.ParseNull(data, p); ok1515 {
@@ -12922,7 +12999,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 18:
 			if strict && seen[0]&(1<<18) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 18
 			if np1519, ok1520 := odjsonrt.ParseNull(data, p); ok1520 {
@@ -12947,7 +13024,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 19:
 			if strict && seen[0]&(1<<19) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 19
 			if np1524, ok1525 := odjsonrt.ParseNull(data, p); ok1525 {
@@ -12972,7 +13049,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 20:
 			if strict && seen[0]&(1<<20) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 20
 			if np1529, ok1530 := odjsonrt.ParseNull(data, p); ok1530 {
@@ -12997,7 +13074,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 21:
 			if strict && seen[0]&(1<<21) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 21
 			if np1534, ok1535 := odjsonrt.ParseNull(data, p); ok1535 {
@@ -13022,7 +13099,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 22:
 			if strict && seen[0]&(1<<22) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 22
 			if np1539, ok1540 := odjsonrt.ParseNull(data, p); ok1540 {
@@ -13047,7 +13124,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 23:
 			if strict && seen[0]&(1<<23) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 23
 			if np1544, ok1545 := odjsonrt.ParseNull(data, p); ok1545 {
@@ -13072,7 +13149,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 24:
 			if strict && seen[0]&(1<<24) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 24
 			if np1549, ok1550 := odjsonrt.ParseNull(data, p); ok1550 {
@@ -13097,7 +13174,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 25:
 			if strict && seen[0]&(1<<25) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 25
 			if np1554, ok1555 := odjsonrt.ParseNull(data, p); ok1555 {
@@ -13122,7 +13199,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 26:
 			if strict && seen[0]&(1<<26) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 26
 			if np1559, ok1560 := odjsonrt.ParseNull(data, p); ok1560 {
@@ -13147,7 +13224,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 27:
 			if strict && seen[0]&(1<<27) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 27
 			if np1564, ok1565 := odjsonrt.ParseNull(data, p); ok1565 {
@@ -13172,7 +13249,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 28:
 			if strict && seen[0]&(1<<28) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 28
 			if np1569, ok1570 := odjsonrt.ParseNull(data, p); ok1570 {
@@ -13197,7 +13274,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 29:
 			if strict && seen[0]&(1<<29) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 29
 			if np1574, ok1575 := odjsonrt.ParseNull(data, p); ok1575 {
@@ -13222,7 +13299,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 30:
 			if strict && seen[0]&(1<<30) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 30
 			if np1579, ok1580 := odjsonrt.ParseNull(data, p); ok1580 {
@@ -13247,7 +13324,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 31:
 			if strict && seen[0]&(1<<31) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 31
 			if np1584, ok1585 := odjsonrt.ParseNull(data, p); ok1585 {
@@ -13272,7 +13349,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 32:
 			if strict && seen[0]&(1<<32) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 32
 			if np1589, ok1590 := odjsonrt.ParseNull(data, p); ok1590 {
@@ -13289,12 +13366,12 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -13310,6 +13387,7 @@ func (v *Sparse) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -14638,6 +14716,9 @@ func (v *Canada) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	return dst, nil
 }
 
+// odjsonCapCanadaFeatures remembers how long v.Features has been, to allocate it once.
+var odjsonCapCanadaFeatures odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -14674,8 +14755,8 @@ func (v *Canada) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -14718,7 +14799,7 @@ func (v *Canada) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 					p++
 				} else {
 					if cap(s1873) == 0 {
-						s1873 = make([]Feature, 0, 4)
+						s1873 = make([]Feature, 0, odjsonrt.CapFor[Feature](&odjsonCapCanadaFeatures))
 					}
 					for {
 						var e1874 Feature
@@ -14741,6 +14822,7 @@ func (v *Canada) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCanadaFeatures.Record(len(s1873))
 				}
 				if s1873 == nil {
 					s1873 = []Feature{}
@@ -14790,8 +14872,7 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -14802,17 +14883,17 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			switch rest[1] {
 			case 't':
 				if len(rest) >= 6 && string(rest[:6]) == "\"type\"" {
-					idx, key, p = 0, rest[1:5], p+6
+					idx, p = 0, p+6
 				}
 			case 'f':
 				if len(rest) >= 10 && string(rest[:10]) == "\"features\"" {
-					idx, key, p = 1, rest[1:9], p+10
+					idx, p = 1, p+10
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -14831,7 +14912,7 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np1875, ok1876 := odjsonrt.ParseNull(data, p); ok1876 {
@@ -14847,7 +14928,7 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np1878, ok1879 := odjsonrt.ParseNull(data, p); ok1879 {
@@ -14864,7 +14945,7 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 					p++
 				} else {
 					if cap(s1880) == 0 {
-						s1880 = make([]Feature, 0, 4)
+						s1880 = make([]Feature, 0, odjsonrt.CapFor[Feature](&odjsonCapCanadaFeatures))
 					}
 					for {
 						var e1881 Feature
@@ -14887,6 +14968,7 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCanadaFeatures.Record(len(s1880))
 				}
 				if s1880 == nil {
 					s1880 = []Feature{}
@@ -14895,12 +14977,12 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -14916,6 +14998,7 @@ func (v *Canada) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -15004,7 +15087,7 @@ func (v *Canada) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 				}
 				s1884 := v.Features[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s1884) == 0 {
-					s1884 = make([]Feature, 0, 4)
+					s1884 = make([]Feature, 0, odjsonrt.CapFor[Feature](&odjsonCapCanadaFeatures))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e1885 Feature
@@ -15015,6 +15098,9 @@ func (v *Canada) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s1884) > 0 {
+					odjsonCapCanadaFeatures.Record(len(s1884))
 				}
 				if s1884 == nil {
 					s1884 = []Feature{}
@@ -15239,8 +15325,8 @@ func (v *Feature) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -15372,8 +15458,7 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -15384,21 +15469,21 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			switch rest[1] {
 			case 't':
 				if len(rest) >= 6 && string(rest[:6]) == "\"type\"" {
-					idx, key, p = 0, rest[1:5], p+6
+					idx, p = 0, p+6
 				}
 			case 'p':
 				if len(rest) >= 12 && string(rest[:12]) == "\"properties\"" {
-					idx, key, p = 1, rest[1:11], p+12
+					idx, p = 1, p+12
 				}
 			case 'g':
 				if len(rest) >= 10 && string(rest[:10]) == "\"geometry\"" {
-					idx, key, p = 2, rest[1:9], p+10
+					idx, p = 2, p+10
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -15419,7 +15504,7 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np1904, ok1905 := odjsonrt.ParseNull(data, p); ok1905 {
@@ -15435,7 +15520,7 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np1907, ok1908 := odjsonrt.ParseNull(data, p); ok1908 {
@@ -15510,7 +15595,7 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		case 2:
 			if strict && seen[0]&(1<<2) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 2
 			p, err = v.Geometry.odjsonParseV2(data, p, sc, strict)
@@ -15519,12 +15604,12 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -15540,6 +15625,7 @@ func (v *Feature) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -15825,6 +15911,9 @@ func (v *Geometry) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	return dst, nil
 }
 
+// odjsonCapGeometryCoordinates remembers how long v.Coordinates has been, to allocate it once.
+var odjsonCapGeometryCoordinates odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -15861,8 +15950,8 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -15905,7 +15994,7 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 					p++
 				} else {
 					if cap(s1937) == 0 {
-						s1937 = make([][][]float64, 0, 4)
+						s1937 = make([][][]float64, 0, odjsonrt.CapFor[[][]float64](&odjsonCapGeometryCoordinates))
 					}
 					for {
 						var e1938 [][]float64
@@ -16020,6 +16109,7 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapGeometryCoordinates.Record(len(s1937))
 				}
 				if s1937 == nil {
 					s1937 = [][][]float64{}
@@ -16069,8 +16159,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -16081,17 +16170,17 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 			switch rest[1] {
 			case 't':
 				if len(rest) >= 6 && string(rest[:6]) == "\"type\"" {
-					idx, key, p = 0, rest[1:5], p+6
+					idx, p = 0, p+6
 				}
 			case 'c':
 				if len(rest) >= 13 && string(rest[:13]) == "\"coordinates\"" {
-					idx, key, p = 1, rest[1:12], p+13
+					idx, p = 1, p+13
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -16110,7 +16199,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np1953, ok1954 := odjsonrt.ParseNull(data, p); ok1954 {
@@ -16126,7 +16215,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np1956, ok1957 := odjsonrt.ParseNull(data, p); ok1957 {
@@ -16143,7 +16232,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 					p++
 				} else {
 					if cap(s1958) == 0 {
-						s1958 = make([][][]float64, 0, 4)
+						s1958 = make([][][]float64, 0, odjsonrt.CapFor[[][]float64](&odjsonCapGeometryCoordinates))
 					}
 					for {
 						var e1959 [][]float64
@@ -16259,6 +16348,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapGeometryCoordinates.Record(len(s1958))
 				}
 				if s1958 == nil {
 					s1958 = [][][]float64{}
@@ -16267,12 +16357,12 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -16288,6 +16378,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -16384,7 +16475,7 @@ func (v *Geometry) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 					vp1977++
 				} else {
 					if cap(s1980) == 0 {
-						s1980 = make([][][]float64, 0, 4)
+						s1980 = make([][][]float64, 0, odjsonrt.CapFor[[][]float64](&odjsonCapGeometryCoordinates))
 					}
 					for {
 						var e1981 [][]float64
@@ -16500,6 +16591,7 @@ func (v *Geometry) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 						}
 						return odjsonrt.ErrSyntax(val1976, vp1977, "after array element")
 					}
+					odjsonCapGeometryCoordinates.Record(len(s1980))
 				}
 				if s1980 == nil {
 					s1980 = [][][]float64{}
@@ -16928,6 +17020,9 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 	return dst, nil
 }
 
+// odjsonCapCitmCatalogPerformances remembers how long v.Performances has been, to allocate it once.
+var odjsonCapCitmCatalogPerformances odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -17005,8 +17100,8 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -17265,7 +17360,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					p++
 				} else {
 					if cap(s2069) == 0 {
-						s2069 = make([]Performance, 0, 4)
+						s2069 = make([]Performance, 0, odjsonrt.CapFor[Performance](&odjsonCapCitmCatalogPerformances))
 					}
 					for {
 						var e2070 Performance
@@ -17288,6 +17383,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCitmCatalogPerformances.Record(len(s2069))
 				}
 				if s2069 == nil {
 					s2069 = []Performance{}
@@ -17706,8 +17802,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -17718,58 +17813,58 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			switch rest[4] {
 			case 'a':
 				if len(rest) >= 11 && string(rest[:11]) == "\"areaNames\"" {
-					idx, key, p = 0, rest[1:10], p+11
+					idx, p = 0, p+11
 				}
 			case 'i':
 				if len(rest) > 6 {
 					switch rest[6] {
 					case 'n':
 						if len(rest) >= 26 && string(rest[:26]) == "\"audienceSubCategoryNames\"" {
-							idx, key, p = 1, rest[1:25], p+26
+							idx, p = 1, p+26
 						}
 					case 'N':
 						if len(rest) >= 12 && string(rest[:12]) == "\"topicNames\"" {
-							idx, key, p = 8, rest[1:11], p+12
+							idx, p = 8, p+12
 						}
 					case 'S':
 						if len(rest) >= 16 && string(rest[:16]) == "\"topicSubTopics\"" {
-							idx, key, p = 9, rest[1:15], p+16
+							idx, p = 9, p+16
 						}
 					}
 				}
 			case 'c':
 				if len(rest) >= 12 && string(rest[:12]) == "\"blockNames\"" {
-					idx, key, p = 2, rest[1:11], p+12
+					idx, p = 2, p+12
 				}
 			case 'n':
 				if len(rest) >= 8 && string(rest[:8]) == "\"events\"" {
-					idx, key, p = 3, rest[1:7], p+8
+					idx, p = 3, p+8
 				}
 			case 'f':
 				if len(rest) >= 14 && string(rest[:14]) == "\"performances\"" {
-					idx, key, p = 4, rest[1:13], p+14
+					idx, p = 4, p+14
 				}
 			case 't':
 				if len(rest) >= 19 && string(rest[:19]) == "\"seatCategoryNames\"" {
-					idx, key, p = 5, rest[1:18], p+19
+					idx, p = 5, p+19
 				}
 			case 'T':
 				if len(rest) >= 15 && string(rest[:15]) == "\"subTopicNames\"" {
-					idx, key, p = 6, rest[1:14], p+15
+					idx, p = 6, p+15
 				}
 			case 'j':
 				if len(rest) >= 14 && string(rest[:14]) == "\"subjectNames\"" {
-					idx, key, p = 7, rest[1:13], p+14
+					idx, p = 7, p+14
 				}
 			case 'u':
 				if len(rest) >= 12 && string(rest[:12]) == "\"venueNames\"" {
-					idx, key, p = 10, rest[1:11], p+12
+					idx, p = 10, p+12
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -17806,7 +17901,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np2126, ok2127 := odjsonrt.ParseNull(data, p); ok2127 {
@@ -17881,7 +17976,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np2136, ok2137 := odjsonrt.ParseNull(data, p); ok2137 {
@@ -17956,7 +18051,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 2:
 			if strict && seen[0]&(1<<2) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 2
 			if np2146, ok2147 := odjsonrt.ParseNull(data, p); ok2147 {
@@ -18031,7 +18126,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 3:
 			if strict && seen[0]&(1<<3) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 3
 			if np2156, ok2157 := odjsonrt.ParseNull(data, p); ok2157 {
@@ -18098,7 +18193,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 4:
 			if strict && seen[0]&(1<<4) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 4
 			if np2163, ok2164 := odjsonrt.ParseNull(data, p); ok2164 {
@@ -18115,7 +18210,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					p++
 				} else {
 					if cap(s2165) == 0 {
-						s2165 = make([]Performance, 0, 4)
+						s2165 = make([]Performance, 0, odjsonrt.CapFor[Performance](&odjsonCapCitmCatalogPerformances))
 					}
 					for {
 						var e2166 Performance
@@ -18138,6 +18233,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapCitmCatalogPerformances.Record(len(s2165))
 				}
 				if s2165 == nil {
 					s2165 = []Performance{}
@@ -18146,7 +18242,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 5:
 			if strict && seen[0]&(1<<5) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 5
 			if np2167, ok2168 := odjsonrt.ParseNull(data, p); ok2168 {
@@ -18221,7 +18317,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 6:
 			if strict && seen[0]&(1<<6) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 6
 			if np2177, ok2178 := odjsonrt.ParseNull(data, p); ok2178 {
@@ -18296,7 +18392,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 7:
 			if strict && seen[0]&(1<<7) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 7
 			if np2187, ok2188 := odjsonrt.ParseNull(data, p); ok2188 {
@@ -18371,7 +18467,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 8:
 			if strict && seen[0]&(1<<8) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 8
 			if np2197, ok2198 := odjsonrt.ParseNull(data, p); ok2198 {
@@ -18446,7 +18542,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 9:
 			if strict && seen[0]&(1<<9) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 9
 			if np2207, ok2208 := odjsonrt.ParseNull(data, p); ok2208 {
@@ -18566,7 +18662,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 10:
 			if strict && seen[0]&(1<<10) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 10
 			if np2224, ok2225 := odjsonrt.ParseNull(data, p); ok2225 {
@@ -18641,12 +18737,12 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -18662,6 +18758,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -18995,7 +19092,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				}
 				s2270 := v.Performances[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s2270) == 0 {
-					s2270 = make([]Performance, 0, 4)
+					s2270 = make([]Performance, 0, odjsonrt.CapFor[Performance](&odjsonCapCitmCatalogPerformances))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e2271 Performance
@@ -19006,6 +19103,9 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s2270) > 0 {
+					odjsonCapCitmCatalogPerformances.Record(len(s2270))
 				}
 				if s2270 == nil {
 					s2270 = []Performance{}
@@ -19605,6 +19705,12 @@ func (v *Event) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 	return dst, nil
 }
 
+// odjsonCapEventSubTopicIds remembers how long v.SubTopicIds has been, to allocate it once.
+var odjsonCapEventSubTopicIds odjsonrt.CapHint
+
+// odjsonCapEventTopicIds remembers how long v.TopicIds has been, to allocate it once.
+var odjsonCapEventTopicIds odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -19670,8 +19776,8 @@ func (v *Event) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -19782,7 +19888,7 @@ func (v *Event) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 					p++
 				} else {
 					if cap(s2362) == 0 {
-						s2362 = make([]int64, 0, 4)
+						s2362 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapEventSubTopicIds))
 					}
 					for {
 						var e2363 int64
@@ -19817,6 +19923,7 @@ func (v *Event) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapEventSubTopicIds.Record(len(s2362))
 				}
 				if s2362 == nil {
 					s2362 = []int64{}
@@ -19878,7 +19985,7 @@ func (v *Event) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 					p++
 				} else {
 					if cap(s2382) == 0 {
-						s2382 = make([]int64, 0, 4)
+						s2382 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapEventTopicIds))
 					}
 					for {
 						var e2383 int64
@@ -19913,6 +20020,7 @@ func (v *Event) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapEventTopicIds.Record(len(s2382))
 				}
 				if s2382 == nil {
 					s2382 = []int64{}
@@ -19962,8 +20070,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -19974,46 +20081,46 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			switch rest[1] {
 			case 'd':
 				if len(rest) >= 13 && string(rest[:13]) == "\"description\"" {
-					idx, key, p = 0, rest[1:12], p+13
+					idx, p = 0, p+13
 				}
 			case 'i':
 				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
-					idx, key, p = 1, rest[1:3], p+4
+					idx, p = 1, p+4
 				}
 			case 'l':
 				if len(rest) >= 6 && string(rest[:6]) == "\"logo\"" {
-					idx, key, p = 2, rest[1:5], p+6
+					idx, p = 2, p+6
 				}
 			case 'n':
 				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
-					idx, key, p = 3, rest[1:5], p+6
+					idx, p = 3, p+6
 				}
 			case 's':
 				if len(rest) > 4 {
 					switch rest[4] {
 					case 'T':
 						if len(rest) >= 13 && string(rest[:13]) == "\"subTopicIds\"" {
-							idx, key, p = 4, rest[1:12], p+13
+							idx, p = 4, p+13
 						}
 					case 'j':
 						if len(rest) >= 13 && string(rest[:13]) == "\"subjectCode\"" {
-							idx, key, p = 5, rest[1:12], p+13
+							idx, p = 5, p+13
 						}
 					case 't':
 						if len(rest) >= 10 && string(rest[:10]) == "\"subtitle\"" {
-							idx, key, p = 6, rest[1:9], p+10
+							idx, p = 6, p+10
 						}
 					}
 				}
 			case 't':
 				if len(rest) >= 10 && string(rest[:10]) == "\"topicIds\"" {
-					idx, key, p = 7, rest[1:9], p+10
+					idx, p = 7, p+10
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -20044,7 +20151,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np2390, ok2391 := odjsonrt.ParseNull(data, p); ok2391 {
@@ -20069,7 +20176,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np2395, ok2396 := odjsonrt.ParseNull(data, p); ok2396 {
@@ -20090,7 +20197,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 2:
 			if strict && seen[0]&(1<<2) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 2
 			if np2401, ok2402 := odjsonrt.ParseNull(data, p); ok2402 {
@@ -20115,7 +20222,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 3:
 			if strict && seen[0]&(1<<3) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 3
 			if np2406, ok2407 := odjsonrt.ParseNull(data, p); ok2407 {
@@ -20131,7 +20238,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 4:
 			if strict && seen[0]&(1<<4) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 4
 			if np2409, ok2410 := odjsonrt.ParseNull(data, p); ok2410 {
@@ -20148,7 +20255,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					p++
 				} else {
 					if cap(s2411) == 0 {
-						s2411 = make([]int64, 0, 4)
+						s2411 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapEventSubTopicIds))
 					}
 					for {
 						var e2412 int64
@@ -20184,6 +20291,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapEventSubTopicIds.Record(len(s2411))
 				}
 				if s2411 == nil {
 					s2411 = []int64{}
@@ -20192,7 +20300,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 5:
 			if strict && seen[0]&(1<<5) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 5
 			if np2419, ok2420 := odjsonrt.ParseNull(data, p); ok2420 {
@@ -20217,7 +20325,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 6:
 			if strict && seen[0]&(1<<6) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 6
 			if np2424, ok2425 := odjsonrt.ParseNull(data, p); ok2425 {
@@ -20242,7 +20350,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 7:
 			if strict && seen[0]&(1<<7) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 7
 			if np2429, ok2430 := odjsonrt.ParseNull(data, p); ok2430 {
@@ -20259,7 +20367,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					p++
 				} else {
 					if cap(s2431) == 0 {
-						s2431 = make([]int64, 0, 4)
+						s2431 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapEventTopicIds))
 					}
 					for {
 						var e2432 int64
@@ -20295,6 +20403,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapEventTopicIds.Record(len(s2431))
 				}
 				if s2431 == nil {
 					s2431 = []int64{}
@@ -20303,12 +20412,12 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -20324,6 +20433,7 @@ func (v *Event) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -20516,7 +20626,7 @@ func (v *Event) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 					vp2458++
 				} else {
 					if cap(s2461) == 0 {
-						s2461 = make([]int64, 0, 4)
+						s2461 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapEventSubTopicIds))
 					}
 					for {
 						var e2462 int64
@@ -20552,6 +20662,7 @@ func (v *Event) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 						}
 						return odjsonrt.ErrSyntax(val2457, vp2458, "after array element")
 					}
+					odjsonCapEventSubTopicIds.Record(len(s2461))
 				}
 				if s2461 == nil {
 					s2461 = []int64{}
@@ -20636,7 +20747,7 @@ func (v *Event) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 					vp2484++
 				} else {
 					if cap(s2487) == 0 {
-						s2487 = make([]int64, 0, 4)
+						s2487 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapEventTopicIds))
 					}
 					for {
 						var e2488 int64
@@ -20672,6 +20783,7 @@ func (v *Event) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 						}
 						return odjsonrt.ErrSyntax(val2483, vp2484, "after array element")
 					}
+					odjsonCapEventTopicIds.Record(len(s2487))
 				}
 				if s2487 == nil {
 					s2487 = []int64{}
@@ -20874,6 +20986,12 @@ func (v *Performance) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 	return dst, nil
 }
 
+// odjsonCapPerformancePrices remembers how long v.Prices has been, to allocate it once.
+var odjsonCapPerformancePrices odjsonrt.CapHint
+
+// odjsonCapPerformanceSeatCategories remembers how long v.SeatCategories has been, to allocate it once.
+var odjsonCapPerformanceSeatCategories odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -20943,8 +21061,8 @@ func (v *Performance) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -21062,7 +21180,7 @@ func (v *Performance) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					p++
 				} else {
 					if cap(s2522) == 0 {
-						s2522 = make([]Price, 0, 4)
+						s2522 = make([]Price, 0, odjsonrt.CapFor[Price](&odjsonCapPerformancePrices))
 					}
 					for {
 						var e2523 Price
@@ -21085,6 +21203,7 @@ func (v *Performance) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapPerformancePrices.Record(len(s2522))
 				}
 				if s2522 == nil {
 					s2522 = []Price{}
@@ -21106,7 +21225,7 @@ func (v *Performance) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 					p++
 				} else {
 					if cap(s2526) == 0 {
-						s2526 = make([]SeatCategory, 0, 4)
+						s2526 = make([]SeatCategory, 0, odjsonrt.CapFor[SeatCategory](&odjsonCapPerformanceSeatCategories))
 					}
 					for {
 						var e2527 SeatCategory
@@ -21129,6 +21248,7 @@ func (v *Performance) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapPerformanceSeatCategories.Record(len(s2526))
 				}
 				if s2526 == nil {
 					s2526 = []SeatCategory{}
@@ -21225,8 +21345,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -21237,50 +21356,50 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			switch rest[1] {
 			case 'e':
 				if len(rest) >= 9 && string(rest[:9]) == "\"eventId\"" {
-					idx, key, p = 0, rest[1:8], p+9
+					idx, p = 0, p+9
 				}
 			case 'i':
 				if len(rest) >= 4 && string(rest[:4]) == "\"id\"" {
-					idx, key, p = 1, rest[1:3], p+4
+					idx, p = 1, p+4
 				}
 			case 'l':
 				if len(rest) >= 6 && string(rest[:6]) == "\"logo\"" {
-					idx, key, p = 2, rest[1:5], p+6
+					idx, p = 2, p+6
 				}
 			case 'n':
 				if len(rest) >= 6 && string(rest[:6]) == "\"name\"" {
-					idx, key, p = 3, rest[1:5], p+6
+					idx, p = 3, p+6
 				}
 			case 'p':
 				if len(rest) >= 8 && string(rest[:8]) == "\"prices\"" {
-					idx, key, p = 4, rest[1:7], p+8
+					idx, p = 4, p+8
 				}
 			case 's':
 				if len(rest) > 5 {
 					switch rest[5] {
 					case 'C':
 						if len(rest) >= 16 && string(rest[:16]) == "\"seatCategories\"" {
-							idx, key, p = 5, rest[1:15], p+16
+							idx, p = 5, p+16
 						}
 					case 'M':
 						if len(rest) >= 14 && string(rest[:14]) == "\"seatMapImage\"" {
-							idx, key, p = 6, rest[1:13], p+14
+							idx, p = 6, p+14
 						}
 					case 't':
 						if len(rest) >= 7 && string(rest[:7]) == "\"start\"" {
-							idx, key, p = 7, rest[1:6], p+7
+							idx, p = 7, p+7
 						}
 					}
 				}
 			case 'v':
 				if len(rest) >= 11 && string(rest[:11]) == "\"venueCode\"" {
-					idx, key, p = 8, rest[1:10], p+11
+					idx, p = 8, p+11
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -21313,7 +21432,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np2542, ok2543 := odjsonrt.ParseNull(data, p); ok2543 {
@@ -21334,7 +21453,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np2548, ok2549 := odjsonrt.ParseNull(data, p); ok2549 {
@@ -21355,7 +21474,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 2:
 			if strict && seen[0]&(1<<2) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 2
 			if np2554, ok2555 := odjsonrt.ParseNull(data, p); ok2555 {
@@ -21380,7 +21499,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 3:
 			if strict && seen[0]&(1<<3) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 3
 			if np2559, ok2560 := odjsonrt.ParseNull(data, p); ok2560 {
@@ -21405,7 +21524,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 4:
 			if strict && seen[0]&(1<<4) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 4
 			if np2564, ok2565 := odjsonrt.ParseNull(data, p); ok2565 {
@@ -21422,7 +21541,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					p++
 				} else {
 					if cap(s2566) == 0 {
-						s2566 = make([]Price, 0, 4)
+						s2566 = make([]Price, 0, odjsonrt.CapFor[Price](&odjsonCapPerformancePrices))
 					}
 					for {
 						var e2567 Price
@@ -21445,6 +21564,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapPerformancePrices.Record(len(s2566))
 				}
 				if s2566 == nil {
 					s2566 = []Price{}
@@ -21453,7 +21573,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 5:
 			if strict && seen[0]&(1<<5) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 5
 			if np2568, ok2569 := odjsonrt.ParseNull(data, p); ok2569 {
@@ -21470,7 +21590,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 					p++
 				} else {
 					if cap(s2570) == 0 {
-						s2570 = make([]SeatCategory, 0, 4)
+						s2570 = make([]SeatCategory, 0, odjsonrt.CapFor[SeatCategory](&odjsonCapPerformanceSeatCategories))
 					}
 					for {
 						var e2571 SeatCategory
@@ -21493,6 +21613,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapPerformanceSeatCategories.Record(len(s2570))
 				}
 				if s2570 == nil {
 					s2570 = []SeatCategory{}
@@ -21501,7 +21622,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 6:
 			if strict && seen[0]&(1<<6) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 6
 			if np2572, ok2573 := odjsonrt.ParseNull(data, p); ok2573 {
@@ -21526,7 +21647,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 7:
 			if strict && seen[0]&(1<<7) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 7
 			if np2577, ok2578 := odjsonrt.ParseNull(data, p); ok2578 {
@@ -21547,7 +21668,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		case 8:
 			if strict && seen[0]&(1<<8) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 8
 			if np2583, ok2584 := odjsonrt.ParseNull(data, p); ok2584 {
@@ -21563,12 +21684,12 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -21584,6 +21705,7 @@ func (v *Performance) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -21772,7 +21894,7 @@ func (v *Performance) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				}
 				s2604 := v.Prices[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s2604) == 0 {
-					s2604 = make([]Price, 0, 4)
+					s2604 = make([]Price, 0, odjsonrt.CapFor[Price](&odjsonCapPerformancePrices))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e2605 Price
@@ -21783,6 +21905,9 @@ func (v *Performance) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s2604) > 0 {
+					odjsonCapPerformancePrices.Record(len(s2604))
 				}
 				if s2604 == nil {
 					s2604 = []Price{}
@@ -21804,7 +21929,7 @@ func (v *Performance) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				}
 				s2606 := v.SeatCategories[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s2606) == 0 {
-					s2606 = make([]SeatCategory, 0, 4)
+					s2606 = make([]SeatCategory, 0, odjsonrt.CapFor[SeatCategory](&odjsonCapPerformanceSeatCategories))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e2607 SeatCategory
@@ -21815,6 +21940,9 @@ func (v *Performance) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s2606) > 0 {
+					odjsonCapPerformanceSeatCategories.Record(len(s2606))
 				}
 				if s2606 == nil {
 					s2606 = []SeatCategory{}
@@ -22028,8 +22156,8 @@ func (v *Price) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -22139,8 +22267,7 @@ func (v *Price) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -22151,21 +22278,21 @@ func (v *Price) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			switch rest[2] {
 			case 'm':
 				if len(rest) >= 8 && string(rest[:8]) == "\"amount\"" {
-					idx, key, p = 0, rest[1:7], p+8
+					idx, p = 0, p+8
 				}
 			case 'u':
 				if len(rest) >= 23 && string(rest[:23]) == "\"audienceSubCategoryId\"" {
-					idx, key, p = 1, rest[1:22], p+23
+					idx, p = 1, p+23
 				}
 			case 'e':
 				if len(rest) >= 16 && string(rest[:16]) == "\"seatCategoryId\"" {
-					idx, key, p = 2, rest[1:15], p+16
+					idx, p = 2, p+16
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -22186,7 +22313,7 @@ func (v *Price) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np2637, ok2638 := odjsonrt.ParseNull(data, p); ok2638 {
@@ -22207,7 +22334,7 @@ func (v *Price) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np2643, ok2644 := odjsonrt.ParseNull(data, p); ok2644 {
@@ -22228,7 +22355,7 @@ func (v *Price) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		case 2:
 			if strict && seen[0]&(1<<2) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 2
 			if np2649, ok2650 := odjsonrt.ParseNull(data, p); ok2650 {
@@ -22249,12 +22376,12 @@ func (v *Price) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -22270,6 +22397,7 @@ func (v *Price) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -22509,6 +22637,9 @@ func (v *SeatCategory) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, 
 	return dst, nil
 }
 
+// odjsonCapSeatCategoryAreas remembers how long v.Areas has been, to allocate it once.
+var odjsonCapSeatCategoryAreas odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -22545,8 +22676,8 @@ func (v *SeatCategory) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache)
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -22578,7 +22709,7 @@ func (v *SeatCategory) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache)
 					p++
 				} else {
 					if cap(s2665) == 0 {
-						s2665 = make([]Area, 0, 4)
+						s2665 = make([]Area, 0, odjsonrt.CapFor[Area](&odjsonCapSeatCategoryAreas))
 					}
 					for {
 						var e2666 Area
@@ -22601,6 +22732,7 @@ func (v *SeatCategory) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache)
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapSeatCategoryAreas.Record(len(s2665))
 				}
 				if s2665 == nil {
 					s2665 = []Area{}
@@ -22666,8 +22798,7 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -22678,17 +22809,17 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 			switch rest[1] {
 			case 'a':
 				if len(rest) >= 7 && string(rest[:7]) == "\"areas\"" {
-					idx, key, p = 0, rest[1:6], p+7
+					idx, p = 0, p+7
 				}
 			case 's':
 				if len(rest) >= 16 && string(rest[:16]) == "\"seatCategoryId\"" {
-					idx, key, p = 1, rest[1:15], p+16
+					idx, p = 1, p+16
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -22707,7 +22838,7 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np2673, ok2674 := odjsonrt.ParseNull(data, p); ok2674 {
@@ -22724,7 +22855,7 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 					p++
 				} else {
 					if cap(s2675) == 0 {
-						s2675 = make([]Area, 0, 4)
+						s2675 = make([]Area, 0, odjsonrt.CapFor[Area](&odjsonCapSeatCategoryAreas))
 					}
 					for {
 						var e2676 Area
@@ -22747,6 +22878,7 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapSeatCategoryAreas.Record(len(s2675))
 				}
 				if s2675 == nil {
 					s2675 = []Area{}
@@ -22755,7 +22887,7 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np2677, ok2678 := odjsonrt.ParseNull(data, p); ok2678 {
@@ -22776,12 +22908,12 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -22797,6 +22929,7 @@ func (v *SeatCategory) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -22869,7 +23002,7 @@ func (v *SeatCategory) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.Strin
 				}
 				s2683 := v.Areas[:0]
 				if odjsonrt.NextKind(dec) != ']' && cap(s2683) == 0 {
-					s2683 = make([]Area, 0, 4)
+					s2683 = make([]Area, 0, odjsonrt.CapFor[Area](&odjsonCapSeatCategoryAreas))
 				}
 				for odjsonrt.NextKind(dec) != ']' {
 					var e2684 Area
@@ -22880,6 +23013,9 @@ func (v *SeatCategory) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.Strin
 				}
 				if _, err = dec.ReadToken(); err != nil {
 					return err
+				}
+				if len(s2683) > 0 {
+					odjsonCapSeatCategoryAreas.Record(len(s2683))
 				}
 				if s2683 == nil {
 					s2683 = []Area{}
@@ -23016,6 +23152,9 @@ func (v *Area) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	return dst, nil
 }
 
+// odjsonCapAreaBlockIds remembers how long v.BlockIds has been, to allocate it once.
+var odjsonCapAreaBlockIds odjsonrt.CapHint
+
 // odjsonParse decodes the JSON object starting at p into v and
 // returns the offset just past it. Strings are interned through
 // sc, which may be nil.
@@ -23052,8 +23191,8 @@ func (v *Area) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -23101,7 +23240,7 @@ func (v *Area) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s2696) == 0 {
-						s2696 = make([]int64, 0, 4)
+						s2696 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapAreaBlockIds))
 					}
 					for {
 						var e2697 int64
@@ -23136,6 +23275,7 @@ func (v *Area) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapAreaBlockIds.Record(len(s2696))
 				}
 				if s2696 == nil {
 					s2696 = []int64{}
@@ -23185,8 +23325,7 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 	}
 	var seen [1]uint64
 	_ = seen
-	var unknownBuf [8][]byte
-	unknown := unknownBuf[:0]
+	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
 		p = odjsonrt.SkipSpace(data, p)
@@ -23197,17 +23336,17 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			switch rest[1] {
 			case 'a':
 				if len(rest) >= 8 && string(rest[:8]) == "\"areaId\"" {
-					idx, key, p = 0, rest[1:7], p+8
+					idx, p = 0, p+8
 				}
 			case 'b':
 				if len(rest) >= 10 && string(rest[:10]) == "\"blockIds\"" {
-					idx, key, p = 1, rest[1:9], p+10
+					idx, p = 1, p+10
 				}
 			}
 		}
 		if idx >= 0 {
-			if p < len(data) && data[p] == ':' {
-				p = odjsonrt.SkipSpace(data, p+1)
+			if np := odjsonrt.AfterName(data, p); np > 0 {
+				p = np
 			} else if p, err = odjsonrt.AfterKey(data, p); err != nil {
 				return p, err
 			}
@@ -23226,7 +23365,7 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		switch idx {
 		case 0:
 			if strict && seen[0]&(1<<0) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 0
 			if np2704, ok2705 := odjsonrt.ParseNull(data, p); ok2705 {
@@ -23247,7 +23386,7 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		case 1:
 			if strict && seen[0]&(1<<1) != 0 {
-				return kp, odjsonrt.ErrDuplicateName(data, kp, key)
+				return kp, odjsonrt.ErrDuplicateNameAt(data, kp)
 			}
 			seen[0] |= 1 << 1
 			if np2710, ok2711 := odjsonrt.ParseNull(data, p); ok2711 {
@@ -23264,7 +23403,7 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s2712) == 0 {
-						s2712 = make([]int64, 0, 4)
+						s2712 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapAreaBlockIds))
 					}
 					for {
 						var e2713 int64
@@ -23300,6 +23439,7 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 						}
 						return p, odjsonrt.ErrSyntax(data, p, "after array element")
 					}
+					odjsonCapAreaBlockIds.Record(len(s2712))
 				}
 				if s2712 == nil {
 					s2712 = []int64{}
@@ -23308,12 +23448,12 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		default:
 			if strict {
-				for _, u := range unknown {
+				for _, u := range unknown[umark:] {
 					if string(u) == string(key) {
 						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 					}
 				}
-				unknown = append(unknown, key)
+				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -23329,6 +23469,7 @@ func (v *Area) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 		case ',':
 			p++
 		case '}':
+			odjsonrt.EndUnknownNames(sc, unknown, umark)
 			return p + 1, nil
 		default:
 			return p, odjsonrt.ErrSyntax(data, p, "after object key:value pair")
@@ -23425,7 +23566,7 @@ func (v *Area) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp2723++
 				} else {
 					if cap(s2726) == 0 {
-						s2726 = make([]int64, 0, 4)
+						s2726 = make([]int64, 0, odjsonrt.CapFor[int64](&odjsonCapAreaBlockIds))
 					}
 					for {
 						var e2727 int64
@@ -23461,6 +23602,7 @@ func (v *Area) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 						}
 						return odjsonrt.ErrSyntax(val2722, vp2723, "after array element")
 					}
+					odjsonCapAreaBlockIds.Record(len(s2726))
 				}
 				if s2726 == nil {
 					s2726 = []int64{}

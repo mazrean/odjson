@@ -54,7 +54,7 @@ func (g *generator) decErr(b *block, c ctx) {
 // match case-sensitively.
 func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 	np, ok, kp := id("np"), id("ok"), id("kp")
-	seen, unknown, unknownBuf := id("seen"), id("unknown"), id("unknownBuf")
+	seen, unknown, umark := id("seen"), id("unknown"), id("umark")
 	g.emit(b, varDecl("err", id("error")))
 	g.emit(b, assign(id("_"), errV))
 	g.emit(b, c.skipSpace())
@@ -78,10 +78,10 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 		// ones, which are rare, in a list.
 		g.emit(b, varDecl("seen", arrayType(int64((max(len(s.Fields), 1)+63)/64), id("uint64"))))
 		g.emit(b, assign(id("_"), seen))
-		// The list lives on the stack until an object carries more unknown
-		// members than the array holds.
-		g.emit(b, varDecl("unknownBuf", arrayType(8, sliceType(id("byte")))))
-		g.emit(b, define(unknown, slice(unknownBuf, nil, num(0))))
+		// The list is scratch shared by every object of the decode, so
+		// that it costs neither an allocation nor zeroing per object; this
+		// object's names start at umark.
+		g.emit(b, assignN(token.DEFINE, []ast.Expr{unknown, umark}, callRT("UnknownNames", cacheExpr(c))))
 	}
 	// The strict decoder reads the name back for its duplicate check. A
 	// struct with no members and no such check never looks at it, and a
@@ -98,10 +98,11 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 		g.emit(b, define(idx, num(-1)))
 		g.rawKeys(b, s, c)
 		s0 := g.ifStmt(b, nil, bin(idx, token.GEQ, num(0)), func(b *block) {
-			// A compact document has the colon right after the name; anything
-			// else (whitespace, or an error) is AfterKey's.
-			s1 := g.ifStmt(b, nil, and(bin(p, token.LSS, call(id("len"), data)), bin(c.at(), token.EQL, chr(':'))), func(b *block) {
-				g.emit(b, assign(p, callRT("SkipSpace", data, bin(p, token.ADD, num(1)))))
+			// AfterName settles the colon and the value's first byte, or
+			// the one space between them, inline; anything else (more
+			// whitespace, or an error) is AfterKey's call.
+			s1 := g.ifStmt(b, define(np, callRT("AfterName", data, p)), bin(np, token.GTR, num(0)), func(b *block) {
+				g.emit(b, assign(p, np))
 			})
 			g.elseIf(s1, assignN(token.ASSIGN, []ast.Expr{p, errV}, callRT("AfterKey", data, p)), bin(errV, token.NEQ, nilV), func(b *block) {
 				g.emit(b, ret(p, errV))
@@ -159,7 +160,7 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 						g.ifStmt(b, nil,
 							bin(strict, token.LAND, bin(bin(index(seen, word), token.AND, paren(bin(num(1), token.SHL, bit))), token.NEQ, num(0))),
 							func(b *block) {
-								g.emit(b, ret(kp, callRT("ErrDuplicateName", data, kp, key)))
+								g.emit(b, ret(kp, callRT("ErrDuplicateNameAt", data, kp)))
 							})
 						g.emit(b, assignN(token.OR_ASSIGN, []ast.Expr{index(seen, word)}, bin(num(1), token.SHL, bit)))
 					}
@@ -170,7 +171,9 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 						// Both key paths leave p on the value's first byte.
 						mc := c
 						mc.trimmed = true
+						g.capHint = capHintName(s, f)
 						g.decode(b, f.Type, selector(f), mc)
+						g.capHint = ""
 					}
 				})
 			}
@@ -178,12 +181,12 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 				if c.strict {
 					u := id("u")
 					g.ifStmt(b, nil, strict, func(b *block) {
-						g.rangeStmt(b, id("_"), u, unknown, func(b *block) {
+						g.rangeStmt(b, id("_"), u, slice(unknown, umark, nil), func(b *block) {
 							g.ifStmt(b, nil, bin(call(id("string"), u), token.EQL, call(id("string"), key)), func(b *block) {
 								g.emit(b, ret(kp, callRT("ErrDuplicateName", data, kp, key)))
 							})
 						})
-						g.emit(b, assign(unknown, call(id("append"), unknown, key)))
+						g.emit(b, assign(unknown, callRT("AddUnknownName", cacheExpr(c), unknown, key)))
 					})
 					g.emit(b, c.skipSpace())
 					g.emit(b, assignN(token.ASSIGN, []ast.Expr{p, errV}, callRT("SkipValueV2", data, p, strict)))
@@ -205,6 +208,9 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 				g.emit(b, incr(p))
 			})
 			g.caseClause(sw, []ast.Expr{chr('}')}, func(b *block) {
+				if c.strict {
+					g.emit(b, expr(callRT("EndUnknownNames", cacheExpr(c), unknown, umark)))
+				}
 				g.emit(b, ret(bin(p, token.ADD, num(1)), nilV))
 			})
 			g.defaultClause(sw, func(b *block) {
@@ -216,9 +222,9 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 
 // rawKeys emits the fast path of member name matching: every field whose
 // name can appear verbatim in a document is compared, quotes included,
-// against the bytes at p. A hit sets idx (and key, where the strict path
-// needs it for its duplicate error) and moves p past the closing quote,
-// having scanned nothing; anything else (an escaped or folded spelling, an
+// against the bytes at p. A hit sets idx and moves p past the closing
+// quote, having scanned nothing and kept nothing (the duplicate error reads
+// the name back from kp); anything else (an escaped or folded spelling, an
 // unknown name, a malformed key) leaves idx at -1 for the general path.
 //
 // The names are told apart by a decision tree over byte positions: each
@@ -263,13 +269,10 @@ func (g *generator) rawKeyTree(b *block, cands []rawCand, c ctx, known int, used
 		}
 		conds = append(conds, bin(call(id("string"), slice(rest, nil, num(l))), token.EQL, str(k.quoted)))
 		g.ifStmt(b, nil, and(conds...), func(b *block) {
-			if c.strict {
-				g.emit(b, assignN(token.ASSIGN, []ast.Expr{idx, key, p},
-					num(int64(k.idx)), slice(rest, num(1), num(l-1)), bin(p, token.ADD, num(l))))
-			} else {
-				g.emit(b, assignN(token.ASSIGN, []ast.Expr{idx, p},
-					num(int64(k.idx)), bin(p, token.ADD, num(l))))
-			}
+			// The name itself is not kept: the one place that needs it,
+			// the duplicate error, reads it back from kp.
+			g.emit(b, assignN(token.ASSIGN, []ast.Expr{idx, p},
+				num(int64(k.idx)), bin(p, token.ADD, num(l))))
 		})
 		return
 	}
@@ -726,6 +729,7 @@ func (g *generator) separator(b *block, c ctx, closing byte, what string) {
 
 func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c ctx) {
 	s, e := id(g.tmp("s")), id(g.tmp("e"))
+	hint := g.takeCapHint()
 	g.expectByte(b, c, '[', t.Expr)
 	g.emit(b, define(s, slice(target, nil, num(0))))
 	g.emit(b, c.skipSpace())
@@ -734,10 +738,12 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 	})
 	g.elseBlock(s0, func(b *block) {
 		// Growing from nothing costs an allocation and a copy per doubling, so
-		// start with room for a few elements — but only once the array is known
-		// to be non-empty, since empty arrays are common and must stay free.
+		// start with room for a few elements — or, for a struct field, for
+		// as many as the field has held before — but only once the array is
+		// known to be non-empty, since empty arrays are common and must stay
+		// free.
 		g.ifStmt(b, nil, bin(call(id("cap"), s), token.EQL, num(0)), func(b *block) {
-			g.emit(b, assign(s, call(id("make"), typ(t.Expr), num(0), num(4))))
+			g.emit(b, assign(s, call(id("make"), typ(t.Expr), num(0), capExpr(hint, t))))
 		})
 		g.loop(b, func(b *block) {
 			g.emit(b, varDecl(e.Name, typ(t.Elem.Expr)))
@@ -745,11 +751,23 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 			g.emit(b, assign(s, call(id("append"), s, e)))
 			g.separator(b, c, ']', "after array element")
 		})
+		if hint != "" {
+			g.emit(b, expr(call(sel(id(hint), "Record"), call(id("len"), s))))
+		}
 	})
 	g.ifStmt(b, nil, bin(s, token.EQL, nilV), func(b *block) {
 		g.emit(b, assign(s, composite(typ(t.Expr))))
 	})
 	g.emit(b, assign(target, s))
+}
+
+// capExpr renders the capacity a slice of type t is allocated with: the
+// field's hint when it has one, otherwise room for a few elements.
+func capExpr(hint string, t *analyzer.Type) ast.Expr {
+	if hint == "" {
+		return num(4)
+	}
+	return call(index(rt("CapFor"), typ(t.Elem.Expr)), addr(id(hint)))
 }
 
 func (g *generator) decodeArray(b *block, t *analyzer.Type, target ast.Expr, c ctx) {

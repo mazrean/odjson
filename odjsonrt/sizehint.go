@@ -1,6 +1,9 @@
 package odjsonrt
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+	"unsafe"
+)
 
 // SizeHint remembers how large a type's JSON encoding has been so far, so that
 // the next encoding can be written into a buffer allocated once at the right
@@ -55,5 +58,56 @@ func (h *SizeHint) Record(b []byte) {
 		if h.n.CompareAndSwap(old, n) {
 			return
 		}
+	}
+}
+
+// CapHint remembers how many elements a slice field has held, so that the
+// next decode of that field can allocate the slice once at that size. Grown
+// by appending from nothing, a slice of a hundred large structs costs five
+// reallocations and copies every element but the last; with the hint it
+// costs one allocation and no copy.
+//
+// The hint follows the largest length seen, and it comes back down when a
+// decode finds it more than four times too large, so one outlying document
+// does not make every later value of the field carry its capacity. Between
+// those two moves a decode only reads it. The zero value is ready to use and
+// safe for concurrent use.
+type CapHint struct {
+	n atomic.Int64
+}
+
+const (
+	// minCap is the capacity a slice gets before its field has a hint, and
+	// the least a hint ever asks for.
+	minCap = 4
+	// maxCapBytes bounds what a hint alone can make a decode allocate.
+	maxCapBytes = 1 << 20
+)
+
+// CapFor returns the capacity to allocate for a slice of T about to be
+// decoded into the field h describes.
+func CapFor[T any](h *CapHint) int {
+	n := int(h.n.Load())
+	if n <= minCap {
+		return minCap
+	}
+	// Sizeof does not evaluate its operand, so nothing is allocated here.
+	if size := int(unsafe.Sizeof(*new(T))); size > 0 && n > maxCapBytes/size {
+		return max(maxCapBytes/size, minCap)
+	}
+	return n
+}
+
+// Record notes the length of a non-empty slice a decode has just filled in.
+// A larger length raises the hint; a length below a quarter of it lowers the
+// hint to twice that length. Each is a single attempt: losing the race to
+// another decode of the same field only means that decode's length stands.
+func (h *CapHint) Record(n int) {
+	old := h.n.Load()
+	switch l := int64(n); {
+	case l > old:
+		h.n.CompareAndSwap(old, l)
+	case l*4 < old && old > minCap:
+		h.n.CompareAndSwap(old, l*2)
 	}
 }

@@ -704,6 +704,55 @@ Not attempted: length-specialised integer formatting for the narrow types
 handle in a couple of steps; json-constantiater's opt-in assumption tags;
 anything that needs `GOEXPERIMENT=simd`.
 
+### The decode round
+
+A second pass, on the decoders alone, started from a profile of the
+`json/v2` rows rather than from the literature: on `twitter` the whitespace
+skip was 18% (12% in `skipSpaceSlow`, 6% in the inlined test), the strict
+skip of the unknown `retweeted_status` members 30% for 42% of the bytes,
+allocation 10%, and the string scan 19%; on `small`, 20% of the row is
+outside the generated parser (the `json/v2` machinery, `sync.Pool` for the
+string cache) and a further 11% is the six slice allocations the target
+type needs. A check of the schema-known decoders in other languages
+(System.Text.Json's source generator, DSL-JSON and fastjson2's name hashes,
+Utf8Json's automata, glaze's compile time maps and its `minified`,
+`null_terminated` and padding options, sonic-rs, Zig's `std.json`, the
+Swift Foundation scanner, Jackson 2.18/2.19) and of the 2023–2026 papers
+found nothing scalar that the generated decoder does not already do or that
+the constraints allow: the remaining techniques either assume something
+about the input (no whitespace, a terminator, padding the caller must
+provide) or need SIMD. The same measurement procedure as above, every step
+against the one before it.
+
+What stayed:
+
+| change | rows that moved |
+| --- | --- |
+| a **capacity hint per slice field** (`odjsonrt.CapHint`): the field's three decoders remember the largest length it has held and allocate the slice once at that size, coming down again when a decode finds the hint more than four times too large, bounded to 1 MiB per allocation; append growth and slices nested in elements are unchanged | `json/v2` twitter decode **-5.8%** (543 → 512 µs, p=0.000), B/op **-35%**: `Statuses` is 848 bytes, and growing a hundred of them from four copied 124 elements over five allocations. `encoding/json` twitter -1.6% (p=0.015); small and every marshal row within noise |
+| the strict decoders' **unknown-name list as shared scratch** (`odjsonrt.UnknownNames`) instead of an `[8][]byte` zeroed on entry to every object, and the matched name no longer stored for an error path that can read it back. Every append is published through the cache (`AddUnknownName`), because a struct member nested after an unknown one takes its own start from the published length: a first cut that grew only the local slice let the nested object write over the outer one's names once the pooled cache was warm, and accepted a duplicate json/v2 rejects. `TestUnknownNamesSurviveNestedObjects` in `v2parity` decodes each case four times for that reason | `json/v2` small decode **-3.5%** and `encoding/json` small **-3.2%** (both p=0.000); twitter within noise. Frames: 416 → 192 bytes for the three-field `Author`, 464 → 224 for `User` |
+| the **colon settled inline** after a raw name match (`odjsonrt.AfterName`, inline cost 47): the one space an indented document puts after it no longer reaches `skipSpaceSlow` through a call on every member | `json/v2` twitter -2.5% at p=0.14 on its own: not separable from layout. Kept with the change above, the pair reading twitter -3.3% against their base |
+
+What did not:
+
+| candidate | result |
+| --- | --- |
+| **indentation verified instead of scanned**: each object learns the newline-plus-spaces run of its first member and checks the rest against it with two masked word compares (`IndentAt`, inline cost 65), falling back to `SkipSpace` on a miss | twitter level (-0.2%), small **+3.0%** (p=0.003): the branch-free two-word path in `skipSpaceSlow` already costs about what the verification does, and the compact document pays for the extra code and three locals. Removed |
+| **a wider duplicate-name filter** in `SkipValueStrict`, on the suspicion that 256 bits over forty-member objects scanned often | instrumented instead of built: on twitter the filter hits 346 times for 13,345 names (2.6%), 10,287 length compares in all, a few microseconds of a 510 µs decode. Nothing to widen |
+| **choosing the string parser in the generated code** (`if strict { ParseStringStrict } else { ParseStringWith }`) instead of through `ParseStringV2`, a wrapper of two calls the inliner cannot take, so that every string costs one call less | `json/v2` twitter and small both -0.6%, while the marshal rows it cannot touch moved -2%: nothing above the floor. The wrapper's call is not where a string's time goes |
+
+The round as a whole, against `main` in one interleaved run (four layouts
+each, n=20): `json/v2` twitter decode **550 → 498 µs (-9.5%)**, small
+**667 → 625 ns (-6.3%)**, `encoding/json` twitter -2.4% and small -2.7%,
+all at p≤0.002, twitter's bytes per decode -35%. The floor of that run is
+the `json/v2` small *encode*, which no decoder change can touch and which
+read +3.7%: the generated file changed, and with it the alignment of every
+literal after it, as described under "Measurement notes".
+
+What is left on the decode side is what the profile said at the start:
+allocation the target type dictates, the string scan, and a whitespace skip
+that is already a handful of instructions per run. Each remaining candidate
+is under the layout floor, which is why this round stopped here.
+
 ## Measurement notes
 
 All figures on this page were re-measured together on an AMD Ryzen 9 7950X,

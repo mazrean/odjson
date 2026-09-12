@@ -133,12 +133,31 @@ func ParseKey(data []byte, p int) (key []byte, aliased bool, next int, err error
 // member value's first byte. Generated decoders call it after matching a
 // name against the document's raw bytes; the errors are [ParseKey]'s.
 func AfterKey(data []byte, p int) (int, error) {
-	// A compact document has the colon right there, and the value right
-	// after it; keeping that shape inlinable is what the raw match buys.
 	if p < len(data) && data[p] == ':' {
 		return SkipSpace(data, p+1), nil
 	}
 	return afterKeySlow(data, p)
+}
+
+// AfterName is [AfterKey] for the two shapes nearly every document has:
+// the colon followed by the value, or by one space and then the value. It
+// returns the index of the value's first byte, or 0 when the bytes are
+// anything else, which [AfterKey] then settles; a value never starts at 0
+// after a name. It has no call in it, so it is inlined into the generated
+// decoder, where the one space of an indented document used to reach
+// skipSpaceSlow on every member.
+func AfterName(data []byte, p int) int {
+	// Two bytes past the colon exist in any document that is not cut off,
+	// since a comma or a bracket follows the value.
+	if p+2 < len(data) && data[p] == ':' {
+		if data[p+1] > ' ' {
+			return p + 1
+		}
+		if data[p+1] == ' ' && data[p+2] > ' ' {
+			return p + 2
+		}
+	}
+	return 0
 }
 
 func afterKeySlow(data []byte, p int) (int, error) {
