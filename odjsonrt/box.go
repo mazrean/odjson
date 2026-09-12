@@ -38,7 +38,11 @@ var (
 )
 
 // boxOK says whether the assembled interfaces come out as the conversions
-// would have; when they do not, the boxes convert.
+// would have; when they do not, the boxes convert. The probe points its
+// interfaces at locals and discards them before returning, which is fine
+// once at init and nowhere else: a box that outlives its frame must point
+// into a heap chunk, as the three constructors below always do, or a stack
+// copy leaves it dangling.
 var boxOK = func() bool {
 	if unsafe.Sizeof(any(nil)) != 2*unsafe.Sizeof(uintptr(0)) {
 		return false
