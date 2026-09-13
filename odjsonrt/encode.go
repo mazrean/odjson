@@ -222,13 +222,70 @@ func AppendStringQuoted(dst []byte, s string, escapeHTML bool) []byte {
 }
 
 // AppendInt appends v as a JSON number.
+//
+// The sign travels as a flag rather than as a call of its own: a function
+// with a call on each side of a branch costs more inline units than the
+// budget allows, and then every signed member of every struct pays two
+// calls instead of one.
 func AppendInt(dst []byte, v int64) []byte {
-	return strconv.AppendInt(dst, v, 10)
+	// The magnitude without a branch: XOR with the sign-extended sign bit
+	// and subtract it, which is two's complement negation for a negative
+	// value and nothing for a positive one. It is also what makes the
+	// smallest int64 need no case of its own.
+	mask := uint64(v >> 63)
+	return appendUint(dst, mask != 0, (uint64(v)^mask)-mask)
 }
 
 // AppendUint appends v as a JSON number.
 func AppendUint(dst []byte, v uint64) []byte {
-	return strconv.AppendUint(dst, v, 10)
+	return appendUint(dst, false, v)
+}
+
+// smalls holds the two digit decimal representation of every value below a
+// hundred, which is what most of a document's numbers are: counts, indices,
+// lengths, the elements of an array of offsets.
+const smalls = "00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899"
+
+// appendUint writes v's digits into dst.
+//
+// strconv formats into a scratch array of its own and copies the digits out
+// of it, which is a call, a store-forwarding stall and a runtime.memmove per
+// number; on a document whose numbers are thousands of small counts and a
+// few hundred eighteen digit ids that was a tenth of the encode. Here the
+// digits are written where they belong. [digits8] turns up to eight of them
+// into one word with three multiplications, and the shift drops the leading
+// zeros of it, so a number of any length is one to three stores; the room
+// for the widest one is taken once, which is also what lets a store land
+// past the digits that follow it.
+func appendUint(dst []byte, neg bool, v uint64) []byte {
+	if neg {
+		dst = append(dst, '-')
+	}
+	if v < 100 {
+		if v < 10 {
+			return append(dst, byte('0'+v))
+		}
+		return append(dst, smalls[v*2], smalls[v*2+1])
+	}
+	nd := numDigits(v)
+	n := len(dst)
+	// The widest uint64 is twenty digits, and a store writes eight.
+	if cap(dst)-n < 28 {
+		dst = slices.Grow(dst, 28)
+	}
+	d := dst[:cap(dst)]
+	switch {
+	case v < 1e8:
+		store64(d, n, digits8(v)>>(8*uint(8-nd)))
+	case v < 1e16:
+		store64(d, n, digits8(v/1e8)>>(8*uint(16-nd)))
+		store64(d, n+nd-8, digits8(v%1e8))
+	default:
+		store64(d, n, digits8(v/1e16)>>(8*uint(24-nd)))
+		store64(d, n+nd-16, digits8(v/1e8%1e8))
+		store64(d, n+nd-8, digits8(v%1e8))
+	}
+	return dst[:n+nd]
 }
 
 // AppendFloat appends v as a JSON number using encoding/json's formatting
@@ -250,7 +307,7 @@ func AppendFloat(dst []byte, v float64, bits int) ([]byte, error) {
 	// integer.
 	if bits == 64 && v > -1e15 && v < 1e15 {
 		if i := int64(v); float64(i) == v && (i != 0 || !math.Signbit(v)) {
-			return strconv.AppendInt(dst, i, 10), nil
+			return AppendInt(dst, i), nil
 		}
 	}
 	if math.IsInf(v, 0) || math.IsNaN(v) {
