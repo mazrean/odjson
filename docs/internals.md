@@ -62,7 +62,7 @@ decode round left — the `json/v2` column reads 93 → 93 µs, 253 → 255 ns,
 differences is itself a measurement. The only code between the two trees is the
 canada round, whose own interleaved, pooled A/B put the `json/v2` decodes of
 these two payloads level, the `encoding/json` decodes at +2.6–3.0% inside a
-batch whose untouched marshal rows moved −6 to −7%, which is the width of
+batch whose untouched `small` marshal rows moved −6 to −7%, which is the width of
 that batch's layout floor; the rest is the drift between two separately built
 runs, up to 3% on a `small` row here. Read the **ratios** rather than the
 differences across runs everywhere on this page, because the baselines move
@@ -83,7 +83,7 @@ Ahead of sonic on all four as well, and — since the encode round — by margin
 that survive changing the measurement. `bench/ab`, in one process, puts the
 encodes at 1.19× and 1.19× and the decodes at 1.32× and 1.80×. The table's two
 encode margins are wider than `ab`'s because both sides' rows land in
-different places in the two binaries: sonic's 11% apart on both (125 vs
+different places in the two binaries: sonic's 11–12% apart (125 vs
 112 µs, 313 vs 282 ns), odjson's `small` row 7% apart the other way
 (255 vs 238 ns). That is the drift between two builds rather than anything
 odjson did. So the honest statement
@@ -471,10 +471,11 @@ canada round then took the three float rows further than any of those,
 whose decode shares the parser). The encode columns moved on the string
 heavy rows, which is the word-at-a-time `ModeHTML` scan and then the encode
 round's fused scan-and-copy: `text-ascii` 2.23× → 2.65×, `unique-strings`
-2.08× → 2.73×, `text-emoji` 1.17× → 1.42×, `text-escaped` 1.46× → 2.16×,
-`twitter` itself 3.76× → 4.67×, `dense` and `sparse` 4.4× → 5.4× and
-8.3× → 11.2× — and down on the rows whose strings are dense non-ASCII from
-end to end, which the next paragraph is about. The v1 decode column is flat
+2.08× → 2.73×, `text-emoji` 1.17× → 1.42× and, against the previous table
+(`4777ed8`) rather than the 2026-09-11 run, `text-escaped` 1.74× → 2.16×,
+`twitter` itself 3.95× → 4.67×, `dense` 4.37× → 5.36× and `sparse`
+8.26× → 11.19× — and down on the rows whose strings are dense non-ASCII
+from end to end, which the next paragraph is about. The v1 decode column is flat
 to +0.14× outside the float rows,
 as it should be — nothing on the September branches touched the public API
 path it stays on except the parser. Of the two rows that were below 1×,
@@ -496,7 +497,7 @@ same A/B, `twitter` at **−16%**, `twitter-compact` −18%, `text-escaped`
 −15%, `text-ascii` −4% and `unique-strings` level; the decodes of the same
 shapes read level to +6%. Binaries built at the merges of PR #37 (the encode
 round) and PR #39 (the codegen fold) read the same as this tree on those
-five rows, to within 2%, so the whole of the move is the encode round's, and
+five rows, to within 3%, so the whole of the move is the encode round's, and
 since the ASCII-only rows did not lose, it is the non-ASCII copy rather than
 the ASCII scan's stores: `copyNonASCII` stores each word it validates, which
 is a win on `twitter`'s runs — 56 bytes on average, among ASCII — and a

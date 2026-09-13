@@ -45,12 +45,12 @@ without re-running `bench/floor` and `bench/ab`. In `README.md` those two
 libraries are
 **comparison baselines only** — their "with odjson" columns stay out of the
 tables, and the claim to keep honest is that json/v2 + odjson beats go-json on
-all four (the narrowest 1.48x, the small decode) and beats sonic on all four
+all four (the narrowest 1.45x, the small decode) and beats sonic on all four
 as well. Since the encode round of September 2026 the two encode margins no
 longer need hedging, but they are still two numbers rather than one: the
 tables read 1.34x on the twitter encode and 1.23x on the small one, `bench/ab`
 reads 1.19x on both, and the gap is where the two binaries put sonic's own
-rows (11% apart on both) and odjson's small row (7% apart the other way), so
+rows (11-12% apart on both) and odjson's small row (7% apart the other way), so
 state the encode side as **at least 1.19x on both**.
 The decodes are 1.35x and 1.91x (1.32x and 1.80x in `bench/ab`). Last
 re-measured 2026-09-13 on `main` at `7d57f14`, `bench/shapes` included;
