@@ -3,6 +3,7 @@ package odjsonrt
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"unicode/utf8"
 	"unsafe"
 )
@@ -107,7 +108,33 @@ func AppendStringQuotedMode(dst []byte, s string, m StringMode) []byte {
 const (
 	swarLo = 0x0101010101010101
 	swarHi = 0x8080808080808080
+	// swarHi32 is swarHi for a four byte word.
+	swarHi32 = 0x80808080
 )
+
+// swarUnsafeOrHigh reports which lanes of w the ModeV2 scan must stop at:
+// the bytes swarUnsafe reports plus every byte >= 0x80, which that mode has
+// to validate as UTF-8 rather than copy blindly.
+//
+// Composing it as swarUnsafe(w)|w&swarHi masks twice and takes a borrow out
+// of the high lanes it then puts back. Here the two are one mask: a lane
+// >= 0x80 is reported by the w term, and for a lane below 0x80 the &^w of
+// swarUnsafe is a no-op, so dropping it changes nothing. Four operations
+// become two, in the loop the encoder spends most of its time in.
+func swarUnsafeOrHigh(w uint64) uint64 {
+	cq := (w ^ (swarLo * 0x02)) - swarLo*0x21
+	e := (w ^ (swarLo * '\\')) - swarLo
+	return (cq | e | w) & swarHi
+}
+
+// swarUnsafeOrHigh32 is [swarUnsafeOrHigh] for four packed bytes, for the
+// halves a string shorter than a word is judged in.
+func swarUnsafeOrHigh32(w uint32) uint32 {
+	const lo = 0x01010101
+	cq := (w ^ (lo * 0x02)) - lo*0x21
+	e := (w ^ (lo * '\\')) - lo
+	return (cq | e | w) & swarHi32
+}
 
 // swarUnsafe reports, for eight packed bytes, whether any of them needs
 // escaping under ModeStream: a control byte, a quote or a backslash. Bytes
@@ -239,53 +266,123 @@ func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, erro
 	case ModeV2HTML:
 		return appendQuotedV2HTML(dst, src, false), nil
 	}
+	// The rest of this function is ModeV2, written out here rather than
+	// called: behind a function of its own every string costs two calls,
+	// which measured 1.9% of the twitter encode when it was last tried.
+	//
+	// The scan and the copy are one pass. The room for the whole body is
+	// taken first, so that every byte of the source reaches the destination
+	// as part of a word store made before the word is judged: what lands
+	// above the first byte that needs attention is either overwritten by the
+	// next store or left in the slack past the length, and what lands past
+	// the source's last byte falls in the word of slack the reservation
+	// adds. The two-pass form this replaces — scan for the next escape, then
+	// append(dst, src[start:i]...) — paid a runtime.memmove call per string,
+	// and the strings a document is full of are around twenty bytes long,
+	// where that call is a large part of the cost.
+	//
+	// Source and destination advance together, so a store of eight bytes at
+	// an offset the scan has not reached yet is never wrong: it writes the
+	// very bytes the next stores would. Only an escape breaks the lockstep,
+	// and it re-takes the reservation.
+	if len(src) == 0 {
+		return dst, nil
+	}
 	mark := len(dst)
-	start := 0
-	for i := 0; i < len(src); {
-		for i+16 <= len(src) {
-			w0 := load64(src, i)
-			w1 := load64(src, i+8)
-			if m0 := swarUnsafe(w0) | w0&swarHi; m0 != 0 {
-				i += swarIndex(m0)
-				goto found
-			}
-			if m1 := swarUnsafe(w1) | w1&swarHi; m1 != 0 {
-				i += 8 + swarIndex(m1)
-				goto found
-			}
-			i += 16
+	n := mark
+	i := 0
+	for {
+		// Room for what is left of the source plus a word of slack:
+		// source and destination advance together, so one reservation
+		// carries a string that holds nothing to escape, which is almost
+		// all of them.
+		if cap(dst)-n < len(src)-i+8 {
+			dst = slices.Grow(dst[:n], len(src)-i+8)
 		}
+		// d is the whole capacity: the stores below land past the length,
+		// which only the return statements publish.
+		d := dst[:cap(dst)]
+		var rem int
 		for i+8 <= len(src) {
 			w := load64(src, i)
-			if m := swarUnsafe(w) | w&swarHi; m != 0 {
-				i += swarIndex(m)
-				goto found
+			store64(d, n, w)
+			if m := swarUnsafeOrHigh(w); m != 0 {
+				k := swarIndex(m)
+				n += k
+				i += k
+				goto hit
 			}
+			n += 8
 			i += 8
 		}
-		// safeSet is false for every byte >= 0x80, so this stops where the
-		// word scan would have.
-		for uint(i) < uint(len(src)) && safeSet[src[i]] {
-			i++
+		rem = len(src) - i
+		if rem == 0 {
+			return dst[:n], nil
 		}
-	found:
-		if uint(i) >= uint(len(src)) {
-			break
+		// The last bytes of the source, as whole words read so that they end
+		// where it does: a masked word would need a shift by a value the
+		// compiler cannot bound, and Go guards those. Every string has such a
+		// tail and a third of them are nothing else, so this is as hot as the
+		// word loop above.
+		if len(src) >= 8 {
+			// One word, overlapping what the loop has already judged. A lane
+			// below i can only be a byte this pass has already written out,
+			// so a hit there sends the rest to the byte loop rather than
+			// reporting it twice; above i the word is the tail itself, and
+			// storing it whole ends exactly at the string's last byte.
+			base := len(src) - 8
+			w := load64(src, base)
+			m := swarUnsafeOrHigh(w)
+			if m == 0 {
+				store64(d, n-(i-base), w)
+				return dst[:n+rem], nil
+			}
+			if p := base + swarIndex(m); p >= i {
+				store64(d, n-(i-base), w)
+				n += p - i
+				i = p
+				goto hit
+			}
+		} else if rem >= 4 {
+			// A string of four to seven bytes: two overlapping halves, judged
+			// together and stored as they are.
+			a, b := load32(src, i), load32(src, i+rem-4)
+			if swarUnsafeOrHigh32(a)|swarUnsafeOrHigh32(b) == 0 {
+				store32(d, n, a)
+				store32(d, n+rem-4, b)
+				return dst[:n+rem], nil
+			}
 		}
+		// A string shorter than four bytes, or a tail whose word carries
+		// something the loop above has already dealt with.
+		for ; i < len(src); i++ {
+			b := src[i]
+			if !safeSet[b] {
+				goto hit
+			}
+			d[n] = b
+			n++
+		}
+		return dst[:n], nil
+	hit:
 		if b := src[i]; b >= utf8.RuneSelf {
-			// The run stays part of the pending copy: a valid sequence
-			// holds nothing that needs escaping. A two byte sequence is
-			// settled here without the call, and the words after it are
-			// taken whole while they are accented Latin text (see
-			// swarLatin), which would otherwise stop the scan at every
-			// letter; the first word without a non-ASCII byte hands back
-			// to the scan above.
+			// A valid sequence holds nothing that needs escaping, so the run
+			// is validated and copied with nothing else to look at. A two byte
+			// sequence is settled here without the call, and the words after
+			// it are taken whole while they are accented Latin text (see
+			// swarLatin), which would otherwise stop the scan at every letter.
 			if b-0xC2 < 0x1E && uint(i+1) < uint(len(src)) && src[i+1]&0xC0 == 0x80 {
+				// The word store that stopped here reached at most the lead
+				// byte, so the sequence is written out by hand.
+				d[n] = b
+				d[n+1] = src[i+1]
+				n += 2
 				i += 2
 				if uint(i) < uint(len(src)) && src[i] >= utf8.RuneSelf {
-					// A dense run (Cyrillic, Greek): skipNonASCII takes
+					// A dense run (Cyrillic, Greek, CJK): skipNonASCII takes
 					// it a word at a time.
-					if i = skipNonASCII(src, i); i < 0 {
+					n, i = copyNonASCII(d, n, src, i)
+					if i < 0 {
 						return dst[:mark], ErrInvalidUTF8
 					}
 					continue
@@ -295,6 +392,8 @@ func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, erro
 					if w&swarHi == 0 || swarUnsafe(w) != 0 || !swarLatin(w) {
 						break
 					}
+					store64(d, n, w)
+					n += 8
 					i += 8
 				}
 				continue
@@ -303,20 +402,44 @@ func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, erro
 			// needs a second byte of 90-BF, F4 one of 80-8F, F1-F3 any.
 			if b-0xF0 < 5 && uint(i+3) < uint(len(src)) && src[i+1]&0xC0 == 0x80 && src[i+2]&0xC0 == 0x80 && src[i+3]&0xC0 == 0x80 &&
 				(b != 0xF0 || src[i+1] >= 0x90) && (b != 0xF4 || src[i+1] < 0x90) {
+				store32(d, n, load32(src, i))
+				n += 4
 				i += 4
 				continue
 			}
-			if i = skipNonASCII(src, i); i < 0 {
+			n, i = copyNonASCII(d, n, src, i)
+			if i < 0 {
 				return dst[:mark], ErrInvalidUTF8
 			}
 			continue
 		}
-		dst = append(dst, src[start:i]...)
-		dst = appendEscape(dst, src[i])
+		// An escape is the one thing that makes the destination outrun
+		// the source, so it is also the only thing that makes the
+		// reservation above run again.
+		dst = appendEscape(dst[:n], src[i])
+		n = len(dst)
 		i++
-		start = i
 	}
-	return append(dst, src[start:]...), nil
+}
+
+// copyRun copies src[i:j] to d at n and returns the offset past it. The
+// caller has reserved room for the rest of src plus a word, so a whole word
+// goes out whenever one can be read: the bytes past j that a last word
+// carries are the ones the caller is about to write there anyway.
+func copyRun(d []byte, n int, src []byte, i, j int) int {
+	for i < j {
+		if i+8 <= len(src) {
+			store64(d, n, load64(src, i))
+			k := min(8, j-i)
+			n += k
+			i += k
+			continue
+		}
+		d[n] = src[i]
+		n++
+		i++
+	}
+	return n
 }
 
 // AppendStringBodyChecked is [AppendStringChecked] without the quotes, for
