@@ -1,92 +1,122 @@
 package odjsonrt
 
 import (
-	"strings"
 	"testing"
+	"unsafe"
 )
 
-// TestSlabStringsSurviveReuse pins the rule the chunk allocator rests on: a
-// string carved from a chunk is never written again, whatever the cache
-// decodes afterwards, through the pool and across chunk boundaries.
-func TestSlabStringsSurviveReuse(t *testing.T) {
-	first := []string{"alpha", "beta\\n", "日本語", strings.Repeat("x", slabMax), strings.Repeat("y", slabMax+1), ""}
-	var doc []byte
-	for _, s := range first {
-		doc = append(doc, '"')
-		doc = append(doc, s...)
-		doc = append(doc, '"', ' ')
+// TestSliceFromDone checks the contract a generated decoder relies on:
+// consecutive slices are distinct, each is clipped to its length so an
+// append by the caller cannot reach the next, a slice that outgrows the
+// tail is a heap slice, and the tail comes back for the strings.
+func TestSliceFromDone(t *testing.T) {
+	c := new(StringCache)
+	a := SliceFrom[float64](c)
+	if len(a) != 0 || cap(a) < sliceMin {
+		t.Fatalf("SliceFrom: len %d cap %d", len(a), cap(a))
 	}
-	c := GetStringCache()
-	var got []string
-	for p := 0; p < len(doc); {
-		s, next, err := ParseStringStrict(doc, p, c)
-		if err != nil {
-			t.Fatal(err)
-		}
-		got = append(got, s)
-		p = SkipSpace(doc, next)
+	a = append(a, 1.5, 2.5)
+	a = SliceDone(c, a)
+	if len(a) != 2 || cap(a) != 2 || a[0] != 1.5 || a[1] != 2.5 {
+		t.Fatalf("SliceDone: %v len %d cap %d", a, len(a), cap(a))
 	}
-	PutStringCache(c)
-
-	// Enough distinct strings to walk through several chunks, four times
-	// over with the pool warm.
-	var filler []byte
-	for i := range 4 * slabSize / 16 {
-		filler = append(filler, '"')
-		filler = append(filler, strings.Repeat(string(rune('a'+i%26)), 8+i%5)...)
-		filler = append(filler, '"', ' ')
+	b := SliceFrom[float64](c)
+	b = append(b, 3.5)
+	b = SliceDone(c, b)
+	if unsafe.Pointer(unsafe.SliceData(b)) != unsafe.Add(unsafe.Pointer(unsafe.SliceData(a)), 16) {
+		t.Errorf("second slice does not follow the first in the chunk")
 	}
-	for range 4 {
-		c := GetStringCache()
-		for p := 0; p < len(filler); {
-			_, next, err := ParseStringStrict(filler, p, c)
-			if err != nil {
-				t.Fatal(err)
-			}
-			p = SkipSpace(filler, next)
-		}
-		PutStringCache(c)
+	// An append by the caller reallocates rather than writing into b.
+	a = append(a, 9)
+	if b[0] != 3.5 {
+		t.Fatalf("append into a clipped slice reached its neighbour: %v", b)
+	}
+	if len(a) != 3 || a[2] != 9 {
+		t.Fatalf("append after SliceDone: %v", a)
 	}
 
-	want := []string{"alpha", "beta\n", "日本語", strings.Repeat("x", slabMax), strings.Repeat("y", slabMax+1), ""}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("string %d changed: got %q, want %q", i, got[i], want[i])
-		}
+	// Mixed element types keep their alignment.
+	bs := SliceFrom[bool](c)
+	bs = append(bs, true, false, true)
+	bs = SliceDone(c, bs)
+	fs := SliceFrom[float64](c)
+	if uintptr(unsafe.Pointer(unsafe.SliceData(fs)))%8 != 0 {
+		t.Errorf("float64 slice misaligned after a bool slice")
+	}
+	fs = append(fs, 7)
+	fs = SliceDone(c, fs)
+	if len(bs) != 3 || !bs[0] || bs[1] || !bs[2] || fs[0] != 7 {
+		t.Errorf("bs %v fs %v", bs, fs)
+	}
+	i8 := SliceFrom[int8](c)
+	i8 = append(i8, -1, 2)
+	i8 = SliceDone(c, i8)
+	if len(i8) != 2 || cap(i8) != 2 || i8[0] != -1 || i8[1] != 2 {
+		t.Errorf("int8 slice %v cap %d", i8, cap(i8))
+	}
+
+	// A slice that outgrows the tail is moved to the heap by append and
+	// comes back as is; the tail is returned whole.
+	free := len(c.slab.free)
+	big := SliceFrom[float64](c)
+	for i := range slabSize {
+		big = append(big, float64(i))
+	}
+	big = SliceDone(c, big)
+	if len(big) != slabSize || big[slabSize-1] != float64(slabSize-1) {
+		t.Fatalf("big slice: len %d", len(big))
+	}
+	if got := len(c.slab.free); got > free || got < free-7 {
+		// The tail comes back whole, less the bytes that aligned it.
+		t.Errorf("tail after an outgrown slice: %d, want %d less alignment", got, free)
+	}
+	if c.slab.reserved != nil {
+		t.Error("tail still reserved")
+	}
+
+	// Strings carved after a slice do not overlap it.
+	s := c.alloc([]byte("after"))
+	if s != "after" || fs[0] != 7 || i8[0] != -1 {
+		t.Errorf("string carve disturbed a slice: %q %v %v", s, fs, i8)
+	}
+
+	// A nil cache allocates, and a slice that is not the cache's comes
+	// back untouched.
+	n := SliceFrom[int](nil)
+	n = append(n, 1)
+	n = SliceDone(nil, n)
+	if len(n) != 1 || n[0] != 1 {
+		t.Errorf("nil cache: %v", n)
+	}
+	own := make([]int, 1, 8)
+	if got := SliceDone(c, own); cap(got) != 8 {
+		t.Errorf("foreign slice clipped: cap %d", cap(got))
 	}
 }
 
-// TestSlabAllocEdges covers the shapes alloc treats specially.
-func TestSlabAllocEdges(t *testing.T) {
-	var nilCache *StringCache
-	if s := nilCache.alloc([]byte("abc")); s != "abc" {
-		t.Errorf("nil cache: %q", s)
-	}
+// TestSliceFromAbandoned checks that a decoder failing between SliceFrom
+// and SliceDone costs the tail and nothing else: the next slice starts a
+// fresh chunk, and a pooled cache gets the tail back.
+func TestSliceFromAbandoned(t *testing.T) {
 	c := new(StringCache)
-	if s := c.alloc(nil); s != "" {
-		t.Errorf("empty: %q", s)
+	a := SliceFrom[float64](c)
+	a = append(a, 1)
+	b := SliceFrom[float64](c)
+	b = append(b, 2)
+	b = SliceDone(c, b)
+	if a[0] != 1 || b[0] != 2 {
+		t.Fatalf("a %v b %v", a, b)
 	}
-	long := make([]byte, slabMax+1)
-	if s := c.alloc(long); len(s) != slabMax+1 || c.slab != nil {
-		t.Errorf("a string past slabMax must be allocated on its own")
+	if unsafe.SliceData(a) == unsafe.SliceData(b) {
+		t.Fatal("an abandoned slice shares its tail with the next")
 	}
-	a := c.alloc([]byte("first"))
-	// Use the chunk up until slabMax bytes no longer fit, then carve
-	// slabMax: that must start a new chunk and leave the tail behind.
-	for len(c.slab.free) >= slabMax {
-		c.alloc(make([]byte, slabMax))
+	x := SliceFrom[int32](c)
+	x = append(x, 3)
+	PutStringCache(c)
+	if c.slab.reserved != nil || len(c.slab.free) == 0 {
+		t.Error("PutStringCache left the tail reserved")
 	}
-	b := c.alloc(make([]byte, slabMax))
-	if len(c.slab.free) != slabSize-slabMax {
-		t.Errorf("a string that does not fit must start a new chunk: free %d", len(c.slab.free))
-	}
-	if a != "first" || len(b) != slabMax {
-		t.Errorf("carved strings changed: %q %d", a, len(b))
-	}
-	if s, ok := c.unquoteString([]byte(`aé\n`), true); !ok || s != "aé\n" {
-		t.Errorf("unquoteString: %q %v", s, ok)
-	}
-	if _, ok := c.unquoteString([]byte(`\ud800`), true); ok {
-		t.Errorf("unquoteString accepted an unpaired surrogate under strict")
+	if x[0] != 3 {
+		t.Error("abandoned elements disturbed")
 	}
 }

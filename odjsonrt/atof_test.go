@@ -120,11 +120,11 @@ func TestParseSimpleFloatHardCases(t *testing.T) {
 	}
 	declined := []string{
 		"", "-", "+1", ".5", "1.", "01", "-01", "00", "-.5", "1e", "1e+", "1e-", "1.e5", "1.5e", "e5",
-		"12345678901234567890",       // twenty digits
-		"1.2345678901234567890",      // twenty digits with a point
-		"0.00000000000000000000001",  // twenty-three fraction digits
-		"1234567890123456789.0",      // twenty digits either side
-		"-12345678901234567890e-5",   // twenty digits and an exponent
+		"12345678901234567890",      // twenty digits
+		"1.2345678901234567890",     // twenty digits with a point
+		"0.00000000000000000000001", // twenty-three fraction digits
+		"1234567890123456789.0",     // twenty digits either side
+		"-12345678901234567890e-5",  // twenty digits and an exponent
 		"Infinity", "NaN", "nan", "inf", "١",
 	}
 	for _, lit := range declined {

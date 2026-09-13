@@ -5516,7 +5516,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 								p++
 							} else {
 								if cap(s623) == 0 {
-									s623 = make([]int, 0, 4)
+									s623 = odjsonrt.SliceFrom[int](sc)
 								}
 								for {
 									var e624 int
@@ -5553,6 +5553,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 									}
 									return p, odjsonrt.ErrSyntax(data, p, "after array element")
 								}
+								s623 = odjsonrt.SliceDone(sc, s623)
 							}
 							if s623 == nil {
 								s623 = []int{}
@@ -6648,7 +6649,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 								p++
 							} else {
 								if cap(s752) == 0 {
-									s752 = make([]int, 0, 4)
+									s752 = odjsonrt.SliceFrom[int](sc)
 								}
 								for {
 									var e753 int
@@ -6686,6 +6687,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 									}
 									return p, odjsonrt.ErrSyntax(data, p, "after array element")
 								}
+								s752 = odjsonrt.SliceDone(sc, s752)
 							}
 							if s752 == nil {
 								s752 = []int{}
@@ -7808,7 +7810,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 								vp894++
 							} else {
 								if cap(s901) == 0 {
-									s901 = make([]int, 0, 4)
+									s901 = odjsonrt.SliceFrom[int](sc)
 								}
 								for {
 									var e902 int
@@ -7846,6 +7848,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 									}
 									return odjsonrt.ErrSyntax(val893, vp894, "after array element")
 								}
+								s901 = odjsonrt.SliceDone(sc, s901)
 							}
 							if s901 == nil {
 								s901 = []int{}

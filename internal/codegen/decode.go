@@ -785,8 +785,15 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 		// start with room for a few elements — or, for a struct field, for
 		// as many as the field has held before — but only once the array is
 		// known to be non-empty, since empty arrays are common and must stay
-		// free.
+		// free. A slice of scalars that is not a struct field, one of many
+		// in the slice or map around it, is carved from the cache's chunk
+		// instead of allocated (see odjsonrt.SliceFrom).
+		carve := hint == "" && c.cache != "" && scalarElem(t.Elem)
 		g.ifStmt(b, nil, bin(call(id("cap"), s), token.EQL, num(0)), func(b *block) {
+			if carve {
+				g.emit(b, assign(s, call(index(rt("SliceFrom"), typ(t.Elem.Expr)), cacheExpr(c))))
+				return
+			}
 			g.emit(b, assign(s, call(id("make"), typ(t.Expr), num(0), capExpr(hint, t))))
 		})
 		g.loop(b, func(b *block) {
@@ -801,6 +808,9 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 			g.emit(b, assign(s, call(id("append"), s, e)))
 			g.separator(b, c, ']', "after array element")
 		})
+		if carve {
+			g.emit(b, assign(s, callRT("SliceDone", cacheExpr(c), s)))
+		}
 		if hint != "" {
 			g.emit(b, expr(call(sel(id(hint), "Record"), call(id("len"), s))))
 		}
@@ -809,6 +819,17 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 		g.emit(b, assign(s, composite(typ(t.Expr))))
 	})
 	g.emit(b, assign(target, s))
+}
+
+// scalarElem reports whether t is a plain number or bool, decoded by the
+// inline scalar path and free of pointers, so that a slice of it can be
+// carved from a chunk.
+func scalarElem(t *analyzer.Type) bool {
+	switch t.Kind {
+	case analyzer.KindBool, analyzer.KindInt, analyzer.KindUint, analyzer.KindFloat:
+		return !t.Unmarshaler && !t.PtrUnmarshaler && !t.TextUnmarshaler && !t.PtrTextUnmarshaler && !t.Interface
+	}
+	return false
 }
 
 // capExpr renders the capacity a slice of type t is allocated with: the
