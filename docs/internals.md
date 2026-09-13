@@ -59,7 +59,7 @@ Against the run quoted here before — the same machine, the tree the encode
 round left — the `json/v2` column reads 94 → 93 µs, 266 → 253 ns,
 380 → 371 µs and 530 → 541 ns, and reflection 395 → 402 µs,
 1.037 → 1.068 µs, 1.078 → 1.089 ms and 1.856 → 1.864 µs. None of those
-differences is a measured change. The only code between the two trees is the
+differences is itself a measurement. The only code between the two trees is the
 fourth decode round, whose own interleaved, pooled A/B put the `json/v2`
 `twitter` decode at **−1.85%** and every other row inside the layout floor;
 the rest is the drift between two separately built runs, up to 5% on a
@@ -80,9 +80,11 @@ Ahead of go-json on all four, the narrowest being 1.48×, the small decode.
 Ahead of sonic on all four as well, and — since the encode round — by margins
 that survive changing the measurement. `bench/ab`, in one process, puts the
 encodes at 1.17× and 1.12× and the decodes at 1.32× and 1.85×. The table's two
-encode margins are wider than `ab`'s because the two runs place sonic's own
-rows 7% and 11% apart (122 vs 114 µs, 313 vs 282 ns), which is the drift
-between two binaries rather than anything odjson did. So the honest statement
+encode margins are wider than `ab`'s because both sides' rows land in
+different places in the two binaries: sonic's 7% and 11% apart (122 vs
+114 µs, 313 vs 282 ns), odjson's `twitter` row 4.5% apart the other way
+(93 vs 98 µs). That is the drift between two builds rather than anything
+odjson did. So the honest statement
 of the encode side is **at least 1.17× on `twitter` and at least 1.12× on
 `small`**, against a suite whose two runs can differ by ±5%. Before the encode
 round the same rows read 1.09× in the table and 1.08× / 1.05× in `ab`, which
@@ -1270,7 +1272,7 @@ their `small` marshals. Against sonic's own path it is 1.17× faster on the
 `twitter` marshal, 1.12× faster on the `small` marshal, 1.32× faster on the
 `twitter` unmarshal and 1.85× faster on the `small` unmarshal — the same four
 signs the tables above report, with the two encode margins smaller, by the
-distance between where the two runs put sonic's own rows.
+distance between where the two binaries put sonic's rows and odjson's.
 
 With the direct path compiled out (`-tags odjson_safe`), the same process puts
 `encoding/json/v2` at **0.91× / 1.10× / 1.09× / 1.54×**: the decode side still

@@ -49,8 +49,9 @@ all four (the narrowest 1.48x, the small decode) and beats sonic on all four
 as well. Since the encode round of September 2026 the two encode margins no
 longer need hedging, but they are still two numbers rather than one: the
 tables read 1.31x on the twitter encode and 1.24x on the small one, `bench/ab`
-reads 1.17x and 1.12x, and the gap is where the two runs put sonic's own rows
-(7% and 11% apart), so state the encode side as **at least 1.17x and 1.12x**.
+reads 1.17x and 1.12x, and the gap is where the two binaries put sonic's rows
+(7% and 11% apart) and odjson's twitter row (4.5% apart the other way), so
+state the encode side as **at least 1.17x and 1.12x**.
 The decodes are 1.41x and 1.98x (1.32x and 1.85x in `bench/ab`). Last
 re-measured 2026-09-13 on `main` at `11714dc`; re-measure before restating
 any of it.
