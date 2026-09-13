@@ -1071,9 +1071,10 @@ behind it are about 16%; the rest is the encoder pool and the collector's
 share of a benchmark that allocates 262 KB per call. Of odjson's part, the
 string writer is about 60% (17 µs of it the non-ASCII runs, whose six byte
 CJK loop is ALU bound at a little over a cycle a byte), the dynamic members
-about a quarter — most of that Go's map iterator over the `[]any` of
+about a quarter — half of that Go's map iterator over the `[]any` of
 `map[string]any` the URL entities decode to, which has no faster public
-form — and the integers about a seventh. The 4,754 value strings hold 200 KB,
+form, the rest the strings inside those maps — and the integers about a
+seventh. The 4,754 value strings hold 200 KB,
 an average of 42 bytes, so the string writer's cost is its bytes rather than
 its calls: 38% of the strings are under eight bytes and take no loop at all.
 
@@ -1091,8 +1092,9 @@ any unconditional member patches its opening brace statically.
 `Marshal/encoding-json/small` **−3.85%** (p=0.000); every other marshal row
 and every decode row level (`json/v2` `twitter` +0.8% at p=0.095). The
 twitter document's 2,791 bools and 1,946 nulls each save an append, but the
-arms carry the literals twice and the generated encoders grow by about a
-third, and on that row the two cancel.
+arms carry the literals twice and the wide encoders grow by about a quarter
+(`Statuses` 7.4 → 9.3 KB of machine code, `User` 9.1 → 11.3 KB; `Book`, with
+few such members, by a tenth), and on that row the two cancel.
 
 **Rejected, with numbers:**
 
@@ -1130,8 +1132,9 @@ third, and on that row the two cancel.
 **What the floor is.** On the `json/v2` `twitter` row, 30% of the wall time
 is `encoding/json/v2`'s own — the clone and the collector — and of odjson's
 70%, half is the string writer at about a cycle a byte with a scalar word
-scan and a branch-predicted loop exit per string, a quarter is the map
-iterator, and the generated code's own literals and tests are about 7%. The
+scan and a branch-predicted loop exit per string, a quarter is the dynamic
+members with the map iterator half of it, and the generated code's own
+literals and tests are about 7%. The
 `small` row is 277 ns of which 105 ns are odjson's, three strings, five
 numbers and eleven member names. Two changes that each moved their
 micro-benchmark by four to eight percent moved neither row past the layout
