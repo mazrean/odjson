@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 **odjson**（*overdrive JSON*）は、`encoding/json/v2` をコード編集なしで [`bytedance/sonic`](https://github.com/bytedance/sonic) 相当まで高速化する CLI コードジェネレータです。
-標準の `encoding/json/v2` をそのまま使って行っている JSON エンコード/デコードが、以下のコメントを追加し、`go generate` するだけで 2.2×〜3.5× 高速化します。
+標準の `encoding/json/v2` をそのまま使って行っている JSON エンコード/デコードが、以下のコメントを追加し、`go generate` するだけで 2.9×〜3.8× 高速化します。
 ```go
 //go:generate go tool odjson -type User
 ```
@@ -16,10 +16,10 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bench-dark.svg">
-  <img alt="1 操作あたりの時間、低いほど速い。Marshal large: encoding/json/v2 400 µs, odjson あり 113 µs, sonic 116 µs, go-json 245 µs。Marshal small: 1036 ns, odjson あり 305 ns, sonic 311 ns, go-json 380 ns。Unmarshal large: 1111 µs, odjson あり 516 µs, sonic 526 µs, go-json 687 µs。Unmarshal small: 1910 ns, odjson あり 601 ns, sonic 1023 ns, go-json 799 ns。" src="./docs/assets/bench-light.svg" width="912">
+  <img alt="1 操作あたりの時間、低いほど速い。Marshal large: encoding/json/v2 394 µs, odjson あり 104 µs, sonic 113 µs, go-json 240 µs。Marshal small: 1030 ns, odjson あり 283 ns, sonic 310 ns, go-json 389 ns。Unmarshal large: 1067 µs, odjson あり 374 µs, sonic 497 µs, go-json 651 µs。Unmarshal small: 1841 ns, odjson あり 535 ns, sonic 996 ns, go-json 778 ns。" src="./docs/assets/bench-light.svg" width="912">
 </picture>
 
-ベンチマーク上で、エンコード/デコードともに **`encoding/json/v2` に対して 2.2×〜3.5×** の速度向上を確認しています。また、[`goccy/go-json`](https://github.com/goccy/go-json) をいずれのベンチマークでも上回り、アセンブリを用いて JIT コンパイルや SIMD を用いる [`bytedance/sonic`](https://github.com/bytedance/sonic) とほぼ同等の実行時間でエンコード/デコードできます。
+ベンチマーク上で、エンコード/デコードともに **`encoding/json/v2` に対して 2.9×〜3.8×** の速度向上を確認しています。また、[`goccy/go-json`](https://github.com/goccy/go-json) をいずれのベンチマークでも 1.4×〜2.3× 上回り、アセンブリを用いて JIT コンパイルや SIMD を用いる [`bytedance/sonic`](https://github.com/bytedance/sonic) も 4 つすべてで上回ります。内訳は large デコードが 1.3×、small デコードが 1.9×、2 つのエンコードが約 1.1× で、エンコードの差は実行間のばらつきに近いため同等と読むのが妥当です。
 
 <details>
 <summary>ベンチマーク環境と再現方法</summary>
@@ -73,7 +73,7 @@ go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(json-v2|go-json|sonic)/' 
 
 Go 1.27 以降で動作します。生成コードが `encoding/json/jsontext` を import するため、1.26 以前ではコンパイルできません。
 
-また、1.27 以降の `encoding/json` でも内部的に `encoding/json/v2` を使うため効果はありますが、`encoding/json/v2` で使用する場合に最大限効果を発揮するようにチューニングしており、`encoding/json/v2` を使うことを推奨します。`encoding/json` 経由ではエンコードが 3.2×、デコードが 1.2×〜1.5× となります。エンコードは後述の内部バッファへの直接書き込みを使いますが、デコードは公開 API を経由します。`encoding/json` が設定するコーダのフラグが、直接経路の厳密なパーサでは拒否する入力を許容するためです。
+また、1.27 以降の `encoding/json` でも内部的に `encoding/json/v2` を使うため効果はありますが、`encoding/json/v2` で使用する場合に最大限効果を発揮するようにチューニングしており、`encoding/json/v2` を使うことを推奨します。`encoding/json` 経由ではエンコードが 3.4×、デコードが 1.3×〜1.6× となります。エンコードは後述の内部バッファへの直接書き込みを使いますが、デコードは公開 API を経由します。`encoding/json` が設定するコーダのフラグが、直接経路の厳密なパーサでは拒否する入力を許容するためです。
 
 ## Quick Start
 
@@ -194,7 +194,7 @@ Go の struct は、JSON の形について必要な情報をコンパイル時�
 
 加えて、これらの専用コードを `(T).MarshalJSONTo` / `(*T).UnmarshalJSONFrom` の標準ライブラリのインターフェースに準拠させることで、標準ライブラリを使用するコードを変更することなく、odjson の恩恵を受けることができます。
 `encoding/json/v2` によりこれらのストリーム処理などによるオーバーヘッドの小さいインターフェースが提供されたことで、初めてこのような実装が可能となりました。
-これにより、**標準ライブラリの信頼性**を生かしつつ、**github.com/bytedance/sonic 相当の速度**も得ることができます。
+これにより、**標準ライブラリの信頼性**を生かしつつ、**github.com/bytedance/sonic 相当の速度**——デコードの 2 つについてはそれを上回る速度——も得ることができます。
 
 具体的には、以下のメソッドを各型に対し追加します。
 

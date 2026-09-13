@@ -65,39 +65,39 @@ type panel struct {
 
 var panels = []panel{
 	{
-		title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "3.54", payload: "twitter",
+		title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "3.78", payload: "twitter",
 		rows: []row{
-			{label: "encoding/json/v2", value: 400, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 113, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 116, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 245, module: "plain", codec: "go-json"},
+			{label: "encoding/json/v2", value: 394, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 104, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 113, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 240, module: "plain", codec: "go-json"},
 		},
 	},
 	{
-		title: "Marshal", sub: "small · 340 B", unit: "ns", ratio: "3.40", payload: "small",
+		title: "Marshal", sub: "small · 340 B", unit: "ns", ratio: "3.63", payload: "small",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1036, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 305, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 311, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 380, module: "plain", codec: "go-json"},
+			{label: "encoding/json/v2", value: 1030, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 283, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 310, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 389, module: "plain", codec: "go-json"},
 		},
 	},
 	{
-		title: "Unmarshal", sub: "large · 616 KiB", unit: "µs", ratio: "2.15", payload: "twitter",
+		title: "Unmarshal", sub: "large · 616 KiB", unit: "µs", ratio: "2.85", payload: "twitter",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1111, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 516, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 526, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 687, module: "plain", codec: "go-json"},
+			{label: "encoding/json/v2", value: 1067, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 374, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 497, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 651, module: "plain", codec: "go-json"},
 		},
 	},
 	{
-		title: "Unmarshal", sub: "small · 340 B", unit: "ns", ratio: "3.18", payload: "small",
+		title: "Unmarshal", sub: "small · 340 B", unit: "ns", ratio: "3.44", payload: "small",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1910, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 601, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 1023, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 799, module: "plain", codec: "go-json"},
+			{label: "encoding/json/v2", value: 1841, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 535, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 996, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 778, module: "plain", codec: "go-json"},
 		},
 	},
 }
