@@ -1652,14 +1652,16 @@ round's tree; a percentage between two separately built binaries is not one
 this page trusts, and none is quoted.
 
 The `bench/plain` / `bench/gen` tables are one run. The decode rows of both
-are all within ±3% by `benchstat`, and so are the `encoding/json` encodes
-but `bench/gen`'s `small` (±5%) and `medium` (±4%). The rest of the encode
-side is wider: `bench/gen`'s `json/v2` `twitter` marshal ±8% (eight of its
-ten samples between 92.7 and 97.1 µs, two at 102–104) and `medium` ±4%,
-`bench/plain`'s `json/v2` `twitter` ±4%, and sonic's and go-json's own
-encodes on every payload (sonic ±10% / ±7% / ±6%, go-json ±4% / ±6% / ±2%,
-`sonic.ConfigStd` ±3% / ±9% / ±2%), sonic's `twitter` in the same two
-clusters, 111–118 and 125–135 µs, that the previous sitting saw. The tables
+are within ±3% by `benchstat` but `sonic.ConfigStd`'s `twitter` (±8%) and
+`medium` (±5%) decodes in `bench/plain`, and so are the `encoding/json`
+encodes but `bench/gen`'s `small` (±5%) and `medium` (±4%). The rest of the
+encode side is wider: `bench/gen`'s `json/v2` `twitter` marshal ±8% (eight
+of its ten samples between 92.7 and 97.1 µs, two at 102–104) and `medium`
+±4%, `bench/plain`'s `json/v2` `twitter` ±4%, and sonic's and go-json's own
+encodes (sonic ±10% / ±7% / ±6%, go-json ±4% / ±6% / ±2%,
+`sonic.ConfigStd` ±3% / ±9% / ±2%, `twitter` / `medium` / `small`), sonic's
+`twitter` in the same two clusters, 111–118 and 125–135 µs, that the
+previous sitting saw. The tables
 quote the medians because a re-run is a different measurement rather than a
 better one: the previous sitting re-ran its wide rows alone at `-count 20`
 and they came back 3–12% from the suite, about what two runs of the suite
@@ -1683,8 +1685,10 @@ sonic's own path it is 1.19× / 1.47× / 1.23× faster on the marshals and
 tables above report, with the margins moved by the distance between where
 the two binaries put sonic's rows and odjson's.
 
-With the direct path compiled out (`-tags odjson_safe`), the same process puts
-`encoding/json/v2` at **0.90× / 1.09× / 1.10× / 1.59×**: the decode side still
+With the direct path compiled out (`-tags odjson_safe`), the same kind of
+process — the previous sitting's, on `7d57f14`, `twitter` and `small` only,
+since `medium` was not in it — puts `encoding/json/v2` at **0.90× / 1.09× /
+1.10× / 1.59×**: the decode side still
 wins and so does the `small` encode, by the headroom the ceiling section
 measures, while the `twitter` encode is a 1.11× loss. That is what a
 Go minor odjson has not verified yet costs, until a release widens the gate.

@@ -136,8 +136,9 @@ cd bench && go test -bench . -count 5 ./ab/
 ```
 
 `ab` covers all four host libraries; the sonic and go-json rows are what settle
-whether odjson wins their small unmarshal (sonic's by 1.20x, go-json's by
-1.10x) and loses everything else on them (it does, by the floor).
+whether odjson wins their small unmarshal (sonic's by 1.15x, go-json's by
+1.07x), is level on sonic's medium unmarshal (0.99x), and loses everything
+else on them (it does, by the floor).
 
 ## `shapes`
 
@@ -150,7 +151,7 @@ the generated codec still pays for itself on that shape:
 
 | shape | what it varies |
 | --- | --- |
-| `twitter`, `small` | the README's payloads, as the reference rows |
+| `twitter`, `small` | the README's `twitter` and `small` payloads, as the reference rows |
 | `twitter-compact`, `page-12k-indented` | whitespace |
 | `page-3k`, `page-12k`, `page-100k` | one top-level object at the sizes between the two fixtures |
 | `array-items`, `array-pages`, `map-items` | a top-level `[]T` / `map[string]T` of a generated type, so every generated value sits below the top level; the element size puts `array-items` under `odjsonrt.WholeValue`'s threshold and `array-pages` over it, which matters on the public path |
