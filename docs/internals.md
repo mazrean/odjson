@@ -503,7 +503,9 @@ What did not hold, and what was done about it:
   3.58×, the `text-*` rows 1.09–1.88×, and every v1 encode row is now above
   1×. v1 *decode* stays on the public path — its flags allow invalid
   UTF-8 and duplicate names, which the strict parsers refuse — so those rows
-  are unchanged, `text-escaped` (0.86×) and `numbers` (0.91×) among them.
+  are unchanged, `text-escaped` (0.86×) and `numbers` (0.91×) among them
+  (`numbers` has since moved to 1.15×, by the canada round's parser, which
+  that path shares).
 - **Non-ASCII text outside the CJK three byte range was slower than
   reflection.** The fused UTF-8 scan in `odjsonrt/utf8.go` settled only
   three byte sequences with leads E1–EC and EE–EF on its own and handed

@@ -426,6 +426,11 @@ func ParseFloatValue(val []byte, bits int) (float64, error) {
 	if len(val) == 0 || (val[0] != '-' && (val[0] < '0' || val[0] > '9')) {
 		return 0, ErrType(val, 0, floatTypeName(bits))
 	}
+	// The token is a whole, validated literal: the one-pass parser settles
+	// it when it accepts it and reads all of it.
+	if v, end, ok := ParseSimpleFloat(val, 0, bits); ok && end == len(val) {
+		return v, nil
+	}
 	v, err := strconv.ParseFloat(asString(val), floatBits(bits))
 	if err != nil {
 		return 0, &TypeError{Value: "number", Type: floatTypeName(bits)}
