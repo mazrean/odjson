@@ -135,3 +135,101 @@ func skipNonASCII(s []byte, i int) int {
 // cjkLead reports whether b leads a three byte sequence that accepts every
 // continuation byte as its second: E1-EC or EE-EF.
 func cjkLead(b byte) bool { return b-0xE1 <= 0xEC-0xE1 || b|1 == 0xEF }
+
+// cjkWord reports whether w holds two complete three byte sequences whose
+// leads accept every continuation byte, which is what a word of CJK text
+// looks like: the shape skipNonASCII's inner loop takes six bytes at a time.
+//
+// The lead range is tested without a branch. Both leads are known to be E0-EF
+// once the mask compare passes, so what is left is that neither low nibble is
+// 0 (E0, whose second byte is restricted) or D (ED, above which lies the
+// surrogate range). A nibble plus fifteen carries into the bit above it
+// exactly when the nibble is not zero, and the two lead nibbles sit far
+// enough apart that neither carry reaches the other; XORing D in first turns
+// the second test into the same one. The two results and the mask compare
+// then fold into one comparison against zero, so a word of text costs no
+// branch but the loop's own.
+func cjkWord(w uint64) bool {
+	const (
+		nibbles = 0x0F00000F // the two leads' low nibbles
+		carries = 0x10000010 // the bit above each of them
+		notED   = 0x0D00000D
+	)
+	t := w & nibbles
+	nonzero := (t + nibbles) & carries
+	notD := ((t ^ notED) + nibbles) & carries
+	return ((w&0xC0C0F0C0C0F0)^0x8080E08080E0)|((nonzero&notD)^carries) == 0
+}
+
+// copyNonASCII is [skipNonASCII] with the copy folded in: it validates the
+// run of non-ASCII bytes that starts at i and stores it into d at n, and
+// returns the offset past what it wrote and the index of the first ASCII
+// byte at or after the run, or -1 when the run is not valid UTF-8.
+//
+// The encoder needs both, and doing them in two passes — validate, then copy
+// what was validated — reads a quarter of a document like twitter.json
+// twice. The word cases below, which are what a document full of one script
+// is made of, store the word they judged; a run that needs the byte-at-a-time
+// table hands the rest to skipNonASCII and copies what that validated, since
+// those sequences are rare enough not to be worth a second copy of the table.
+//
+// d must have room for eight bytes past n, as [appendStringBodyV2]'s
+// reservation guarantees: a word case stores the whole word it loaded even
+// when the sequences in it are shorter, and the bytes past them are the ones
+// the next store writes anyway.
+func copyNonASCII(d []byte, n int, s []byte, i int) (int, int) {
+	for uint(i) < uint(len(s)) {
+		b := s[i]
+		if b < utf8.RuneSelf {
+			return n, i
+		}
+		if i+8 <= len(s) {
+			w := load64(s, i)
+			if cjkWord(w) {
+				store64(d, n, w)
+				n += 6
+				i += 6
+				for i+8 <= len(s) {
+					w = load64(s, i)
+					if !cjkWord(w) {
+						break
+					}
+					store64(d, n, w)
+					n += 6
+					i += 6
+				}
+				continue
+			}
+			if w&0xC0E0C0E0C0E0C0E0 == 0x80C080C080C080C0 {
+				t := w & 0x001E001E001E001E
+				if (t-0x0001000100010001)&^t&0x8000800080008000 == 0 {
+					store64(d, n, w)
+					n += 8
+					i += 8
+					continue
+				}
+			}
+			if w&0xC0C0C0FCC0C0C0FC == 0x808080F0808080F0 &&
+				(b != 0xF0 || byte(w>>8) >= 0x90) && (byte(w>>32) != 0xF0 || byte(w>>40) >= 0x90) {
+				store64(d, n, w)
+				n += 8
+				i += 8
+				continue
+			}
+			if w&0xC0C0F0 == 0x8080E0 && cjkLead(b) {
+				store64(d, n, w)
+				n += 3
+				i += 3
+				continue
+			}
+		}
+		// What is left is a sequence the table settles, and after it a
+		// run that may be anything: skipNonASCII takes all of it.
+		j := skipNonASCII(s, i)
+		if j < 0 {
+			return n, -1
+		}
+		return copyRun(d, n, s, i, j), j
+	}
+	return n, i
+}
