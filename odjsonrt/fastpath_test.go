@@ -8,13 +8,14 @@ import (
 
 // TestParseSimpleFloatMatchesStrconv checks that every literal the fast path
 // accepts produces exactly strconv.ParseFloat's bits, and that it declines
-// everything outside its shape rather than guessing.
+// everything outside its shape rather than guessing; atof_test.go has the
+// sweeps.
 func TestParseSimpleFloatMatchesStrconv(t *testing.T) {
 	accepted := []string{
 		"0", "-0", "1", "-1", "40.8", "-0.1", "0.1", "123456789.123456789",
 		"9007199254740991", "9007199254740991.0", "0.0000000000000000000001",
 		"1.5", "2.25", "3.14159", "1234567890123456789", "0.30000000000000004",
-		"100", "1e", // "1e" declines at the exponent, see below
+		"100", "1e5", "1E5", "1.5e-3", "1e", // "1e" declines at the exponent, see below
 	}
 	for _, lit := range accepted {
 		data := []byte(lit + ",")
@@ -45,7 +46,7 @@ func TestParseSimpleFloatMatchesStrconv(t *testing.T) {
 		}
 	}
 
-	declined := []string{"", "-", ".5", "1.", "01", "1e5", "1E5", "1.5e-3", "abc", "-.5",
+	declined := []string{"", "-", ".5", "1.", "01", "abc", "-.5",
 		"12345678901234567890",      // twenty digits
 		"0.00000000000000000000001", // twenty-three fraction digits
 	}
