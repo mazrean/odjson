@@ -16,10 +16,10 @@ Deleting the generated file (`odjson_gen.go`) puts everything back to plain `enc
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bench-dark.svg">
-  <img alt="Time per operation, lower is better. Marshal large: encoding/json/v2 402 µs, with odjson 93 µs, sonic 122 µs, go-json 242 µs. Marshal small: 1068 ns, with odjson 253 ns, sonic 313 ns, go-json 416 ns. Unmarshal large: 1089 µs, with odjson 371 µs, sonic 521 µs, go-json 662 µs. Unmarshal small: 1864 ns, with odjson 541 ns, sonic 1072 ns, go-json 799 ns." src="./docs/assets/bench-light.svg" width="912">
+  <img alt="Time per operation, lower is better. Marshal large: encoding/json/v2 399 µs, with odjson 93 µs, sonic 125 µs, go-json 239 µs. Marshal small: 1040 ns, with odjson 255 ns, sonic 313 ns, go-json 390 ns. Unmarshal large: 1073 µs, with odjson 370 µs, sonic 500 µs, go-json 657 µs. Unmarshal small: 1854 ns, with odjson 536 ns, sonic 1024 ns, go-json 775 ns." src="./docs/assets/bench-light.svg" width="912">
 </picture>
 
-The benchmarks measure **2.9×–4.3× over `encoding/json/v2`** on encode and decode alike. They also put odjson ahead of [`goccy/go-json`](https://github.com/goccy/go-json) on every measurement, by 1.5×–2.6×, and ahead of [`bytedance/sonic`](https://github.com/bytedance/sonic) — which JIT-compiles hand-written assembly and uses SIMD — on all four: 1.41× and 1.98× on the two decodes, and 1.1×–1.3× on the two encodes — the tables below read 1.31× and 1.24×, a second method ([`bench/ab`](./bench/ab), one process) reads 1.17× and 1.12×, so the margin is real either way. The encodes were level with sonic until September 2026, when the string writer stopped scanning and copying in two passes; see [docs/internals.md](./docs/internals.md).
+The benchmarks measure **2.9×–4.3× over `encoding/json/v2`** on encode and decode alike. They also put odjson ahead of [`goccy/go-json`](https://github.com/goccy/go-json) on every measurement, by 1.5×–2.6×, and ahead of [`bytedance/sonic`](https://github.com/bytedance/sonic) — which JIT-compiles hand-written assembly and uses SIMD — on all four: 1.35× and 1.91× on the two decodes, and 1.2×–1.3× on the two encodes — the tables below read 1.34× and 1.23×, a second method ([`bench/ab`](./bench/ab), one process) reads 1.19× on both, so the margin is real either way. The encodes were level with sonic until September 2026, when the string writer stopped scanning and copying in two passes; see [docs/internals.md](./docs/internals.md).
 
 <details>
 <summary>Benchmark environment and how to reproduce it</summary>
@@ -73,7 +73,7 @@ The method and the assumptions behind it are written up in [bench/README.md](./b
 
 Go 1.27 or newer. Generated files import `encoding/json/jsontext`, so they do not compile on 1.26 and older.
 
-`encoding/json` benefits too, since 1.27 implements it on top of `encoding/json/v2` internally, but odjson is tuned to get the most out of `encoding/json/v2`, which is the recommended way to use it. Through `encoding/json` the two encodes come out at 3.6×–3.7× and the two decodes at 1.25×–1.6×: the encodes take the direct write into the internal buffer described below, while the decodes go through the public API, because the coder flags `encoding/json` sets allow input that the direct path's strict parsers refuse.
+`encoding/json` benefits too, since 1.27 implements it on top of `encoding/json/v2` internally, but odjson is tuned to get the most out of `encoding/json/v2`, which is the recommended way to use it. Through `encoding/json` the two encodes come out at 3.6×–3.8× and the two decodes at 1.3×–1.6×: the encodes take the direct write into the internal buffer described below, while the decodes go through the public API, because the coder flags `encoding/json` sets allow input that the direct path's strict parsers refuse.
 
 ## Quick Start
 

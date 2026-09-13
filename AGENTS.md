@@ -25,21 +25,21 @@ using the standard library, and take it off whenever you like" is the product,
 and a second entry point contradicts it.
 
 **Positioning** (measured, see `bench/`): the target is `encoding/json/v2`
-(2.9-4.3x faster on all four measurements) and `encoding/json` (3.6-3.7x on
-the two encodes, since the direct path learned v1's coder flags, and 1.25-1.6x
+(2.9-4.3x faster on all four measurements) and `encoding/json` (3.6-3.8x on
+the two encodes, since the direct path learned v1's coder flags, and 1.3-1.6x
 on the two decodes, which stay on the public API path because v1's flags
 allow what the strict parsers refuse). `github.com/bytedance/sonic` and
 `github.com/goccy/go-json` honour the v1 interfaces too and the generated code
 is correct under them, but odjson does **not** make them faster: it wins only
-their small unmarshal rows (sonic's by 1.19x and go-json's by 1.08x in
+their small unmarshal rows (sonic's by 1.16x and go-json's by 1.09x in
 `bench/ab`), and `bench/floor` proves why the rest cannot be won rather than
 asserting it: with a
 `MarshalJSON` that costs nothing, sonic still spends 111us on the twitter
-payload against 122us for its own path, and go-json 349us against 242us,
+payload against 125us for its own path, and go-json 348us against 239us,
 because sonic validates and go-json compacts whatever a marshaler returns.
 On the decode side the floor is the skip-and-validate pass they make before
-calling `UnmarshalJSON`: 284us and 478us on twitter, against their own 521us
-and 662us, so the generated decoder would have to decode that document 2.2x
+calling `UnmarshalJSON`: 276us and 497us on twitter, against their own 500us
+and 657us, so the generated decoder would have to decode that document 2.2x
 faster than sonic's JIT to break even there. Do not re-open either question
 without re-running `bench/floor` and `bench/ab`. In `README.md` those two
 libraries are
@@ -48,13 +48,13 @@ tables, and the claim to keep honest is that json/v2 + odjson beats go-json on
 all four (the narrowest 1.48x, the small decode) and beats sonic on all four
 as well. Since the encode round of September 2026 the two encode margins no
 longer need hedging, but they are still two numbers rather than one: the
-tables read 1.31x on the twitter encode and 1.24x on the small one, `bench/ab`
-reads 1.17x and 1.12x, and the gap is where the two binaries put sonic's rows
-(7% and 11% apart) and odjson's twitter row (4.5% apart the other way), so
-state the encode side as **at least 1.17x and 1.12x**.
-The decodes are 1.41x and 1.98x (1.32x and 1.85x in `bench/ab`). Last
-re-measured 2026-09-13 on `main` at `11714dc`; re-measure before restating
-any of it.
+tables read 1.34x on the twitter encode and 1.23x on the small one, `bench/ab`
+reads 1.19x on both, and the gap is where the two binaries put sonic's own
+rows (11% apart on both) and odjson's small row (7% apart the other way), so
+state the encode side as **at least 1.19x on both**.
+The decodes are 1.35x and 1.91x (1.32x and 1.80x in `bench/ab`). Last
+re-measured 2026-09-13 on `main` at `7d57f14`, `bench/shapes` included;
+re-measure before restating any of it.
 
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,
