@@ -34,9 +34,12 @@ Four libraries, driven through one uniform table:
 | `sonic` | `github.com/bytedance/sonic` |
 | `go-json` | `github.com/goccy/go-json` |
 
-Two payloads: `twitter` (~616 KiB, decoded into `TwitterStruct` — deeply nested,
-lots of strings and slices) and `small` (~340 B, decoded into `Book` — the
-per-call overhead case, where fixed costs dominate).
+Three payloads, the three sizes sonic's own README benchmarks: `twitter`
+(~616 KiB, decoded into `TwitterStruct` — deeply nested, lots of strings and
+slices), `medium` (~13 KiB, the same shape at four statuses instead of a
+hundred, decoded into the same `TwitterStruct` — the size where neither the
+per-call floor nor throughput dominates on its own) and `small` (~340 B,
+decoded into `Book` — the per-call overhead case, where fixed costs dominate).
 
 Benchmark names are `BenchmarkMarshal/<lib>/<payload>` and
 `BenchmarkUnmarshal/<lib>/<payload>`.
@@ -75,6 +78,7 @@ bench/
   go.mod            module + replace directive
   testdata/
     twitter.json    payload, vendored from sonic
+    medium.json     sonic's "Medium" payload, vendored from its decoder tests
     NOTICE          provenance + Apache-2.0 notice for the vendored files
   plain/
     twitter.go      TwitterStruct et al., vendored from sonic
@@ -120,7 +124,7 @@ That covers `gen` and `shapes/gen`, which carry the same directive.
 ## `ab`
 
 `bench/ab` measures the generated codec against the reflection baseline **in one
-process**. The other packages each measure one side, so comparing them is a
+process**, on the same three payloads. The other packages each measure one side, so comparing them is a
 comparison across processes: different heaps, different GC state, and several
 percent of drift between runs. Some of the differences that matter here are
 smaller than that drift, and reading them off two separate runs produced results
@@ -132,8 +136,9 @@ cd bench && go test -bench . -count 5 ./ab/
 ```
 
 `ab` covers all four host libraries; the sonic and go-json rows are what settle
-whether odjson wins their small unmarshal (sonic's by 1.20x, go-json's by
-1.10x) and loses everything else on them (it does, by the floor).
+whether odjson wins their small unmarshal (sonic's by 1.15x, go-json's by
+1.07x), is level on sonic's medium unmarshal (0.99x), and loses everything
+else on them (it does, by the floor).
 
 ## `shapes`
 
@@ -146,7 +151,7 @@ the generated codec still pays for itself on that shape:
 
 | shape | what it varies |
 | --- | --- |
-| `twitter`, `small` | the README's payloads, as the reference rows |
+| `twitter`, `small` | the README's `twitter` and `small` payloads, as the reference rows |
 | `twitter-compact`, `page-12k-indented` | whitespace |
 | `page-3k`, `page-12k`, `page-100k` | one top-level object at the sizes between the two fixtures |
 | `array-items`, `array-pages`, `map-items` | a top-level `[]T` / `map[string]T` of a generated type, so every generated value sits below the top level; the element size puts `array-items` under `odjsonrt.WholeValue`'s threshold and `array-pages` over it, which matters on the public path |

@@ -64,9 +64,9 @@ type payload struct {
 	decoded any
 }
 
-// loadPayloads reads the fixtures once per test binary. twitter.json lives in
-// bench/testdata rather than beside this package, so it is loaded by relative
-// path (go test runs with the package directory as its working directory)
+// loadPayloads reads the fixtures once per test binary. twitter.json and
+// medium.json live in bench/testdata rather than beside this package, so they
+// are loaded by relative path (go test runs with the package directory as its working directory)
 // instead of go:embed, which cannot reach out of the package directory.
 var loadPayloads = sync.OnceValues(func() ([]payload, error) {
 	twitterJSON, err := os.ReadFile("../testdata/twitter.json")
@@ -77,6 +77,18 @@ var loadPayloads = sync.OnceValues(func() ([]payload, error) {
 	twitter := new(TwitterStruct)
 	if err := jsonv1.Unmarshal(twitterJSON, twitter); err != nil {
 		return nil, fmt.Errorf("decode twitter.json: %w", err)
+	}
+
+	// medium.json is sonic's "Medium" input: the same shape as twitter.json,
+	// at four statuses instead of a hundred.
+	mediumJSON, err := os.ReadFile("../testdata/medium.json")
+	if err != nil {
+		return nil, fmt.Errorf("read medium.json: %w", err)
+	}
+
+	medium := new(TwitterStruct)
+	if err := jsonv1.Unmarshal(mediumJSON, medium); err != nil {
+		return nil, fmt.Errorf("decode medium.json: %w", err)
 	}
 
 	// data and Book come from small.go, vendored from sonic's testdata.
@@ -91,6 +103,12 @@ var loadPayloads = sync.OnceValues(func() ([]payload, error) {
 			data:     twitterJSON,
 			newValue: func() any { return new(TwitterStruct) },
 			decoded:  twitter,
+		},
+		{
+			name:     "medium",
+			data:     mediumJSON,
+			newValue: func() any { return new(TwitterStruct) },
+			decoded:  medium,
 		},
 		{
 			name:     "small",

@@ -50,7 +50,9 @@ type row struct {
 	module, codec string
 }
 
-// A panel is one benchmark: four libraries on a scale of their own.
+// A panel is one benchmark: four libraries on a scale of their own. The
+// panels are drawn in two columns, Marshal on the left and Unmarshal on the
+// right, so the slice lists every Marshal panel and then every Unmarshal one.
 type panel struct {
 	title string
 	sub   string
@@ -65,39 +67,57 @@ type panel struct {
 
 var panels = []panel{
 	{
-		title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "4.28", payload: "twitter",
+		title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "4.22", payload: "twitter",
 		rows: []row{
-			{label: "encoding/json/v2", value: 399, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 93, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 125, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 239, module: "plain", codec: "go-json"},
+			{label: "encoding/json/v2", value: 401, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 95, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 117, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 251, module: "plain", codec: "go-json"},
 		},
 	},
 	{
-		title: "Marshal", sub: "small · 340 B", unit: "ns", ratio: "4.08", payload: "small",
+		title: "Marshal", sub: "medium · 13 KiB", unit: "ns", ratio: "4.39", payload: "medium",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1040, module: "plain", codec: "json-v2"},
+			{label: "encoding/json/v2", value: 12259, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 2790, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 3606, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 4571, module: "plain", codec: "go-json"},
+		},
+	},
+	{
+		title: "Marshal", sub: "small · 340 B", unit: "ns", ratio: "4.05", payload: "small",
+		rows: []row{
+			{label: "encoding/json/v2", value: 1033, module: "plain", codec: "json-v2"},
 			{label: "+ odjson", value: 255, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 313, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 390, module: "plain", codec: "go-json"},
+			{label: "sonic", value: 323, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 402, module: "plain", codec: "go-json"},
 		},
 	},
 	{
-		title: "Unmarshal", sub: "large · 616 KiB", unit: "µs", ratio: "2.90", payload: "twitter",
+		title: "Unmarshal", sub: "large · 616 KiB", unit: "µs", ratio: "2.93", payload: "twitter",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1073, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 370, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 500, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 657, module: "plain", codec: "go-json"},
+			{label: "encoding/json/v2", value: 1100, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 376, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 505, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 662, module: "plain", codec: "go-json"},
 		},
 	},
 	{
-		title: "Unmarshal", sub: "small · 340 B", unit: "ns", ratio: "3.46", payload: "small",
+		title: "Unmarshal", sub: "medium · 13 KiB", unit: "ns", ratio: "2.69", payload: "medium",
 		rows: []row{
-			{label: "encoding/json/v2", value: 1854, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 536, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 1024, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 775, module: "plain", codec: "go-json"},
+			{label: "encoding/json/v2", value: 22222, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 8263, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 13941, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 14991, module: "plain", codec: "go-json"},
+		},
+	},
+	{
+		title: "Unmarshal", sub: "small · 340 B", unit: "ns", ratio: "3.39", payload: "small",
+		rows: []row{
+			{label: "encoding/json/v2", value: 1853, module: "plain", codec: "json-v2"},
+			{label: "+ odjson", value: 547, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+			{label: "sonic", value: 964, module: "plain", codec: "sonic"},
+			{label: "go-json", value: 788, module: "plain", codec: "go-json"},
 		},
 	},
 }
@@ -254,9 +274,16 @@ func fail(err error) {
 	os.Exit(1)
 }
 
+// perColumn is how many panels each of the two columns holds: the Marshal
+// panels down the left, the Unmarshal panels down the right.
+func perColumn() int {
+	return (len(panels) + 1) / 2
+}
+
 func render(t theme, footer string) []byte {
 	panelH := titleH + rowH*len(panels[0].rows)
-	svgH := headerH + 2*panelH + panelGapY + footerH
+	rows := perColumn()
+	svgH := headerH + rows*panelH + (rows-1)*panelGapY + footerH
 
 	var b bytes.Buffer
 	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-label="%s">`,
@@ -272,8 +299,8 @@ text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,san
 	fmt.Fprintf(&b, `<text class="t2" x="%d" y="46" font-size="12">Time per operation — lower is better. Each panel has its own scale.</text>`, padX)
 
 	for i, p := range panels {
-		x := padX + (i%2)*(panelW+panelGapX)
-		y := headerH + (i/2)*(panelH+panelGapY)
+		x := padX + (i/rows)*(panelW+panelGapX)
+		y := headerH + (i%rows)*(panelH+panelGapY)
 		drawPanel(&b, t, p, x, y)
 	}
 
@@ -512,7 +539,8 @@ func apply(m map[key][]float64) error {
 				return fmt.Errorf("no Benchmark%s/%s/%s in bench/%s", p.title, r.codec, p.payload, r.module)
 			}
 			ns[j] = v
-			// The panels' scales are the README's: µs for twitter, ns for small.
+			// The panels' scales are the README's: µs for twitter, ns for
+			// medium and small, whose values print whole in that unit.
 			if p.unit == "µs" {
 				v /= 1000
 			}

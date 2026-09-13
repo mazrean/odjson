@@ -7,7 +7,7 @@ English | [日本語](./README.ja.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 **odjson** (*overdrive JSON*) is a CLI code generator that takes `encoding/json/v2` past [`bytedance/sonic`](https://github.com/bytedance/sonic) without editing a line of your code.
-JSON encoding and decoding that already goes through the standard `encoding/json/v2` gets 2.9×–4.3× faster by adding the comment below and running `go generate`.
+JSON encoding and decoding that already goes through the standard `encoding/json/v2` gets 2.7×–4.4× faster by adding the comment below and running `go generate`.
 ```go
 //go:generate go tool odjson -type User
 ```
@@ -16,10 +16,10 @@ Deleting the generated file (`odjson_gen.go`) puts everything back to plain `enc
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bench-dark.svg">
-  <img alt="Time per operation, lower is better. Marshal large: encoding/json/v2 399 µs, with odjson 93 µs, sonic 125 µs, go-json 239 µs. Marshal small: 1040 ns, with odjson 255 ns, sonic 313 ns, go-json 390 ns. Unmarshal large: 1073 µs, with odjson 370 µs, sonic 500 µs, go-json 657 µs. Unmarshal small: 1854 ns, with odjson 536 ns, sonic 1024 ns, go-json 775 ns." src="./docs/assets/bench-light.svg" width="912">
+  <img alt="Time per operation, lower is better. Marshal large: encoding/json/v2 401 µs, with odjson 95 µs, sonic 117 µs, go-json 251 µs. Marshal medium: 12259 ns, with odjson 2790 ns, sonic 3606 ns, go-json 4571 ns. Marshal small: 1033 ns, with odjson 255 ns, sonic 323 ns, go-json 402 ns. Unmarshal large: 1100 µs, with odjson 376 µs, sonic 505 µs, go-json 662 µs. Unmarshal medium: 22222 ns, with odjson 8263 ns, sonic 13941 ns, go-json 14991 ns. Unmarshal small: 1853 ns, with odjson 547 ns, sonic 964 ns, go-json 788 ns." src="./docs/assets/bench-light.svg" width="912">
 </picture>
 
-The benchmarks measure **2.9×–4.3× over `encoding/json/v2`** on encode and decode alike. They also put odjson ahead of [`goccy/go-json`](https://github.com/goccy/go-json) on every measurement, by 1.4×–2.6×, and ahead of [`bytedance/sonic`](https://github.com/bytedance/sonic) — which JIT-compiles hand-written assembly and uses SIMD — on all four: 1.35× and 1.91× on the two decodes, and 1.2×–1.3× on the two encodes — the tables below read 1.34× and 1.23×, a second method ([`bench/ab`](./bench/ab), one process) reads 1.19× on both, so the margin is real either way. The encodes were level with sonic until September 2026, when the string writer stopped scanning and copying in two passes; see [docs/internals.md](./docs/internals.md).
+The benchmarks measure **2.7×–4.4× over `encoding/json/v2`** on encode and decode alike, across the three payload sizes sonic's own benchmarks use. They also put odjson ahead of [`goccy/go-json`](https://github.com/goccy/go-json) on every measurement, by 1.4×–2.6×, and ahead of [`bytedance/sonic`](https://github.com/bytedance/sonic) — which JIT-compiles hand-written assembly and uses SIMD — on all six: 1.34×, 1.69× and 1.76× on the three decodes, and 1.2×–1.3× on the three encodes — the tables below read 1.23×, 1.29× and 1.27×, a second method ([`bench/ab`](./bench/ab), one process) reads 1.19×, 1.47× and 1.23×, so the margin is real either way. The encodes were level with sonic until September 2026, when the string writer stopped scanning and copying in two passes; see [docs/internals.md](./docs/internals.md).
 
 <details>
 <summary>Benchmark environment and how to reproduce it</summary>
@@ -47,12 +47,13 @@ go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(json-v2|go-json|sonic)/' 
 
 ### What is measured
 
-Four subjects: `encoding/json` v1, `encoding/json/v2`, `sonic` and `goccy/go-json`. The benchmark names are `BenchmarkMarshal/<library>/<input>` and `BenchmarkUnmarshal/<library>/<input>`.
-Both inputs are the same ones [`bytedance/sonic`](https://github.com/bytedance/sonic)'s own benchmarks use.
+Four subjects: `encoding/json` v1, `encoding/json/v2`, `sonic` and `goccy/go-json`. The benchmark names are `BenchmarkMarshal/<library>/<input>` and `BenchmarkUnmarshal/<library>/<input>`; the `large` input is the benchmarks' `twitter`.
+All three inputs are the ones [`bytedance/sonic`](https://github.com/bytedance/sonic)'s own benchmarks use.
 
 | Input | Size | Go type | Content |
 | --- | ---: | --- | --- |
 | `large` | ~616 KiB | `TwitterStruct` | `twitter.json` |
+| `medium` | ~13 KiB | `TwitterStruct` | `medium.json`, the same shape at four statuses (sonic's "Medium") |
 | `small` | ~340 B | `Book` | a small JSON document |
 
 ### Conditions
@@ -73,7 +74,7 @@ The method and the assumptions behind it are written up in [bench/README.md](./b
 
 Go 1.27 or newer. Generated files import `encoding/json/jsontext`, so they do not compile on 1.26 and older.
 
-`encoding/json` benefits too, since 1.27 implements it on top of `encoding/json/v2` internally, but odjson is tuned to get the most out of `encoding/json/v2`, which is the recommended way to use it. Through `encoding/json` the two encodes come out at 3.6×–3.8× and the two decodes at 1.3×–1.6×: the encodes take the direct write into the internal buffer described below, while the decodes go through the public API, because the coder flags `encoding/json` sets allow input that the direct path's strict parsers refuse.
+`encoding/json` benefits too, since 1.27 implements it on top of `encoding/json/v2` internally, but odjson is tuned to get the most out of `encoding/json/v2`, which is the recommended way to use it. Through `encoding/json` the three encodes come out at 3.6×–3.8× and the three decodes at 1.2×–1.6×: the encodes take the direct write into the internal buffer described below, while the decodes go through the public API, because the coder flags `encoding/json` sets allow input that the direct path's strict parsers refuse.
 
 ## Quick Start
 
@@ -194,7 +195,7 @@ this performs JIT-grade optimisation at compile time and cuts the run-time overh
 
 On top of that, making the dedicated code satisfy the standard library's `(T).MarshalJSONTo` / `(*T).UnmarshalJSONFrom` interfaces is what lets code that uses the standard library benefit from odjson without being changed.
 Only `encoding/json/v2`, by offering streaming interfaces with that little overhead, made such an implementation possible in the first place.
-The result keeps **the standard library's reliability** while passing **github.com/bytedance/sonic** on all four measurements.
+The result keeps **the standard library's reliability** while passing **github.com/bytedance/sonic** on all six measurements.
 
 The methods added to each type are these:
 

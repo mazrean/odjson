@@ -27,6 +27,14 @@ Files and their upstream sources
     Copied unmodified except for the package clause, which was changed from
     `package testdata` to `package plain`.
 
+  bench/testdata/medium.json
+    https://github.com/bytedance/sonic/blob/v1.15.4/decoder/testdata_test.go
+    The body of that file's `TwitterJson` string constant, which sonic's own
+    README calls its "Medium" benchmark input. Copied byte-for-byte from the
+    v1.15.4 module (the constant carries no trailing newline, and neither
+    does the file). It is not the `TwitterJson` constant in
+    bench/plain/twitter.go, which is a different, shorter document.
+
 License
 -------
 
@@ -37,7 +45,7 @@ Version 2.0:
 
 The original Apache-2.0 copyright headers are retained verbatim in
 bench/plain/twitter.go and bench/plain/small.go. twitter.json carries no
-header, being pure data.
+header, being pure data, and neither does medium.json.
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
