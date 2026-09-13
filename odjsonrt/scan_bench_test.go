@@ -8,7 +8,9 @@ package odjsonrt
 
 import (
 	"bytes"
+	"math/rand"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -275,5 +277,70 @@ func BenchmarkAppendBodyTwitter(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+// textLines builds strings shaped like bench/shapes' text-* corpora: 96
+// lines, each at least 80 bytes of words from one script separated by
+// spaces. The Cyrillic, CJK, Hangul and emoji word lists are the ones
+// bench/shapes uses; the ASCII and Latin ones are of the same shape.
+func textLines(seed int64, words string) []string {
+	ws := strings.Fields(words)
+	r := rand.New(rand.NewSource(seed))
+	out := make([]string, 96)
+	for i := range out {
+		var sb strings.Builder
+		for sb.Len() < 80 {
+			if sb.Len() > 0 {
+				sb.WriteByte(' ')
+			}
+			sb.WriteString(ws[r.Intn(len(ws))])
+		}
+		out[i] = sb.String()
+	}
+	return out
+}
+
+var textCorpora = []struct {
+	name  string
+	words string
+}{
+	{"ascii", "the quick brown fox jumps over the lazy dog while seven silent engineers measure every allocation before trusting a benchmark"},
+	{"latin", "café naïve résumé façade jalapeño über straße smörgåsbord crème brûlée piñata señor fête cliché déjà vu"},
+	{"cyrillic", "быстрая коричневая лиса прыгает через ленивую собаку пока семь молчаливых инженеров измеряют каждое выделение памяти"},
+	{"cjk", "素早い 茶色の 狐が 怠け者の 犬を 飛び越える 七人の 無口な 技術者が すべての 割り当てを 測定する 前に ベンチマークを 信じる"},
+	{"hangul", "빠른 갈색 여우가 게으른 개를 뛰어넘는다 일곱 명의 조용한 엔지니어가 벤치마크를 믿기 전에 모든 할당을 측정한다"},
+	{"emoji", "🦊 jumps 🐕 over 🎉 the 🚀 lazy 🧪 dog 📊 while 🔬 seven 🛠️ engineers 🧠 measure 💾 every 🧵 allocation ⏱️"},
+}
+
+// BenchmarkAppendBodyText is BenchmarkAppendBodyTwitter over the text-*
+// corpora of bench/shapes, one script per sub-benchmark, under the two modes
+// a direct-path Marshal writes. It is what the text-* encode rows are
+// measured with first.
+func BenchmarkAppendBodyText(b *testing.B) {
+	for _, c := range textCorpora {
+		strs := textLines(1, c.words)
+		var total int
+		for _, s := range strs {
+			total += len(s)
+		}
+		for _, m := range []struct {
+			name string
+			mode StringMode
+		}{{"v2", ModeV2}, {"v2html", ModeV2HTML}} {
+			b.Run(c.name+"/"+m.name, func(b *testing.B) {
+				b.SetBytes(int64(total))
+				buf := make([]byte, 0, 2*total)
+				for b.Loop() {
+					buf = buf[:0]
+					for _, s := range strs {
+						var err error
+						if buf, err = AppendStringBodyChecked(buf, s, m.mode); err != nil {
+							b.Fatal(err)
+						}
+					}
+				}
+			})
+		}
 	}
 }

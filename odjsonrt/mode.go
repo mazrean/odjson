@@ -367,45 +367,65 @@ func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, erro
 	hit:
 		if b := src[i]; b >= utf8.RuneSelf {
 			// A valid sequence holds nothing that needs escaping, so the run
-			// is validated and copied with nothing else to look at. A two byte
-			// sequence is settled here without the call, and the words after
-			// it are taken whole while they are accented Latin text (see
-			// swarLatin), which would otherwise stop the scan at every letter.
-			if b-0xC2 < 0x1E && uint(i+1) < uint(len(src)) && src[i+1]&0xC0 == 0x80 {
-				// The word store that stopped here reached at most the lead
-				// byte, so the sequence is written out by hand.
-				d[n] = b
-				d[n+1] = src[i+1]
-				n += 2
-				i += 2
-				if uint(i) < uint(len(src)) && src[i] >= utf8.RuneSelf {
-					// A dense run (Cyrillic, Greek, CJK): skipNonASCII takes
-					// it a word at a time.
-					n, i = copyNonASCII(d, n, src, i)
-					if i < 0 {
-						return dst[:mark], ErrInvalidUTF8
-					}
-					continue
-				}
+			// is validated and copied with nothing else to look at.
+			if b-0xC2 < 0x1E {
+				// A two byte lead. The words from here on are taken whole
+				// while they are text of a two byte script, accents among
+				// ASCII or a dense run of Cyrillic alike (see swarTwoByte);
+				// the first word without a non-ASCII byte hands back to
+				// the scan above, and what the loop refuses — the last
+				// bytes of the string, or another script — goes to
+				// copyNonASCII.
+				var carry uint64
 				for i+8 <= len(src) {
 					w := load64(src, i)
-					if w&swarHi == 0 || swarUnsafe(w) != 0 || !swarLatin(w) {
+					if w&swarHi == 0 || swarUnsafe(w) != 0 {
+						break
+					}
+					lead, bad := swarTwoByte(w, carry)
+					if bad != 0 {
 						break
 					}
 					store64(d, n, w)
 					n += 8
 					i += 8
+					carry = lead >> 56 & 0x80
+				}
+				if carry != 0 {
+					// The last word ended in a lead whose continuation
+					// nobody has looked at: step back onto it, so that the
+					// byte loop below judges the pair. Its store stands.
+					n--
+					i--
+				}
+				// The last bytes of the string, fewer than a word: the two
+				// byte sequences among them are settled here, by hand.
+				for uint(i) < uint(len(src)) && src[i] >= utf8.RuneSelf {
+					b := src[i]
+					if b-0xC2 >= 0x1E || uint(i+1) >= uint(len(src)) || src[i+1]&0xC0 != 0x80 {
+						n, i = copyNonASCII(d, n, src, i)
+						if i < 0 {
+							return dst[:mark], ErrInvalidUTF8
+						}
+						break
+					}
+					d[n] = b
+					d[n+1] = src[i+1]
+					n += 2
+					i += 2
 				}
 				continue
 			}
 			// A lone four byte sequence (an emoji among ASCII) likewise: F0
 			// needs a second byte of 90-BF, F4 one of 80-8F, F1-F3 any.
-			if b-0xF0 < 5 && uint(i+3) < uint(len(src)) && src[i+1]&0xC0 == 0x80 && src[i+2]&0xC0 == 0x80 && src[i+3]&0xC0 == 0x80 &&
-				(b != 0xF0 || src[i+1] >= 0x90) && (b != 0xF4 || src[i+1] < 0x90) {
-				store32(d, n, load32(src, i))
-				n += 4
-				i += 4
-				continue
+			if b-0xF0 < 5 && uint(i+3) < uint(len(src)) {
+				w := load32(src, i)
+				if s1 := byte(w >> 8); w&0xC0C0C000 == 0x80808000 && (b != 0xF0 || s1 >= 0x90) && (b != 0xF4 || s1 < 0x90) {
+					store32(d, n, w)
+					n += 4
+					i += 4
+					continue
+				}
 			}
 			n, i = copyNonASCII(d, n, src, i)
 			if i < 0 {

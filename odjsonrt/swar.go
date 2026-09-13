@@ -74,6 +74,37 @@ func swarLatin(w uint64) bool {
 	return nz&lead == lead
 }
 
+// swarTwoByte is [swarLatin] for a copy loop that stays inside text of a
+// two byte script and takes a whole word every turn. It reports the lanes
+// of w that hold a lead (11xxxxxx) and a word that is nonzero when w is not
+// such text: a lead of more than two bytes (111xxxxx), a continuation that
+// does not follow a lead or a lead that is not followed by one, or an
+// overlong lead (C0, C1). A sequence is allowed to straddle the word's end:
+// a lead in the top lane needs no continuation inside the word, and carry,
+// 0x80 when the previous word ended in such a lead and 0 otherwise, says
+// whether the bottom lane has to be one. That is how a run of Cyrillic,
+// whose letters and spaces put a sequence across every other word
+// boundary, is taken eight bytes a turn rather than handed back to the byte
+// path in the middle — and at a fixed stride, so that no load waits on the
+// judgement of the word before it. The escape test is the caller's.
+func swarTwoByte(w, carry uint64) (lead, bad uint64) {
+	hi := w & swarHi
+	// Bit 6 of a non-ASCII byte says lead or continuation; bit 5 of a
+	// lead says it leads more than two bytes.
+	lead = (w << 1) & hi
+	cont := hi ^ lead
+	long := (w << 2) & lead
+	// A lead below C2 has bits 1-4 clear: adding 0x7E to those four bits
+	// reaches the lane's top bit exactly when they are not all zero, and
+	// never carries out of the lane.
+	nz := (w&0x1E1E1E1E1E1E1E1E + 0x7E7E7E7E7E7E7E7E) & swarHi
+	// The continuations are exactly the lanes after the leads, the top
+	// lane's lead excepted, which the shift drops, and the bottom lane
+	// added when the previous word ended in a lead.
+	bad = long | (cont ^ (lead<<8 | carry)) | (lead &^ nz)
+	return lead, bad
+}
+
 // swarIndex returns the byte offset of the lowest set lane of a mask produced
 // by the helpers above, for a word loaded little-endian.
 //
