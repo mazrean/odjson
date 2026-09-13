@@ -1007,28 +1007,31 @@ every signed member paid two calls; taking the magnitude branch-free
   rather than `strconv`: level on both rows (p=0.067 and p=0.245). Kept
   anyway, because it is what leaves the encode path with no `strconv` call in
   it at all.
-- **The same fusion for `ModeV2HTML`**, the mode a direct-path
-  `encoding/json` marshal writes. It was written — reservation, word stores,
-  the backward-word tail, `copyNonASCII` for the runs, the line separators
-  looked for after the copy and rewound to — and measured twice, four
-  `-ldflags=-randlayout` seeds against four, five runs each (n=20). Both
-  rounds agree on the `twitter` row: **−2.99%** (p=0.000) and **−2.86%**
-  (p=0.004). Both disagree with it on `small`: **+2.83%** against an untouched
-  floor of +3.47% in the first round, and **+7.66%** (p=0.000) against level
-  floors in the second. A profile puts about a fifth of that inside the
-  appender — `copyNonASCII` costs more than `skipNonASCII` plus the copy it
-  replaces when a run's last bytes fall into the table path, which is exactly
-  the shape of `small`'s one CJK member — and the rest outside it, spread. Two
-  shapes for a string shorter than a word were tried inside it: two
-  overlapping halves, as the `ModeV2` body uses (**+8.95%** on that row
-  against a level floor, because this mode's word test carries five terms
-  rather than two), and a byte loop storing as it goes (the +7.66% above).
-  A large encode gaining 3% is not worth a small one losing 4 to 8, so the
-  mode keeps its two passes. What the attempt left behind is
+- **The same fusion for `ModeV2HTML`**, the mode a direct-path `encoding/json`
+  marshal writes. It was written — reservation, word stores, the backward-word
+  tail, `copyNonASCII` for the runs, the line separators looked for after the
+  copy and rewound to — and measured twice, four `-ldflags=-randlayout` seeds
+  against four, five runs each (n=20). Both rounds agree on the `twitter` row:
+  **−2.99%** (p=0.000) and **−2.86%** (p=0.004), and its untouched floor moved
+  +2.0% and +0.6%, so the gain is that or a little more. The `small` row is
+  where they disagree: **+2.83%** against an untouched floor of +3.47% in the
+  first round, which is level or a shade better, and **+7.66%** (p=0.000)
+  against a floor of +1.0% in the second. Level in one measurement and seven
+  percent behind in the other is not a state a headline row may be left in. A
+  profile puts about a fifth of the second figure inside the appender —
+  `copyNonASCII` costs more than `skipNonASCII` plus the copy it replaces when
+  a run's last bytes fall into the table path, which is exactly the shape of
+  `small`'s one CJK member — and the rest outside it, spread. Two shapes for a
+  string shorter than a word were tried inside it: two overlapping halves, as
+  the `ModeV2` body uses (**+8.95%** on that row against a level floor,
+  because this mode's word test carries five terms rather than two), and a
+  byte loop storing as it goes (the +7.66% above). A large encode gaining 3 to
+  5% is not worth a small one whose two measurements read level and −7.7%, so
+  the mode keeps its two passes. What the attempt left behind is
   `odjsonrt/v2html_test.go`, which drives the appender against what
   `encoding/json` makes of the same literal through a `MarshalerTo` — the
-  reformat this mode reproduces — over every prefix of a dozen shapes with
-  one byte of each corrupted in turn. That oracle did not exist before and it
+  reformat this mode reproduces — over every prefix of a dozen shapes with one
+  byte of each corrupted in turn. That oracle did not exist before and it
   covers the implementation that stayed.
 - **Splicing `appendShortFloat` into `AppendFloat`**, the last place where a
   value cost two calls: level on every row pooled over four layouts (n=20),
