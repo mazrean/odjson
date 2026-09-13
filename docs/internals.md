@@ -1010,7 +1010,8 @@ every signed member paid two calls; taking the magnitude branch-free
 What is left, measured by replacing the `ModeV2` body with
 `append(dst, src...)` — no scan, no validation, the wrong output and the right
 timing — is **28.9 µs** of the `twitter` encode and **36.8 ns** of the `small`
-one, against 35.7 µs and 40.8 ns at the start of the round. Roughly half of
+one, against 35.7 µs and 40.8 ns measured the same way earlier in the round,
+once the scan and the copy were already one pass. Roughly half of
 the `twitter` figure is the non-ASCII validation. Of the rest of that row,
 `bytes.Clone` — which `encoding/json/v2`'s `Marshal` makes of the buffer, and
 which is not odjson's to remove — is 18%, and the dynamic members are 15%.
@@ -1032,9 +1033,11 @@ five pairs of `-count=2`, which is what the round's percentages are taken from;
 a percentage between two separately built binaries is not one this page trusts.
 
 The `bench/plain` / `bench/gen` tables are one run. Every row of it is within
-±3% by `benchstat` except the `json/v2` `twitter` marshal (±7%), which re-reads
-96.2 µs ±1% on its own at `-count 20`; the tables quote the suite's median and
-the ratio paragraph above quotes both. `bench/floor`'s `json/v2` marshal floor
+±3% by `benchstat` except the `json/v2` `twitter` marshal (±7%): two of its ten
+samples, both from the first of the five interleaved pairs, read 100 and
+104 µs where the other eight lie between 91 and 95 µs. Re-run on its own at
+`-count 20` the row reads 96.2 µs ±1%. The tables quote the suite's median,
+94 µs, and the ratio paragraph above quotes the spread rather than picking. `bench/floor`'s `json/v2` marshal floor
 reads 347 µs and sonic's 106 µs against sonic's own 110 µs in the same
 process, so its marshal still leaves a few µs of room rather than none.
 

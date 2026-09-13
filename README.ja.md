@@ -19,7 +19,7 @@
   <img alt="1 操作あたりの時間、低いほど速い。Marshal large: encoding/json/v2 395 µs, odjson あり 94 µs, sonic 116 µs, go-json 242 µs。Marshal small: 1037 ns, odjson あり 266 ns, sonic 311 ns, go-json 404 ns。Unmarshal large: 1078 µs, odjson あり 380 µs, sonic 508 µs, go-json 656 µs。Unmarshal small: 1856 ns, odjson あり 530 ns, sonic 990 ns, go-json 784 ns。" src="./docs/assets/bench-light.svg" width="912">
 </picture>
 
-ベンチマーク上で、エンコード/デコードともに **`encoding/json/v2` に対して 2.8×〜4.2×** の速度向上を確認しています。また、[`goccy/go-json`](https://github.com/goccy/go-json) をいずれのベンチマークでも 1.5×〜2.6× 上回り、アセンブリを用いて JIT コンパイルや SIMD を用いる [`bytedance/sonic`](https://github.com/bytedance/sonic) も 4 つすべてで上回ります。内訳は large デコードが 1.34×、small デコードが 1.87×、large エンコードが 1.23×、small エンコードが 1.17× です。エンコードは 2026 年 9 月まで sonic と同等でしたが、文字列の走査とコピーを 1 パスに融合したことで差がつきました（[docs/internals.md](./docs/internals.md)）。
+ベンチマーク上で、エンコード/デコードともに **`encoding/json/v2` に対して 2.8×〜4.2×** の速度向上を確認しています。また、[`goccy/go-json`](https://github.com/goccy/go-json) をいずれのベンチマークでも 1.5×〜2.6× 上回り、アセンブリを用いて JIT コンパイルや SIMD を用いる [`bytedance/sonic`](https://github.com/bytedance/sonic) も 4 つすべてで上回ります。内訳は large デコードが 1.34×、small デコードが 1.87×、2 つのエンコードが約 1.2× と約 1.15× です。エンコードは下表の測り方で 1.23× と 1.17×、別の測り方（[`bench/ab`](./bench/ab)、同一プロセス）で 1.17× と 1.14× となり、どちらで測っても実質的な差があります。エンコードは 2026 年 9 月まで sonic と同等でしたが、文字列の走査とコピーを 1 パスに融合したことで差がつきました（[docs/internals.md](./docs/internals.md)）。
 
 <details>
 <summary>ベンチマーク環境と再現方法</summary>
