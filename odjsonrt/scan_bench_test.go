@@ -282,7 +282,8 @@ func BenchmarkAppendBodyTwitter(b *testing.B) {
 
 // textLines builds strings shaped like bench/shapes' text-* corpora: 96
 // lines, each at least 80 bytes of words from one script separated by
-// spaces. The word lists are the ones bench/shapes uses.
+// spaces. The Cyrillic, CJK, Hangul and emoji word lists are the ones
+// bench/shapes uses; the ASCII and Latin ones are of the same shape.
 func textLines(seed int64, words string) []string {
 	ws := strings.Fields(words)
 	r := rand.New(rand.NewSource(seed))

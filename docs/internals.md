@@ -509,8 +509,8 @@ its own three-way A/B (`4777ed8`, `main` at `088a337`, the round's tree,
 two rounds of `-count 6` each) rather than from the suite run the rest of
 the table comes from, and against `4777ed8` — the tree before the encode
 round — they now read `text-latin` −25%, `text-cyrillic` −28%,
-`text-hangul` −8%, `text-cjk` level and `text-emoji` +5% (all p < 0.001,
-n = 12), with the reflection side within ±1% throughout, `twitter` on the
+`text-hangul` −8%, `text-cjk` level (+0.5%, p = 0.03) and `text-emoji` +5%
+(the rest p < 0.001; n = 12), with the reflection side within ±1% throughout, `twitter` on the
 pooled `bench/gen` A/B level on both libraries, and the `encoding/json`
 encode column untouched, since that path's appender was not changed. The
 emoji row is the one residue of the encode round's trade: an emoji among
@@ -1614,7 +1614,11 @@ round: `bench/plain` and `bench/gen` at `-count=10`, `bench/floor` at
 `-count=6`, `bench/ab` at `-count=5`, `bench/ab` again under `-tags
 odjson_safe` at `-count=5`, and `bench/shapes` at `-count=6` for the two
 standard libraries and `-count=3` for sonic and go-json, each binary built
-once and run alone, one after another, on an otherwise idle machine. The percentages inside the round sections are each round's own
+once and run alone, one after another, on an otherwise idle machine. The
+five `json/v2` encode cells of the shapes table's `text-*` rows whose
+strings are non-ASCII are the exception: they are the text round's, from
+its own three-way A/B on the same machine (see "What the other shapes
+say"). The percentages inside the round sections are each round's own
 interleaved A/B, taken on that round's tree; a percentage between two
 separately built binaries is not one this page trusts, and none is quoted.
 
