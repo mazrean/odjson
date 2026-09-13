@@ -1001,11 +1001,42 @@ every signed member paid two calls; taking the magnitude branch-free
   fourteen dynamic members twitter.json declares per status and per user and
   almost never fills: it puts the function at 82 to 104 inline units against a
   budget of 80, so it stops being inlined and the nil case costs a call again
-  either way. Doing it in generated code instead was not tried.
+  either way. It was redundant in any case — `internal/codegen` already emits
+  `if v.Field == nil { … }` around the call, which is where that test belongs.
 - **Writing integral floats and wide fixed integers with the new writer**
   rather than `strconv`: level on both rows (p=0.067 and p=0.245). Kept
   anyway, because it is what leaves the encode path with no `strconv` call in
   it at all.
+- **The same fusion for `ModeV2HTML`**, the mode a direct-path
+  `encoding/json` marshal writes. It was written — reservation, word stores,
+  the backward-word tail, `copyNonASCII` for the runs, the line separators
+  looked for after the copy and rewound to — and measured twice, four
+  `-ldflags=-randlayout` seeds against four, five runs each (n=20). Both
+  rounds agree on the `twitter` row: **−2.99%** (p=0.000) and **−2.86%**
+  (p=0.004). Both disagree with it on `small`: **+2.83%** against an untouched
+  floor of +3.47% in the first round, and **+7.66%** (p=0.000) against level
+  floors in the second. A profile puts about a fifth of that inside the
+  appender — `copyNonASCII` costs more than `skipNonASCII` plus the copy it
+  replaces when a run's last bytes fall into the table path, which is exactly
+  the shape of `small`'s one CJK member — and the rest outside it, spread. Two
+  shapes for a string shorter than a word were tried inside it: two
+  overlapping halves, as the `ModeV2` body uses (**+8.95%** on that row
+  against a level floor, because this mode's word test carries five terms
+  rather than two), and a byte loop storing as it goes (the +7.66% above).
+  A large encode gaining 3% is not worth a small one losing 4 to 8, so the
+  mode keeps its two passes. What the attempt left behind is
+  `odjsonrt/v2html_test.go`, which drives the appender against what
+  `encoding/json` makes of the same literal through a `MarshalerTo` — the
+  reformat this mode reproduces — over every prefix of a dozen shapes with
+  one byte of each corrupted in turn. That oracle did not exist before and it
+  covers the implementation that stayed.
+- **Splicing `appendShortFloat` into `AppendFloat`**, the last place where a
+  value cost two calls: level on every row pooled over four layouts (n=20),
+  with the `encoding/json` `small` row trending −1.6% at p=0.057 and the
+  `json/v2` one −0.7% at p=0.239. Not taken: it would cost
+  `ftoa_short_test.go`'s pin on which values the short path accepts and
+  declines, which is a performance contract nothing else records, and the
+  measurement does not pay for it.
 
 What is left, measured by replacing the `ModeV2` body with
 `append(dst, src...)` — no scan, no validation, the wrong output and the right
@@ -1017,10 +1048,8 @@ the `twitter` figure is the non-ASCII validation. Of the rest of that row,
 which is not odjson's to remove — is 18%, and the dynamic members are 15%.
 
 `ModeV2HTML`, the mode a direct-path `encoding/json` marshal writes, still
-scans and copies in two passes: its escaping is woven through a `start`
-pointer that the U+2028/U+2029 handling also moves, so the same rewrite is a
-larger change than this round took on. Its row moved only by the number
-writer.
+scans and copies in two passes — not for want of trying; see the rejected
+list above. Its row moved only by the number writer.
 
 ## Measurement notes
 
