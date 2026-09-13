@@ -46,36 +46,47 @@ func (v *Item) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	}
 	dst = append(dst, ",\"count\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Count))
-	dst = append(dst, ",\"active\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.Active))
-	dst = append(dst, ",\"tags\":"...)
-	if v.Tags == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+	if bool(v.Active) {
+		dst = append(dst, ",\"active\":true,\""...)
+		dst = append(dst, "tags\":"...)
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, ",\"active\":false,"...)
+		dst = append(dst, "\"tags\":"...)
+	}
+	if v.Tags == nil {
+		if m.V2() {
+			dst = append(dst, "[],\"attrs\":"...)
+		} else {
+			dst = append(dst, "null,\"attrs\":"...)
+		}
+	} else {
+		dst = append(dst, "["...)
 		for i1 := range v.Tags {
 			if i1 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Tags[i1]), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"attrs\":"...)
 	}
-	dst = append(dst, ",\"attrs\":"...)
 	if v.Attrs == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{}"...)
+		} else {
+			dst = append(dst, "null"...)
+		}
 	} else {
 		keys2 := make([]string, 0, len(v.Attrs))
 		for k3 := range v.Attrs {
 			keys2 = append(keys2, string(k3))
 		}
 		slices.Sort(keys2)
-		dst = append(dst, '{')
+		dst = append(dst, "{"...)
 		for i4, k3 := range keys2 {
 			if i4 > 0 {
 				dst = append(dst, ',')
@@ -85,23 +96,21 @@ func (v *Item) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv5 := v.Attrs[k3]
-			dst = append(dst, '"')
+			dst = append(dst, "\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv5), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "}"...)
 	}
 	if v.Owner != nil {
-		dst = append(dst, ",\"owner\":"...)
 		if v.Owner == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"owner\":null"...)
 		} else {
-			dst = append(dst, "{\"id\":"...)
+			dst = append(dst, ",\"owner\":{\"id\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.Owner).ID))
 			dst = append(dst, ",\"name\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.Owner).Name), m)
@@ -116,12 +125,8 @@ func (v *Item) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 			dst = append(dst, "\"}"...)
 		}
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst[start] = '{'
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -1859,11 +1864,16 @@ func (v *Page) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
 	start := len(dst)
-	dst = append(dst, ",\"items\":"...)
 	if v.Items == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, ",\"items\":[],\"tot"...)
+			dst = append(dst, "al\":"...)
+		} else {
+			dst = append(dst, ",\"items\":null,\"t"...)
+			dst = append(dst, "otal\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, ",\"items\":["...)
 		for i171 := range v.Items {
 			if i171 > 0 {
 				dst = append(dst, ',')
@@ -1873,9 +1883,8 @@ func (v *Page) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 				return nil, err
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"total\":"...)
 	}
-	dst = append(dst, ",\"total\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Total))
 	if len(v.NextCursor) != 0 {
 		dst = append(dst, ",\"next_cursor\":\""...)
@@ -1883,14 +1892,10 @@ func (v *Page) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		dst = append(dst, '"')
+		dst = append(dst, "\""...)
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst[start] = '{'
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -2449,25 +2454,27 @@ func (v *Page) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Text) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"lines\":"...)
 	if v.Lines == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "{\"lines\":[]}"...)
+		} else {
+			dst = append(dst, "{\"lines\":null}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "{\"lines\":["...)
 		for i204 := range v.Lines {
 			if i204 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Lines[i204]), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -2928,25 +2935,27 @@ func (v *Text) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *IDs) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"values\":"...)
 	if v.Values == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "{\"values\":[]}"...)
+		} else {
+			dst = append(dst, "{\"values\":null}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "{\"values\":["...)
 		for i228 := range v.Values {
 			if i228 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Values[i228]), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -3407,16 +3416,16 @@ func (v *IDs) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Generic) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"payload\":"...)
 	if v.Payload == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, "{\"payload\":null}"...)
 	} else {
+		dst = append(dst, "{\"payload\":"...)
 		dst, err = odjsonrt.AppendAnyMode(dst, v.Payload, m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, "}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -3752,50 +3761,63 @@ func (v *Generic) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Numbers) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"i64\":"...)
 	if v.I64 == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "{\"i64\":[],\"u64\":"...)
+		} else {
+			dst = append(dst, "{\"i64\":null,\"u64"...)
+			dst = append(dst, "\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "{\"i64\":["...)
 		for i263 := range v.I64 {
 			if i263 > 0 {
 				dst = append(dst, ',')
 			}
 			dst = odjsonrt.AppendInt(dst, int64(v.I64[i263]))
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"u64\":"...)
 	}
-	dst = append(dst, ",\"u64\":"...)
 	if v.U64 == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[],\"i16\":"...)
+		} else {
+			dst = append(dst, "null,\"i16\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i264 := range v.U64 {
 			if i264 > 0 {
 				dst = append(dst, ',')
 			}
 			dst = odjsonrt.AppendUint(dst, uint64(v.U64[i264]))
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"i16\":"...)
 	}
-	dst = append(dst, ",\"i16\":"...)
 	if v.I16 == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[],\"f32\":"...)
+		} else {
+			dst = append(dst, "null,\"f32\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i265 := range v.I16 {
 			if i265 > 0 {
 				dst = append(dst, ',')
 			}
 			dst = odjsonrt.AppendInt(dst, int64(v.I16[i265]))
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"f32\":"...)
 	}
-	dst = append(dst, ",\"f32\":"...)
 	if v.F32 == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[],\"f64\":"...)
+		} else {
+			dst = append(dst, "null,\"f64\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i266 := range v.F32 {
 			if i266 > 0 {
 				dst = append(dst, ',')
@@ -3805,13 +3827,16 @@ func (v *Numbers) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 				return nil, err
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"f64\":"...)
 	}
-	dst = append(dst, ",\"f64\":"...)
 	if v.F64 == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[],\"sci\":"...)
+		} else {
+			dst = append(dst, "null,\"sci\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i267 := range v.F64 {
 			if i267 > 0 {
 				dst = append(dst, ',')
@@ -3821,13 +3846,16 @@ func (v *Numbers) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 				return nil, err
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"sci\":"...)
 	}
-	dst = append(dst, ",\"sci\":"...)
 	if v.Sci == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[]}"...)
+		} else {
+			dst = append(dst, "null}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i268 := range v.Sci {
 			if i268 > 0 {
 				dst = append(dst, ',')
@@ -3837,9 +3865,8 @@ func (v *Numbers) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 				return nil, err
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -5360,11 +5387,14 @@ func (v *Numbers) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *DenseDoc) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"rows\":"...)
 	if v.Rows == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "{\"rows\":[]}"...)
+		} else {
+			dst = append(dst, "{\"rows\":null}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "{\"rows\":["...)
 		for i461 := range v.Rows {
 			if i461 > 0 {
 				dst = append(dst, ',')
@@ -5374,9 +5404,8 @@ func (v *DenseDoc) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 				return nil, err
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -5861,39 +5890,88 @@ func (v *Dense) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 	dst = odjsonrt.AppendInt(dst, int64(v.F30))
 	dst = append(dst, ",\"f31\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.F31))
-	dst = append(dst, ",\"b00\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B00))
-	dst = append(dst, ",\"b01\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B01))
-	dst = append(dst, ",\"b02\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B02))
-	dst = append(dst, ",\"b03\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B03))
-	dst = append(dst, ",\"b04\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B04))
-	dst = append(dst, ",\"b05\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B05))
-	dst = append(dst, ",\"b06\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B06))
-	dst = append(dst, ",\"b07\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B07))
-	dst = append(dst, ",\"b08\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B08))
-	dst = append(dst, ",\"b09\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B09))
-	dst = append(dst, ",\"b10\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B10))
-	dst = append(dst, ",\"b11\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B11))
-	dst = append(dst, ",\"b12\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B12))
-	dst = append(dst, ",\"b13\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B13))
-	dst = append(dst, ",\"b14\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B14))
-	dst = append(dst, ",\"b15\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B15))
-	dst = append(dst, ",\"x00\":"...)
+	if bool(v.B00) {
+		dst = append(dst, ",\"b00\":true,\"b01"...)
+		dst = append(dst, "\":"...)
+	} else {
+		dst = append(dst, ",\"b00\":false,\"b0"...)
+		dst = append(dst, "1\":"...)
+	}
+	if bool(v.B01) {
+		dst = append(dst, "true,\"b02\":"...)
+	} else {
+		dst = append(dst, "false,\"b02\":"...)
+	}
+	if bool(v.B02) {
+		dst = append(dst, "true,\"b03\":"...)
+	} else {
+		dst = append(dst, "false,\"b03\":"...)
+	}
+	if bool(v.B03) {
+		dst = append(dst, "true,\"b04\":"...)
+	} else {
+		dst = append(dst, "false,\"b04\":"...)
+	}
+	if bool(v.B04) {
+		dst = append(dst, "true,\"b05\":"...)
+	} else {
+		dst = append(dst, "false,\"b05\":"...)
+	}
+	if bool(v.B05) {
+		dst = append(dst, "true,\"b06\":"...)
+	} else {
+		dst = append(dst, "false,\"b06\":"...)
+	}
+	if bool(v.B06) {
+		dst = append(dst, "true,\"b07\":"...)
+	} else {
+		dst = append(dst, "false,\"b07\":"...)
+	}
+	if bool(v.B07) {
+		dst = append(dst, "true,\"b08\":"...)
+	} else {
+		dst = append(dst, "false,\"b08\":"...)
+	}
+	if bool(v.B08) {
+		dst = append(dst, "true,\"b09\":"...)
+	} else {
+		dst = append(dst, "false,\"b09\":"...)
+	}
+	if bool(v.B09) {
+		dst = append(dst, "true,\"b10\":"...)
+	} else {
+		dst = append(dst, "false,\"b10\":"...)
+	}
+	if bool(v.B10) {
+		dst = append(dst, "true,\"b11\":"...)
+	} else {
+		dst = append(dst, "false,\"b11\":"...)
+	}
+	if bool(v.B11) {
+		dst = append(dst, "true,\"b12\":"...)
+	} else {
+		dst = append(dst, "false,\"b12\":"...)
+	}
+	if bool(v.B12) {
+		dst = append(dst, "true,\"b13\":"...)
+	} else {
+		dst = append(dst, "false,\"b13\":"...)
+	}
+	if bool(v.B13) {
+		dst = append(dst, "true,\"b14\":"...)
+	} else {
+		dst = append(dst, "false,\"b14\":"...)
+	}
+	if bool(v.B14) {
+		dst = append(dst, "true,\"b15\":"...)
+	} else {
+		dst = append(dst, "false,\"b15\":"...)
+	}
+	if bool(v.B15) {
+		dst = append(dst, "true,\"x00\":"...)
+	} else {
+		dst = append(dst, "false,\"x00\":"...)
+	}
 	dst, err = odjsonrt.AppendFloat(dst, float64(v.X00), 64)
 	if err != nil {
 		return nil, err
@@ -10332,11 +10410,14 @@ func (v *Dense) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *SparseDoc) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"rows\":"...)
 	if v.Rows == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "{\"rows\":[]}"...)
+		} else {
+			dst = append(dst, "{\"rows\":null}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "{\"rows\":["...)
 		for i1160 := range v.Rows {
 			if i1160 > 0 {
 				dst = append(dst, ',')
@@ -10346,9 +10427,8 @@ func (v *SparseDoc) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, err
 				return nil, err
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -10771,347 +10851,330 @@ func (v *Sparse) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	_ = err
 	start := len(dst)
 	if v.F00 != nil {
-		dst = append(dst, ",\"f00\":"...)
 		if v.F00 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f00\":null"...)
 		} else {
+			dst = append(dst, ",\"f00\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F00)))
 		}
 	}
 	if v.F01 != nil {
-		dst = append(dst, ",\"f01\":"...)
 		if v.F01 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f01\":null"...)
 		} else {
+			dst = append(dst, ",\"f01\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F01)))
 		}
 	}
 	if v.F02 != nil {
-		dst = append(dst, ",\"f02\":"...)
 		if v.F02 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f02\":null"...)
 		} else {
+			dst = append(dst, ",\"f02\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F02)))
 		}
 	}
 	if v.F03 != nil {
-		dst = append(dst, ",\"f03\":"...)
 		if v.F03 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f03\":null"...)
 		} else {
+			dst = append(dst, ",\"f03\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F03)))
 		}
 	}
 	if v.F04 != nil {
-		dst = append(dst, ",\"f04\":"...)
 		if v.F04 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f04\":null"...)
 		} else {
+			dst = append(dst, ",\"f04\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F04)))
 		}
 	}
 	if v.F05 != nil {
-		dst = append(dst, ",\"f05\":"...)
 		if v.F05 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f05\":null"...)
 		} else {
+			dst = append(dst, ",\"f05\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F05)))
 		}
 	}
 	if v.F06 != nil {
-		dst = append(dst, ",\"f06\":"...)
 		if v.F06 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f06\":null"...)
 		} else {
+			dst = append(dst, ",\"f06\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F06)))
 		}
 	}
 	if v.F07 != nil {
-		dst = append(dst, ",\"f07\":"...)
 		if v.F07 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f07\":null"...)
 		} else {
+			dst = append(dst, ",\"f07\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F07)))
 		}
 	}
 	if v.F08 != nil {
-		dst = append(dst, ",\"f08\":"...)
 		if v.F08 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f08\":null"...)
 		} else {
+			dst = append(dst, ",\"f08\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F08)))
 		}
 	}
 	if v.F09 != nil {
-		dst = append(dst, ",\"f09\":"...)
 		if v.F09 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f09\":null"...)
 		} else {
+			dst = append(dst, ",\"f09\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F09)))
 		}
 	}
 	if v.F10 != nil {
-		dst = append(dst, ",\"f10\":"...)
 		if v.F10 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f10\":null"...)
 		} else {
+			dst = append(dst, ",\"f10\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F10)))
 		}
 	}
 	if v.F11 != nil {
-		dst = append(dst, ",\"f11\":"...)
 		if v.F11 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f11\":null"...)
 		} else {
+			dst = append(dst, ",\"f11\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F11)))
 		}
 	}
 	if v.F12 != nil {
-		dst = append(dst, ",\"f12\":"...)
 		if v.F12 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f12\":null"...)
 		} else {
+			dst = append(dst, ",\"f12\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F12)))
 		}
 	}
 	if v.F13 != nil {
-		dst = append(dst, ",\"f13\":"...)
 		if v.F13 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f13\":null"...)
 		} else {
+			dst = append(dst, ",\"f13\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F13)))
 		}
 	}
 	if v.F14 != nil {
-		dst = append(dst, ",\"f14\":"...)
 		if v.F14 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f14\":null"...)
 		} else {
+			dst = append(dst, ",\"f14\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F14)))
 		}
 	}
 	if v.F15 != nil {
-		dst = append(dst, ",\"f15\":"...)
 		if v.F15 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"f15\":null"...)
 		} else {
+			dst = append(dst, ",\"f15\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.F15)))
 		}
 	}
 	if v.S00 != nil {
-		dst = append(dst, ",\"s00\":"...)
 		if v.S00 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s00\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s00\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S00)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S01 != nil {
-		dst = append(dst, ",\"s01\":"...)
 		if v.S01 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s01\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s01\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S01)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S02 != nil {
-		dst = append(dst, ",\"s02\":"...)
 		if v.S02 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s02\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s02\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S02)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S03 != nil {
-		dst = append(dst, ",\"s03\":"...)
 		if v.S03 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s03\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s03\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S03)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S04 != nil {
-		dst = append(dst, ",\"s04\":"...)
 		if v.S04 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s04\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s04\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S04)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S05 != nil {
-		dst = append(dst, ",\"s05\":"...)
 		if v.S05 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s05\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s05\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S05)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S06 != nil {
-		dst = append(dst, ",\"s06\":"...)
 		if v.S06 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s06\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s06\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S06)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S07 != nil {
-		dst = append(dst, ",\"s07\":"...)
 		if v.S07 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s07\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s07\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S07)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S08 != nil {
-		dst = append(dst, ",\"s08\":"...)
 		if v.S08 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s08\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s08\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S08)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S09 != nil {
-		dst = append(dst, ",\"s09\":"...)
 		if v.S09 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s09\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s09\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S09)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S10 != nil {
-		dst = append(dst, ",\"s10\":"...)
 		if v.S10 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s10\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s10\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S10)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S11 != nil {
-		dst = append(dst, ",\"s11\":"...)
 		if v.S11 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s11\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s11\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S11)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S12 != nil {
-		dst = append(dst, ",\"s12\":"...)
 		if v.S12 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s12\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s12\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S12)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S13 != nil {
-		dst = append(dst, ",\"s13\":"...)
 		if v.S13 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s13\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s13\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S13)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S14 != nil {
-		dst = append(dst, ",\"s14\":"...)
 		if v.S14 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s14\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s14\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S14)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.S15 != nil {
-		dst = append(dst, ",\"s15\":"...)
 		if v.S15 == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"s15\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"s15\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.S15)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if v.N != nil {
-		dst = append(dst, ",\"n\":"...)
 		if v.N == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"n\":null"...)
 		} else {
-			dst = append(dst, "{\"id\":"...)
+			dst = append(dst, ",\"n\":{\"id\":"...)
 			dst = odjsonrt.AppendInt(dst, int64((*v.N).ID))
 			dst = append(dst, ",\"name\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.N).Name), m)
@@ -14659,11 +14722,15 @@ func (v *Canada) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, "\",\"features\":"...)
 	if v.Features == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "\",\"features\":[]}"...)
+		} else {
+			dst = append(dst, "\",\"features\":nul"...)
+			dst = append(dst, "l}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "\",\"features\":["...)
 		for i1863 := range v.Features {
 			if i1863 > 0 {
 				dst = append(dst, ',')
@@ -14673,16 +14740,21 @@ func (v *Canada) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, "\",\"properties\":"...)
 			if v.Features[i1863].Properties == nil {
-				dst = odjsonrt.AppendNilMap(dst, m)
+				if m.V2() {
+					dst = append(dst, "\",\"properties\":{"...)
+					dst = append(dst, "},\"geometry\":"...)
+				} else {
+					dst = append(dst, "\",\"properties\":n"...)
+					dst = append(dst, "ull,\"geometry\":"...)
+				}
 			} else {
 				keys1864 := make([]string, 0, len(v.Features[i1863].Properties))
 				for k1865 := range v.Features[i1863].Properties {
 					keys1864 = append(keys1864, string(k1865))
 				}
 				slices.Sort(keys1864)
-				dst = append(dst, '{')
+				dst = append(dst, "\",\"properties\":{"...)
 				for i1866, k1865 := range keys1864 {
 					if i1866 > 0 {
 						dst = append(dst, ',')
@@ -14692,27 +14764,24 @@ func (v *Canada) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 					if err != nil {
 						return nil, err
 					}
-					dst = append(dst, '"', ':')
 					mv1867 := v.Features[i1863].Properties[k1865]
-					dst = append(dst, '"')
+					dst = append(dst, "\":\""...)
 					dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv1867), m)
 					if err != nil {
 						return nil, err
 					}
-					dst = append(dst, '"')
+					dst = append(dst, "\""...)
 				}
-				dst = append(dst, '}')
+				dst = append(dst, "},\"geometry\":"...)
 			}
-			dst = append(dst, ",\"geometry\":"...)
 			dst, err = v.Features[i1863].Geometry.odjsonAppend(dst, m)
 			if err != nil {
 				return nil, err
 			}
 			dst = append(dst, "}"...)
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -15207,16 +15276,23 @@ func (v *Feature) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, "\",\"properties\":"...)
 	if v.Properties == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "\",\"properties\":{"...)
+			dst = append(dst, "},\"geometry\":{\"t"...)
+			dst = append(dst, "ype\":\""...)
+		} else {
+			dst = append(dst, "\",\"properties\":n"...)
+			dst = append(dst, "ull,\"geometry\":{"...)
+			dst = append(dst, "\"type\":\""...)
+		}
 	} else {
 		keys1886 := make([]string, 0, len(v.Properties))
 		for k1887 := range v.Properties {
 			keys1886 = append(keys1886, string(k1887))
 		}
 		slices.Sort(keys1886)
-		dst = append(dst, '{')
+		dst = append(dst, "\",\"properties\":{"...)
 		for i1888, k1887 := range keys1886 {
 			if i1888 > 0 {
 				dst = append(dst, ',')
@@ -15226,44 +15302,56 @@ func (v *Feature) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv1889 := v.Properties[k1887]
-			dst = append(dst, '"')
+			dst = append(dst, "\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv1889), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"geometry\":{\"t"...)
+		dst = append(dst, "ype\":\""...)
 	}
-	dst = append(dst, ",\"geometry\":{\"ty"...)
-	dst = append(dst, "pe\":\""...)
 	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Geometry.Type), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, "\",\"coordinates\":"...)
 	if v.Geometry.Coordinates == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "\",\"coordinates\":"...)
+			dst = append(dst, "[]}}"...)
+		} else {
+			dst = append(dst, "\",\"coordinates\":"...)
+			dst = append(dst, "null}}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "\",\"coordinates\":"...)
+		dst = append(dst, "["...)
 		for i1890 := range v.Geometry.Coordinates {
 			if i1890 > 0 {
 				dst = append(dst, ',')
 			}
 			if v.Geometry.Coordinates[i1890] == nil {
-				dst = odjsonrt.AppendNilSlice(dst, m)
+				if m.V2() {
+					dst = append(dst, "[]"...)
+				} else {
+					dst = append(dst, "null"...)
+				}
 			} else {
-				dst = append(dst, '[')
+				dst = append(dst, "["...)
 				for i1891 := range v.Geometry.Coordinates[i1890] {
 					if i1891 > 0 {
 						dst = append(dst, ',')
 					}
 					if v.Geometry.Coordinates[i1890][i1891] == nil {
-						dst = odjsonrt.AppendNilSlice(dst, m)
+						if m.V2() {
+							dst = append(dst, "[]"...)
+						} else {
+							dst = append(dst, "null"...)
+						}
 					} else {
-						dst = append(dst, '[')
+						dst = append(dst, "["...)
 						for i1892 := range v.Geometry.Coordinates[i1890][i1891] {
 							if i1892 > 0 {
 								dst = append(dst, ',')
@@ -15273,15 +15361,14 @@ func (v *Feature) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 								return nil, err
 							}
 						}
-						dst = append(dst, ']')
+						dst = append(dst, "]"...)
 					}
 				}
-				dst = append(dst, ']')
+				dst = append(dst, "]"...)
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}}"...)
 	}
-	dst = append(dst, "}}"...)
 	return dst, nil
 }
 
@@ -15869,27 +15956,41 @@ func (v *Geometry) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, "\",\"coordinates\":"...)
 	if v.Coordinates == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "\",\"coordinates\":"...)
+			dst = append(dst, "[]}"...)
+		} else {
+			dst = append(dst, "\",\"coordinates\":"...)
+			dst = append(dst, "null}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "\",\"coordinates\":"...)
+		dst = append(dst, "["...)
 		for i1929 := range v.Coordinates {
 			if i1929 > 0 {
 				dst = append(dst, ',')
 			}
 			if v.Coordinates[i1929] == nil {
-				dst = odjsonrt.AppendNilSlice(dst, m)
+				if m.V2() {
+					dst = append(dst, "[]"...)
+				} else {
+					dst = append(dst, "null"...)
+				}
 			} else {
-				dst = append(dst, '[')
+				dst = append(dst, "["...)
 				for i1930 := range v.Coordinates[i1929] {
 					if i1930 > 0 {
 						dst = append(dst, ',')
 					}
 					if v.Coordinates[i1929][i1930] == nil {
-						dst = odjsonrt.AppendNilSlice(dst, m)
+						if m.V2() {
+							dst = append(dst, "[]"...)
+						} else {
+							dst = append(dst, "null"...)
+						}
 					} else {
-						dst = append(dst, '[')
+						dst = append(dst, "["...)
 						for i1931 := range v.Coordinates[i1929][i1930] {
 							if i1931 > 0 {
 								dst = append(dst, ',')
@@ -15899,15 +16000,14 @@ func (v *Geometry) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, erro
 								return nil, err
 							}
 						}
-						dst = append(dst, ']')
+						dst = append(dst, "]"...)
 					}
 				}
-				dst = append(dst, ']')
+				dst = append(dst, "]"...)
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -16692,16 +16792,23 @@ func (v *Geometry) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"areaNames\":"...)
 	if v.AreaNames == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{\"areaNames\":{},"...)
+			dst = append(dst, "\"audienceSubCate"...)
+			dst = append(dst, "goryNames\":"...)
+		} else {
+			dst = append(dst, "{\"areaNames\":nul"...)
+			dst = append(dst, "l,\"audienceSubCa"...)
+			dst = append(dst, "tegoryNames\":"...)
+		}
 	} else {
 		keys1996 := make([]string, 0, len(v.AreaNames))
 		for k1997 := range v.AreaNames {
 			keys1996 = append(keys1996, string(k1997))
 		}
 		slices.Sort(keys1996)
-		dst = append(dst, '{')
+		dst = append(dst, "{\"areaNames\":{"...)
 		for i1998, k1997 := range keys1996 {
 			if i1998 > 0 {
 				dst = append(dst, ',')
@@ -16711,28 +16818,31 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv1999 := v.AreaNames[k1997]
-			dst = append(dst, '"')
+			dst = append(dst, "\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv1999), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"audienceSubCa"...)
+		dst = append(dst, "tegoryNames\":"...)
 	}
-	dst = append(dst, ",\"audienceSubCat"...)
-	dst = append(dst, "egoryNames\":"...)
 	if v.AudienceSubCategoryNames == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{},\"blockNames\":"...)
+		} else {
+			dst = append(dst, "null,\"blockNames"...)
+			dst = append(dst, "\":"...)
+		}
 	} else {
 		keys2000 := make([]string, 0, len(v.AudienceSubCategoryNames))
 		for k2001 := range v.AudienceSubCategoryNames {
 			keys2000 = append(keys2000, string(k2001))
 		}
 		slices.Sort(keys2000)
-		dst = append(dst, '{')
+		dst = append(dst, "{"...)
 		for i2002, k2001 := range keys2000 {
 			if i2002 > 0 {
 				dst = append(dst, ',')
@@ -16742,27 +16852,29 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv2003 := v.AudienceSubCategoryNames[k2001]
-			dst = append(dst, '"')
+			dst = append(dst, "\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv2003), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"blockNames\":"...)
 	}
-	dst = append(dst, ",\"blockNames\":"...)
 	if v.BlockNames == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{},\"events\":"...)
+		} else {
+			dst = append(dst, "null,\"events\":"...)
+		}
 	} else {
 		keys2004 := make([]string, 0, len(v.BlockNames))
 		for k2005 := range v.BlockNames {
 			keys2004 = append(keys2004, string(k2005))
 		}
 		slices.Sort(keys2004)
-		dst = append(dst, '{')
+		dst = append(dst, "{"...)
 		for i2006, k2005 := range keys2004 {
 			if i2006 > 0 {
 				dst = append(dst, ',')
@@ -16772,27 +16884,31 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv2007 := v.BlockNames[k2005]
-			dst = append(dst, '"')
+			dst = append(dst, "\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv2007), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"events\":"...)
 	}
-	dst = append(dst, ",\"events\":"...)
 	if v.Events == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{},\"performances"...)
+			dst = append(dst, "\":"...)
+		} else {
+			dst = append(dst, "null,\"performanc"...)
+			dst = append(dst, "es\":"...)
+		}
 	} else {
 		keys2008 := make([]string, 0, len(v.Events))
 		for k2009 := range v.Events {
 			keys2008 = append(keys2008, string(k2009))
 		}
 		slices.Sort(keys2008)
-		dst = append(dst, '{')
+		dst = append(dst, "{"...)
 		for i2010, k2009 := range keys2008 {
 			if i2010 > 0 {
 				dst = append(dst, ',')
@@ -16802,20 +16918,26 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv2011 := v.Events[k2009]
+			dst = append(dst, "\":"...)
 			dst, err = mv2011.odjsonAppend(dst, m)
 			if err != nil {
 				return nil, err
 			}
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"performances\""...)
+		dst = append(dst, ":"...)
 	}
-	dst = append(dst, ",\"performances\":"...)
 	if v.Performances == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[],\"seatCategory"...)
+			dst = append(dst, "Names\":"...)
+		} else {
+			dst = append(dst, "null,\"seatCatego"...)
+			dst = append(dst, "ryNames\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i2012 := range v.Performances {
 			if i2012 > 0 {
 				dst = append(dst, ',')
@@ -16825,19 +16947,24 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 				return nil, err
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"seatCategoryN"...)
+		dst = append(dst, "ames\":"...)
 	}
-	dst = append(dst, ",\"seatCategoryNa"...)
-	dst = append(dst, "mes\":"...)
 	if v.SeatCategoryNames == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{},\"subTopicName"...)
+			dst = append(dst, "s\":"...)
+		} else {
+			dst = append(dst, "null,\"subTopicNa"...)
+			dst = append(dst, "mes\":"...)
+		}
 	} else {
 		keys2013 := make([]string, 0, len(v.SeatCategoryNames))
 		for k2014 := range v.SeatCategoryNames {
 			keys2013 = append(keys2013, string(k2014))
 		}
 		slices.Sort(keys2013)
-		dst = append(dst, '{')
+		dst = append(dst, "{"...)
 		for i2015, k2014 := range keys2013 {
 			if i2015 > 0 {
 				dst = append(dst, ',')
@@ -16847,28 +16974,32 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv2016 := v.SeatCategoryNames[k2014]
-			dst = append(dst, '"')
+			dst = append(dst, "\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv2016), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"subTopicNames"...)
+		dst = append(dst, "\":"...)
 	}
-	dst = append(dst, ",\"subTopicNames\""...)
-	dst = append(dst, ":"...)
 	if v.SubTopicNames == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{},\"subjectNames"...)
+			dst = append(dst, "\":"...)
+		} else {
+			dst = append(dst, "null,\"subjectNam"...)
+			dst = append(dst, "es\":"...)
+		}
 	} else {
 		keys2017 := make([]string, 0, len(v.SubTopicNames))
 		for k2018 := range v.SubTopicNames {
 			keys2017 = append(keys2017, string(k2018))
 		}
 		slices.Sort(keys2017)
-		dst = append(dst, '{')
+		dst = append(dst, "{"...)
 		for i2019, k2018 := range keys2017 {
 			if i2019 > 0 {
 				dst = append(dst, ',')
@@ -16878,27 +17009,31 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv2020 := v.SubTopicNames[k2018]
-			dst = append(dst, '"')
+			dst = append(dst, "\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv2020), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"subjectNames\""...)
+		dst = append(dst, ":"...)
 	}
-	dst = append(dst, ",\"subjectNames\":"...)
 	if v.SubjectNames == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{},\"topicNames\":"...)
+		} else {
+			dst = append(dst, "null,\"topicNames"...)
+			dst = append(dst, "\":"...)
+		}
 	} else {
 		keys2021 := make([]string, 0, len(v.SubjectNames))
 		for k2022 := range v.SubjectNames {
 			keys2021 = append(keys2021, string(k2022))
 		}
 		slices.Sort(keys2021)
-		dst = append(dst, '{')
+		dst = append(dst, "{"...)
 		for i2023, k2022 := range keys2021 {
 			if i2023 > 0 {
 				dst = append(dst, ',')
@@ -16908,27 +17043,31 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv2024 := v.SubjectNames[k2022]
-			dst = append(dst, '"')
+			dst = append(dst, "\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv2024), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"topicNames\":"...)
 	}
-	dst = append(dst, ",\"topicNames\":"...)
 	if v.TopicNames == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{},\"topicSubTopi"...)
+			dst = append(dst, "cs\":"...)
+		} else {
+			dst = append(dst, "null,\"topicSubTo"...)
+			dst = append(dst, "pics\":"...)
+		}
 	} else {
 		keys2025 := make([]string, 0, len(v.TopicNames))
 		for k2026 := range v.TopicNames {
 			keys2025 = append(keys2025, string(k2026))
 		}
 		slices.Sort(keys2025)
-		dst = append(dst, '{')
+		dst = append(dst, "{"...)
 		for i2027, k2026 := range keys2025 {
 			if i2027 > 0 {
 				dst = append(dst, ',')
@@ -16938,28 +17077,31 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv2028 := v.TopicNames[k2026]
-			dst = append(dst, '"')
+			dst = append(dst, "\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv2028), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"topicSubTopic"...)
+		dst = append(dst, "s\":"...)
 	}
-	dst = append(dst, ",\"topicSubTopics"...)
-	dst = append(dst, "\":"...)
 	if v.TopicSubTopics == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{},\"venueNames\":"...)
+		} else {
+			dst = append(dst, "null,\"venueNames"...)
+			dst = append(dst, "\":"...)
+		}
 	} else {
 		keys2029 := make([]string, 0, len(v.TopicSubTopics))
 		for k2030 := range v.TopicSubTopics {
 			keys2029 = append(keys2029, string(k2030))
 		}
 		slices.Sort(keys2029)
-		dst = append(dst, '{')
+		dst = append(dst, "{"...)
 		for i2031, k2030 := range keys2029 {
 			if i2031 > 0 {
 				dst = append(dst, ',')
@@ -16969,54 +17111,58 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv2032 := v.TopicSubTopics[k2030]
 			if mv2032 == nil {
-				dst = odjsonrt.AppendNilSlice(dst, m)
+				if m.V2() {
+					dst = append(dst, "\":[]"...)
+				} else {
+					dst = append(dst, "\":null"...)
+				}
 			} else {
-				dst = append(dst, '[')
-				for i2033 := range mv2032 {
-					if i2033 > 0 {
+				dst = append(dst, "\":["...)
+				for i2037 := range mv2032 {
+					if i2037 > 0 {
 						dst = append(dst, ',')
 					}
-					dst = odjsonrt.AppendInt(dst, int64(mv2032[i2033]))
+					dst = odjsonrt.AppendInt(dst, int64(mv2032[i2037]))
 				}
-				dst = append(dst, ']')
+				dst = append(dst, "]"...)
 			}
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"venueNames\":"...)
 	}
-	dst = append(dst, ",\"venueNames\":"...)
 	if v.VenueNames == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
-	} else {
-		keys2034 := make([]string, 0, len(v.VenueNames))
-		for k2035 := range v.VenueNames {
-			keys2034 = append(keys2034, string(k2035))
+		if m.V2() {
+			dst = append(dst, "{}}"...)
+		} else {
+			dst = append(dst, "null}"...)
 		}
-		slices.Sort(keys2034)
-		dst = append(dst, '{')
-		for i2036, k2035 := range keys2034 {
-			if i2036 > 0 {
+	} else {
+		keys2033 := make([]string, 0, len(v.VenueNames))
+		for k2034 := range v.VenueNames {
+			keys2033 = append(keys2033, string(k2034))
+		}
+		slices.Sort(keys2033)
+		dst = append(dst, "{"...)
+		for i2035, k2034 := range keys2033 {
+			if i2035 > 0 {
 				dst = append(dst, ',')
 			}
 			dst = append(dst, '"')
-			dst, err = odjsonrt.AppendStringBodyChecked(dst, k2035, m)
+			dst, err = odjsonrt.AppendStringBodyChecked(dst, k2034, m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
-			mv2037 := v.VenueNames[k2035]
-			dst = append(dst, '"')
-			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv2037), m)
+			mv2036 := v.VenueNames[k2034]
+			dst = append(dst, "\":\""...)
+			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv2036), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "}}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -19624,84 +19770,90 @@ func (v *CitmCatalog) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Event) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"description\":"...)
 	if v.Description == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, "{\"description\":n"...)
+		dst = append(dst, "ull,\"id\":"...)
 	} else {
-		dst = append(dst, '"')
+		dst = append(dst, "{\"description\":\""...)
 		dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.Description)), m)
 		if err != nil {
 			return nil, err
 		}
-		dst = append(dst, '"')
+		dst = append(dst, "\",\"id\":"...)
 	}
-	dst = append(dst, ",\"id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.ID))
-	dst = append(dst, ",\"logo\":"...)
 	if v.Logo == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, ",\"logo\":null,\"na"...)
+		dst = append(dst, "me\":\""...)
 	} else {
-		dst = append(dst, '"')
+		dst = append(dst, ",\"logo\":\""...)
 		dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.Logo)), m)
 		if err != nil {
 			return nil, err
 		}
-		dst = append(dst, '"')
+		dst = append(dst, "\",\"name\":\""...)
 	}
-	dst = append(dst, ",\"name\":\""...)
 	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Name), m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, "\",\"subTopicIds\":"...)
 	if v.SubTopicIds == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "\",\"subTopicIds\":"...)
+			dst = append(dst, "[],\"subjectCode\""...)
+			dst = append(dst, ":"...)
+		} else {
+			dst = append(dst, "\",\"subTopicIds\":"...)
+			dst = append(dst, "null,\"subjectCod"...)
+			dst = append(dst, "e\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "\",\"subTopicIds\":"...)
+		dst = append(dst, "["...)
 		for i2339 := range v.SubTopicIds {
 			if i2339 > 0 {
 				dst = append(dst, ',')
 			}
 			dst = odjsonrt.AppendInt(dst, int64(v.SubTopicIds[i2339]))
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"subjectCode\":"...)
 	}
-	dst = append(dst, ",\"subjectCode\":"...)
 	if v.SubjectCode == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, "null,\"subtitle\":"...)
 	} else {
-		dst = append(dst, '"')
+		dst = append(dst, "\""...)
 		dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.SubjectCode)), m)
 		if err != nil {
 			return nil, err
 		}
-		dst = append(dst, '"')
+		dst = append(dst, "\",\"subtitle\":"...)
 	}
-	dst = append(dst, ",\"subtitle\":"...)
 	if v.Subtitle == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, "null,\"topicIds\":"...)
 	} else {
-		dst = append(dst, '"')
+		dst = append(dst, "\""...)
 		dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.Subtitle)), m)
 		if err != nil {
 			return nil, err
 		}
-		dst = append(dst, '"')
+		dst = append(dst, "\",\"topicIds\":"...)
 	}
-	dst = append(dst, ",\"topicIds\":"...)
 	if v.TopicIds == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[]}"...)
+		} else {
+			dst = append(dst, "null}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i2340 := range v.TopicIds {
 			if i2340 > 0 {
 				dst = append(dst, ',')
 			}
 			dst = odjsonrt.AppendInt(dst, int64(v.TopicIds[i2340]))
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -20888,33 +21040,37 @@ func (v *Performance) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 	dst = odjsonrt.AppendInt(dst, int64(v.EventID))
 	dst = append(dst, ",\"id\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.ID))
-	dst = append(dst, ",\"logo\":"...)
 	if v.Logo == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, ",\"logo\":null,\"na"...)
+		dst = append(dst, "me\":"...)
 	} else {
-		dst = append(dst, '"')
+		dst = append(dst, ",\"logo\":\""...)
 		dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.Logo)), m)
 		if err != nil {
 			return nil, err
 		}
-		dst = append(dst, '"')
+		dst = append(dst, "\",\"name\":"...)
 	}
-	dst = append(dst, ",\"name\":"...)
 	if v.Name == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, "null,\"prices\":"...)
 	} else {
-		dst = append(dst, '"')
+		dst = append(dst, "\""...)
 		dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.Name)), m)
 		if err != nil {
 			return nil, err
 		}
-		dst = append(dst, '"')
+		dst = append(dst, "\",\"prices\":"...)
 	}
-	dst = append(dst, ",\"prices\":"...)
 	if v.Prices == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[],\"seatCategori"...)
+			dst = append(dst, "es\":"...)
+		} else {
+			dst = append(dst, "null,\"seatCatego"...)
+			dst = append(dst, "ries\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i2495 := range v.Prices {
 			if i2495 > 0 {
 				dst = append(dst, ',')
@@ -20929,23 +21085,33 @@ func (v *Performance) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 			dst = odjsonrt.AppendInt(dst, int64(v.Prices[i2495].SeatCategoryID))
 			dst = append(dst, "}"...)
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"seatCategorie"...)
+		dst = append(dst, "s\":"...)
 	}
-	dst = append(dst, ",\"seatCategories"...)
-	dst = append(dst, "\":"...)
 	if v.SeatCategories == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[],\"seatMapImage"...)
+			dst = append(dst, "\":"...)
+		} else {
+			dst = append(dst, "null,\"seatMapIma"...)
+			dst = append(dst, "ge\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i2496 := range v.SeatCategories {
 			if i2496 > 0 {
 				dst = append(dst, ',')
 			}
-			dst = append(dst, "{\"areas\":"...)
 			if v.SeatCategories[i2496].Areas == nil {
-				dst = odjsonrt.AppendNilSlice(dst, m)
+				if m.V2() {
+					dst = append(dst, "{\"areas\":[],\"sea"...)
+					dst = append(dst, "tCategoryId\":"...)
+				} else {
+					dst = append(dst, "{\"areas\":null,\"s"...)
+					dst = append(dst, "eatCategoryId\":"...)
+				}
 			} else {
-				dst = append(dst, '[')
+				dst = append(dst, "{\"areas\":["...)
 				for i2497 := range v.SeatCategories[i2496].Areas {
 					if i2497 > 0 {
 						dst = append(dst, ',')
@@ -20955,27 +21121,25 @@ func (v *Performance) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 						return nil, err
 					}
 				}
-				dst = append(dst, ']')
+				dst = append(dst, "],\"seatCategoryI"...)
+				dst = append(dst, "d\":"...)
 			}
-			dst = append(dst, ",\"seatCategoryId"...)
-			dst = append(dst, "\":"...)
 			dst = odjsonrt.AppendInt(dst, int64(v.SeatCategories[i2496].SeatCategoryID))
 			dst = append(dst, "}"...)
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"seatMapImage\""...)
+		dst = append(dst, ":"...)
 	}
-	dst = append(dst, ",\"seatMapImage\":"...)
 	if v.SeatMapImage == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, "null,\"start\":"...)
 	} else {
-		dst = append(dst, '"')
+		dst = append(dst, "\""...)
 		dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.SeatMapImage)), m)
 		if err != nil {
 			return nil, err
 		}
-		dst = append(dst, '"')
+		dst = append(dst, "\",\"start\":"...)
 	}
-	dst = append(dst, ",\"start\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Start))
 	dst = append(dst, ",\"venueCode\":\""...)
 	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.VenueCode), m)
@@ -22602,36 +22766,43 @@ func (v *Price) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *SeatCategory) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"areas\":"...)
 	if v.Areas == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "{\"areas\":[],\"sea"...)
+			dst = append(dst, "tCategoryId\":"...)
+		} else {
+			dst = append(dst, "{\"areas\":null,\"s"...)
+			dst = append(dst, "eatCategoryId\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "{\"areas\":["...)
 		for i2661 := range v.Areas {
 			if i2661 > 0 {
 				dst = append(dst, ',')
 			}
 			dst = append(dst, "{\"areaId\":"...)
 			dst = odjsonrt.AppendInt(dst, int64(v.Areas[i2661].AreaID))
-			dst = append(dst, ",\"blockIds\":"...)
 			if v.Areas[i2661].BlockIds == nil {
-				dst = odjsonrt.AppendNilSlice(dst, m)
+				if m.V2() {
+					dst = append(dst, ",\"blockIds\":[]}"...)
+				} else {
+					dst = append(dst, ",\"blockIds\":null"...)
+					dst = append(dst, "}"...)
+				}
 			} else {
-				dst = append(dst, '[')
+				dst = append(dst, ",\"blockIds\":["...)
 				for i2662 := range v.Areas[i2661].BlockIds {
 					if i2662 > 0 {
 						dst = append(dst, ',')
 					}
 					dst = odjsonrt.AppendInt(dst, int64(v.Areas[i2661].BlockIds[i2662]))
 				}
-				dst = append(dst, ']')
+				dst = append(dst, "]}"...)
 			}
-			dst = append(dst, "}"...)
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"seatCategoryI"...)
+		dst = append(dst, "d\":"...)
 	}
-	dst = append(dst, ",\"seatCategoryId"...)
-	dst = append(dst, "\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.SeatCategoryID))
 	dst = append(dst, "}"...)
 	return dst, nil
@@ -23135,20 +23306,23 @@ func (v *Area) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	_ = err
 	dst = append(dst, "{\"areaId\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.AreaID))
-	dst = append(dst, ",\"blockIds\":"...)
 	if v.BlockIds == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, ",\"blockIds\":[]}"...)
+		} else {
+			dst = append(dst, ",\"blockIds\":null"...)
+			dst = append(dst, "}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, ",\"blockIds\":["...)
 		for i2687 := range v.BlockIds {
 			if i2687 > 0 {
 				dst = append(dst, ',')
 			}
 			dst = odjsonrt.AppendInt(dst, int64(v.BlockIds[i2687]))
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 

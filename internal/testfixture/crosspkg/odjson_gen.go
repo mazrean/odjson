@@ -21,25 +21,31 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"ptr\":"...)
 	if v.Ptr == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, ",\"ptr\":null,\"wra"...)
+		dst = append(dst, "pper\":"...)
 	} else {
+		dst = append(dst, ",\"ptr\":"...)
 		dst, err = odjsonOtherThingAppend(dst, v.Ptr, m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, ",\"wrapper\":"...)
 	}
-	dst = append(dst, ",\"wrapper\":"...)
 	dst, err = odjsonOtherWrapperAppend(dst, &v.Wrapper, m)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"list\":"...)
 	if v.List == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, ",\"list\":[],\"map\""...)
+			dst = append(dst, ":"...)
+		} else {
+			dst = append(dst, ",\"list\":null,\"ma"...)
+			dst = append(dst, "p\":"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, ",\"list\":["...)
 		for i1 := range v.List {
 			if i1 > 0 {
 				dst = append(dst, ',')
@@ -49,18 +55,21 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 				return nil, err
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"map\":"...)
 	}
-	dst = append(dst, ",\"map\":"...)
 	if v.Map == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{},\"deep\":"...)
+		} else {
+			dst = append(dst, "null,\"deep\":"...)
+		}
 	} else {
 		keys2 := make([]string, 0, len(v.Map))
 		for k3 := range v.Map {
 			keys2 = append(keys2, string(k3))
 		}
 		slices.Sort(keys2)
-		dst = append(dst, '{')
+		dst = append(dst, "{"...)
 		for i4, k3 := range keys2 {
 			if i4 > 0 {
 				dst = append(dst, ',')
@@ -70,26 +79,29 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv5 := v.Map[k3]
+			dst = append(dst, "\":"...)
 			dst, err = odjsonOtherThingAppend(dst, &mv5, m)
 			if err != nil {
 				return nil, err
 			}
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"deep\":"...)
 	}
-	dst = append(dst, ",\"deep\":"...)
 	if v.Deep == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[]}"...)
+		} else {
+			dst = append(dst, "null}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i6 := range v.Deep {
 			if i6 > 0 {
 				dst = append(dst, ',')
 			}
 			if v.Deep[i6] == nil {
-				dst = append(dst, 'n', 'u', 'l', 'l')
+				dst = append(dst, "null"...)
 			} else {
 				dst, err = odjsonOtherWrapperAppend(dst, v.Deep[i6], m)
 				if err != nil {
@@ -97,9 +109,8 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 				}
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -1012,14 +1023,10 @@ func odjsonOtherThingAppend(dst []byte, v *other.Thing, m odjsonrt.StringMode) (
 		if err != nil {
 			return nil, err
 		}
-		dst = append(dst, '"')
+		dst = append(dst, "\""...)
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst[start] = '{'
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -1356,20 +1363,25 @@ func odjsonOtherWrapperAppend(dst []byte, v *other.Wrapper, m odjsonrt.StringMod
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"ptr\":"...)
 	if v.Ptr == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, ",\"ptr\":null,\"lis"...)
+		dst = append(dst, "t\":"...)
 	} else {
+		dst = append(dst, ",\"ptr\":"...)
 		dst, err = odjsonOtherThingAppend(dst, v.Ptr, m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, ",\"list\":"...)
 	}
-	dst = append(dst, ",\"list\":"...)
 	if v.List == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[]}"...)
+		} else {
+			dst = append(dst, "null}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i75 := range v.List {
 			if i75 > 0 {
 				dst = append(dst, ',')
@@ -1379,9 +1391,8 @@ func odjsonOtherWrapperAppend(dst []byte, v *other.Wrapper, m odjsonrt.StringMod
 				return nil, err
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 

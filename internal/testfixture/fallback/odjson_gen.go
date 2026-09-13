@@ -19,16 +19,17 @@ func (v *Fallbacks) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"generic_ptr\":"...)
 	if v.GenericPtr == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, ",\"generic_ptr\":n"...)
+		dst = append(dst, "ull,\"anon\":"...)
 	} else {
+		dst = append(dst, ",\"generic_ptr\":"...)
 		dst, err = odjsonrt.AppendAnyMode(dst, (*v.GenericPtr), m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, ",\"anon\":"...)
 	}
-	dst = append(dst, ",\"anon\":"...)
 	dst, err = odjsonrt.AppendAnyMode(dst, v.Anon, m)
 	if err != nil {
 		return nil, err
@@ -43,30 +44,32 @@ func (v *Fallbacks) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"custom_ptr\":"...)
 	if v.CustomPtr == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, ",\"custom_ptr\":nu"...)
+		dst = append(dst, "ll,\"text\":"...)
 	} else {
+		dst = append(dst, ",\"custom_ptr\":"...)
 		dst, err = odjsonrt.AppendMarshaler(dst, (*v.CustomPtr), m.EscapeHTML())
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, ",\"text\":"...)
 	}
-	dst = append(dst, ",\"text\":"...)
 	dst, err = odjsonrt.AppendTextMarshaler(dst, v.Text, m.EscapeHTML())
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"text_ptr\":"...)
 	if v.TextPtr == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, ",\"text_ptr\":null"...)
+		dst = append(dst, ",\"plain\":\""...)
 	} else {
+		dst = append(dst, ",\"text_ptr\":"...)
 		dst, err = odjsonrt.AppendTextMarshaler(dst, (*v.TextPtr), m.EscapeHTML())
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, ",\"plain\":\""...)
 	}
-	dst = append(dst, ",\"plain\":\""...)
 	dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Plain), m)
 	if err != nil {
 		return nil, err
