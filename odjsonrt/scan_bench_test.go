@@ -135,6 +135,38 @@ func BenchmarkScanStringTwitter(b *testing.B) {
 	}
 }
 
+// BenchmarkParseStringTwitter is BenchmarkScanStringTwitter through
+// ParseStringStrict with a pooled cache: the scan, the table and the chunk
+// allocator together, which is what a string value costs the decoders.
+func BenchmarkParseStringTwitter(b *testing.B) {
+	data, err := os.ReadFile("../bench/testdata/twitter.json")
+	if err != nil {
+		b.Skip(err)
+	}
+	var starts []int
+	for i := 1; i < len(data); i++ {
+		if data[i] == '"' {
+			end, _, _, err := scanString(data, i)
+			if err != nil {
+				b.Fatal(err)
+			}
+			starts = append(starts, i)
+			i = end - 1
+		}
+	}
+	b.ReportMetric(float64(len(starts)), "strings")
+	b.ResetTimer()
+	for b.Loop() {
+		c := GetStringCache()
+		for _, p := range starts {
+			if _, _, err := ParseStringStrict(data, p, c); err != nil {
+				b.Fatal(err)
+			}
+		}
+		PutStringCache(c)
+	}
+}
+
 func BenchmarkNonASCIITwitter(b *testing.B) {
 	data, err := os.ReadFile("../bench/testdata/twitter.json")
 	if err != nil {
