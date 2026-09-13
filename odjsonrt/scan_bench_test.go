@@ -192,3 +192,56 @@ func BenchmarkAppendQuotedTwitter(b *testing.B) {
 		})
 	}
 }
+
+// twitterStrings returns every string value of the twitter document, decoded
+// the way a value held in a struct field would be: the shape the encoder's
+// body appender is handed on the marshal side.
+func twitterStrings(b *testing.B) []string {
+	data, err := os.ReadFile("../bench/testdata/twitter.json")
+	if err != nil {
+		b.Skip(err)
+	}
+	var strs []string
+	for i := 1; i < len(data); i++ {
+		if data[i] == '"' {
+			s, end, err := ParseString(data, i)
+			if err != nil {
+				b.Fatal(err)
+			}
+			strs = append(strs, s)
+			i = end - 1
+		}
+	}
+	return strs
+}
+
+// BenchmarkAppendBodyTwitter is BenchmarkAppendQuotedTwitter through the entry
+// point generated code actually uses: the quoteless body, under the two modes
+// a direct-path Marshal writes. This is the encoder's hottest function on the
+// marshal profile, so it is what a change to it is measured with first.
+func BenchmarkAppendBodyTwitter(b *testing.B) {
+	strs := twitterStrings(b)
+	var total int
+	for _, s := range strs {
+		total += len(s)
+	}
+	for _, m := range []struct {
+		name string
+		mode StringMode
+	}{{"v2", ModeV2}, {"v2html", ModeV2HTML}} {
+		b.Run(m.name, func(b *testing.B) {
+			b.ReportMetric(float64(len(strs)), "strings")
+			b.SetBytes(int64(total))
+			buf := make([]byte, 0, 2*total)
+			for b.Loop() {
+				buf = buf[:0]
+				for _, s := range strs {
+					var err error
+					if buf, err = AppendStringBodyChecked(buf, s, m.mode); err != nil {
+						b.Fatal(err)
+					}
+				}
+			}
+		})
+	}
+}

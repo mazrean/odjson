@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/bits"
 	"slices"
-	"strconv"
 )
 
 // Float formatting.
@@ -441,7 +440,7 @@ func appendFixedInteger(dst []byte, neg bool, d uint64, zeros int) []byte {
 	if neg {
 		dst = append(dst, '-')
 	}
-	dst = strconv.AppendUint(dst, d, 10)
+	dst = AppendUint(dst, d)
 	for range zeros {
 		dst = append(dst, '0')
 	}
