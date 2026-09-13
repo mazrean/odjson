@@ -4,8 +4,8 @@ dependencies:
 - repo_url: mazrean/apm-plackage
   name: apm-plackage-common
   host: github.com
-  resolved_commit: fefb3e288ca7ff23959e5433696c3b7c18abff32
-  version: 0.3.0
+  resolved_commit: 2a0c0fadd75109c8cc09ceb6c707dcf6e5136263
+  version: 0.4.0
   virtual_path: common
   is_virtual: true
   package_type: apm_package
@@ -14,13 +14,13 @@ dependencies:
   - .claude/skills/apm-dependency-common
   - .claude/skills/apm-dependency-common/SKILL.md
   deployed_file_hashes:
-    .claude/rules/conventions.md: sha256:54c6d167efff3a33a4b30febca2fe03a7661774ebea06aabeeb42713b4d05603
-    .claude/skills/apm-dependency-common/SKILL.md: sha256:8ed66c44c49f5c3b97328be5ad199d7774b805ade05eac953faf540126a2d9ca
-  content_hash: sha256:26f72930042bbf069388187793583544bccb5b98f50cdc7bb07290eab5a7b635
+    .claude/rules/conventions.md: sha256:4af2c43148497296e0388d2623585b887a07822269c271ae571ea84cc7b423dc
+    .claude/skills/apm-dependency-common/SKILL.md: sha256:7ee64742355aa489e3a279a95e005faabc9b364ccd7eed65a0b302359c690a9e
+  content_hash: sha256:3d1cbe983bad1bf3bdb44367d6ceeb77dc47d296bffe315d3c66d59545fc9f4f
 - repo_url: mazrean/apm-plackage
   name: apm-plackage-go
   host: github.com
-  resolved_commit: fefb3e288ca7ff23959e5433696c3b7c18abff32
+  resolved_commit: 2a0c0fadd75109c8cc09ceb6c707dcf6e5136263
   version: 0.3.0
   virtual_path: go
   is_virtual: true
@@ -36,7 +36,7 @@ dependencies:
 - repo_url: anthropics/skills
   name: skill-creator
   host: github.com
-  resolved_commit: 41bbe19d1a1a7eaab5e7bb9050a417e5c6cffc8f
+  resolved_commit: 34040c9c568585f6929bedeaad110ad08f079624
   version: unknown
   virtual_path: skills/skill-creator
   is_virtual: true
@@ -242,7 +242,7 @@ deployments:
   owners:
   - mazrean/apm-plackage/common
   active_owner: mazrean/apm-plackage/common
-  content_hash: sha256:54c6d167efff3a33a4b30febca2fe03a7661774ebea06aabeeb42713b4d05603
+  content_hash: sha256:4af2c43148497296e0388d2623585b887a07822269c271ae571ea84cc7b423dc
 - kind: project-relative
   target: claude
   value: .claude/rules/go-conventions.md
@@ -269,7 +269,7 @@ deployments:
   owners:
   - mazrean/apm-plackage/common
   active_owner: mazrean/apm-plackage/common
-  content_hash: sha256:8ed66c44c49f5c3b97328be5ad199d7774b805ade05eac953faf540126a2d9ca
+  content_hash: sha256:7ee64742355aa489e3a279a95e005faabc9b364ccd7eed65a0b302359c690a9e
 - kind: project-relative
   target: claude
   value: .claude/skills/apm-dependency-go
