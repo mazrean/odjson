@@ -22,7 +22,7 @@ import (
 	"github.com/mazrean/odjson/bench/plain"
 )
 
-var twitterJSON []byte
+var twitterJSON, mediumJSON []byte
 
 func TestMain(m *testing.M) {
 	b, err := os.ReadFile("../testdata/twitter.json")
@@ -30,6 +30,12 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	twitterJSON = b
+	// sonic's "Medium" input: twitter.json's shape at four statuses.
+	b, err = os.ReadFile("../testdata/medium.json")
+	if err != nil {
+		panic(err)
+	}
+	mediumJSON = b
 	os.Exit(m.Run())
 }
 
@@ -229,6 +235,16 @@ func BenchmarkMarshalTwitter(b *testing.B) {
 	b.Run("go-json", func(b *testing.B) { runMarshal(b, ss, len(twitterJSON), gojson.Marshal) })
 }
 
+func BenchmarkMarshalMedium(b *testing.B) {
+	ss := sides(b, mediumJSON)
+	b.Run("encoding-json", func(b *testing.B) { runMarshal(b, ss, len(mediumJSON), jsonv1.Marshal) })
+	b.Run("json-v2", func(b *testing.B) {
+		runMarshal(b, ss, len(mediumJSON), func(v any) ([]byte, error) { return jsonv2.Marshal(v) })
+	})
+	b.Run("sonic", func(b *testing.B) { runMarshal(b, ss, len(mediumJSON), sonic.Marshal) })
+	b.Run("go-json", func(b *testing.B) { runMarshal(b, ss, len(mediumJSON), gojson.Marshal) })
+}
+
 func BenchmarkMarshalSmall(b *testing.B) {
 	ss := smallSides(b)
 	n := len(plain.SmallPayload())
@@ -248,6 +264,16 @@ func BenchmarkUnmarshalTwitter(b *testing.B) {
 	})
 	b.Run("sonic", func(b *testing.B) { runUnmarshal(b, ss, twitterJSON, sonic.Unmarshal) })
 	b.Run("go-json", func(b *testing.B) { runUnmarshal(b, ss, twitterJSON, gojson.Unmarshal) })
+}
+
+func BenchmarkUnmarshalMedium(b *testing.B) {
+	ss := sides(b, mediumJSON)
+	b.Run("encoding-json", func(b *testing.B) { runUnmarshal(b, ss, mediumJSON, jsonv1.Unmarshal) })
+	b.Run("json-v2", func(b *testing.B) {
+		runUnmarshal(b, ss, mediumJSON, func(d []byte, v any) error { return jsonv2.Unmarshal(d, v) })
+	})
+	b.Run("sonic", func(b *testing.B) { runUnmarshal(b, ss, mediumJSON, sonic.Unmarshal) })
+	b.Run("go-json", func(b *testing.B) { runUnmarshal(b, ss, mediumJSON, gojson.Unmarshal) })
 }
 
 func BenchmarkUnmarshalSmall(b *testing.B) {
