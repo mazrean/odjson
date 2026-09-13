@@ -334,6 +334,15 @@ func appendShortWide(dst []byte, neg bool, abs float64, n uint64, f int) ([]byte
 	return dst[:k+ip+1+f], true
 }
 
+// digitPairs holds the two ASCII digits of each number below 100, the tens
+// digit in the low byte.
+var digitPairs = func() (t [100]uint16) {
+	for i := range t {
+		t[i] = uint16('0'+i/10) | uint16('0'+i%10)<<8
+	}
+	return t
+}()
+
 // nonzeroBytes returns w with bit 7 of each byte set exactly when the byte
 // is not zero.
 func nonzeroBytes(w uint64) uint64 {
@@ -369,6 +378,9 @@ func appendFixed(dst []byte, neg bool, abs float64, d uint64, p int) []byte {
 	f := -p
 	ip := max(dp, 1) // digits of integer part: a lone zero below one
 	i := uint64(int64(abs))
+	if i < 1e7 && f >= 8 && f <= 16 {
+		return appendFixedWords(dst, neg, i, ip, d-i*pow10u[f], f)
+	}
 	fr := d - i*pow10u[min(f, 19)] // zero above 1e17, where i is zero
 
 	// A 24 byte scratch: the number is at most 24 bytes, and starts 16 in
@@ -431,6 +443,62 @@ func appendFixed(dst []byte, neg bool, abs float64, d uint64, p int) []byte {
 	binary.LittleEndian.PutUint64(out[16:24], binary.LittleEndian.Uint64(src[16:24]))
 	binary.LittleEndian.PutUint64(out[24:32], binary.LittleEndian.Uint64(src[24:32]))
 	return dst[:n+end-tz-from]
+}
+
+// appendFixedWords appends i.fr, the integer part i of at most seven
+// digits (ip of them, a lone zero below one) and the fraction fr of f
+// digits, 8 to 16 of them: the shape of a full precision value with a
+// small integer part, which is what a coordinate is. It writes three words
+// straight into dst, each over the padding of the one before: the integer
+// digits with the point behind them, then the first f−8 fraction digits
+// behind the point, then the last eight at the end. Nothing is loaded back,
+// so there is no scratch to copy out and no store to wait for; the general
+// writer above pays a store-forwarding stall on each of its four copies.
+func appendFixedWords(dst []byte, neg bool, i uint64, ip int, fr uint64, f int) []byte {
+	if cap(dst)-len(dst) < 32 {
+		dst = slices.Grow(dst, 32)
+	}
+	q := fr / 1e8
+	lo := digits8(fr - q*1e8)
+	hi := digits8(q)
+	// The f−8 digits of q are the top of its digits8 word, behind 16−f
+	// zeros: shifted down, they start at the low byte. (For f = 8 the
+	// shift is 64, and the masked shift leaves the word whole; its store
+	// is then wholly overwritten by the last word, so it does not matter.)
+	a := hi >> (8 * uint(16-f) & 63)
+	// The integer part, one or two digits nearly always: a table pair.
+	var iw uint64
+	if i < 100 {
+		iw = uint64(digitPairs[i]) >> (8 * uint(2-ip) & 63)
+	} else {
+		iw = digits8(i) >> (8 * uint(8-ip) & 63)
+	}
+	iw |= '.' << (8 * uint(ip) & 63)
+	k := len(dst)
+	out := dst[k : k+32]
+	s := 0
+	if neg {
+		out[0] = '-'
+		s = 1
+	}
+	end := s + ip + 1 + f
+	binary.LittleEndian.PutUint64(out[s:s+8], iw)
+	binary.LittleEndian.PutUint64(out[s+ip+1:s+ip+9], a)
+	binary.LittleEndian.PutUint64(out[end-8:end], lo)
+
+	// Trailing zeros: leading zero bytes of the last word, then of the
+	// f−8 digits before it, which sit at the top of their word.
+	nz := nonzeroBytes(lo ^ digitZeros)
+	tz := bits.LeadingZeros64(nz) >> 3
+	if nz == 0 {
+		nz = nonzeroBytes(hi ^ digitZeros)
+		tz = 8 + min(bits.LeadingZeros64(nz)>>3, f-8)
+	}
+	if tz >= f {
+		// A fraction of nothing but zeros: an integer, without the point.
+		tz = f + 1
+	}
+	return dst[:k+end-tz]
 }
 
 // appendFixedInteger appends d followed by zeros zeros: a value of 1e15
