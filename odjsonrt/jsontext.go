@@ -113,7 +113,8 @@ func ErrKindFrom(dec *jsontext.Decoder, goType string) error {
 // the pool drops it. Strings longer than [slabMax] are allocated on their
 // own, which bounds the waste at the end of a chunk. The chunks are only
 // ever carved forward and never written to again, which is what lets a
-// string be made over their bytes.
+// string be made over their bytes; the scalar slices of slab.go are the
+// one exception, and they own their region outright.
 type StringCache struct {
 	s [stringCacheSize]string
 	// valid marks the entries known to be UTF-8, which is what
@@ -151,6 +152,9 @@ const (
 type slab struct {
 	free    []byte
 	scratch []byte
+	// reserved is the tail [SliceFrom] has handed out and [SliceDone]
+	// has not yet returned; free is empty while it is set.
+	reserved []byte
 	// boxes holds the header chunks the any decoder's interface values
 	// point into; see box.go.
 	boxes *boxes
@@ -274,6 +278,11 @@ func PutStringCache(c *StringCache) {
 		// One document with a huge escaped string should not size the
 		// buffer every later decode carries.
 		c.slab.scratch = nil
+	}
+	if c.slab != nil && c.slab.reserved != nil {
+		// A decoder that failed inside a scalar slice never handed its
+		// tail back; nothing reachable points into it.
+		c.slab.free, c.slab.reserved = c.slab.reserved, nil
 	}
 	stringCachePool.Put(c)
 }
@@ -416,6 +425,11 @@ func ParseStringWith(data []byte, p int, c *StringCache) (string, int, error) {
 func ParseFloatValue(val []byte, bits int) (float64, error) {
 	if len(val) == 0 || (val[0] != '-' && (val[0] < '0' || val[0] > '9')) {
 		return 0, ErrType(val, 0, floatTypeName(bits))
+	}
+	// The token is a whole, validated literal: the one-pass parser settles
+	// it when it accepts it and reads all of it.
+	if v, end, ok := ParseSimpleFloat(val, 0, bits); ok && end == len(val) {
+		return v, nil
 	}
 	v, err := strconv.ParseFloat(asString(val), floatBits(bits))
 	if err != nil {

@@ -16268,7 +16268,7 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 											p++
 										} else {
 											if cap(s1945) == 0 {
-												s1945 = make([]float64, 0, 4)
+												s1945 = odjsonrt.SliceFrom[float64](sc)
 											}
 											for {
 												var e1946 float64
@@ -16305,6 +16305,7 @@ func (v *Geometry) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 												}
 												return p, odjsonrt.ErrSyntax(data, p, "after array element")
 											}
+											s1945 = odjsonrt.SliceDone(sc, s1945)
 										}
 										if s1945 == nil {
 											s1945 = []float64{}
@@ -16514,7 +16515,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 											p++
 										} else {
 											if cap(s1966) == 0 {
-												s1966 = make([]float64, 0, 4)
+												s1966 = odjsonrt.SliceFrom[float64](sc)
 											}
 											for {
 												var e1967 float64
@@ -16552,6 +16553,7 @@ func (v *Geometry) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 												}
 												return p, odjsonrt.ErrSyntax(data, p, "after array element")
 											}
+											s1966 = odjsonrt.SliceDone(sc, s1966)
 										}
 										if s1966 == nil {
 											s1966 = []float64{}
@@ -16763,7 +16765,7 @@ func (v *Geometry) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 											vp1977++
 										} else {
 											if cap(s1988) == 0 {
-												s1988 = make([]float64, 0, 4)
+												s1988 = odjsonrt.SliceFrom[float64](sc)
 											}
 											for {
 												var e1989 float64
@@ -16801,6 +16803,7 @@ func (v *Geometry) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 												}
 												return odjsonrt.ErrSyntax(val1976, vp1977, "after array element")
 											}
+											s1988 = odjsonrt.SliceDone(sc, s1988)
 										}
 										if s1988 == nil {
 											s1988 = []float64{}
@@ -17949,7 +17952,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 								p++
 							} else {
 								if cap(s2110) == 0 {
-									s2110 = make([]int64, 0, 4)
+									s2110 = odjsonrt.SliceFrom[int64](sc)
 								}
 								for {
 									var e2111 int64
@@ -17986,6 +17989,7 @@ func (v *CitmCatalog) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) 
 									}
 									return p, odjsonrt.ErrSyntax(data, p, "after array element")
 								}
+								s2110 = odjsonrt.SliceDone(sc, s2110)
 							}
 							if s2110 == nil {
 								s2110 = []int64{}
@@ -18910,7 +18914,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 								p++
 							} else {
 								if cap(s2216) == 0 {
-									s2216 = make([]int64, 0, 4)
+									s2216 = odjsonrt.SliceFrom[int64](sc)
 								}
 								for {
 									var e2217 int64
@@ -18948,6 +18952,7 @@ func (v *CitmCatalog) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 									}
 									return p, odjsonrt.ErrSyntax(data, p, "after array element")
 								}
+								s2216 = odjsonrt.SliceDone(sc, s2216)
 							}
 							if s2216 == nil {
 								s2216 = []int64{}
@@ -19720,7 +19725,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 								vp2313++
 							} else {
 								if cap(s2321) == 0 {
-									s2321 = make([]int64, 0, 4)
+									s2321 = odjsonrt.SliceFrom[int64](sc)
 								}
 								for {
 									var e2322 int64
@@ -19758,6 +19763,7 @@ func (v *CitmCatalog) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.String
 									}
 									return odjsonrt.ErrSyntax(val2312, vp2313, "after array element")
 								}
+								s2321 = odjsonrt.SliceDone(sc, s2321)
 							}
 							if s2321 == nil {
 								s2321 = []int64{}

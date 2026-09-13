@@ -428,7 +428,10 @@ figures quoted, 3.82× and 3.58× against the noisy run's 3.80× and 3.55×);
 the v2 `twitter` encode (±4%) and the v1 `text-escaped` encode (±7%); the v1
 `citm` and `text-cjk` decodes (±4%); and the v1 `text-hangul` decode (±6–8%,
 the one row `benchstat` does not separate at p<0.05, which is why it reads as
-level). A ratio between 0.95× and 1.05× is read as level.
+level). A ratio between 0.95× and 1.05× is read as level. The three float rows,
+`numbers`, `floats` and `canada`, are from a later run on the canada round's
+tree (see "The canada round" below, `-count 6`, both sides in one process);
+the rest of the table is the 2026-09-13 run.
 
 | shape | v2 Marshal | v2 Unmarshal | v1 Marshal | v1 Unmarshal |
 | --- | --- | --- | --- | --- |
@@ -449,9 +452,9 @@ level). A ratio between 0.95× and 1.05× is read as level.
 | `text-emoji` | 1.54× | 1.43× | 1.23× | 1.07× |
 | `text-escaped` | 1.74× | 1.46× | 1.35× | **0.86×** |
 | `unique-strings` | 2.62× | 2.12× | 1.92× | 1.18× |
-| `numbers` | 1.37× | 1.21× | 1.34× | **0.91×** |
-| `floats` (synthetic GeoJSON) | 1.50× | 2.02× | 1.53× | 1.35× |
-| `canada` | 1.16× | 1.32× | 1.16× | 1.09× |
+| `numbers` | 1.52× | 1.87× | 1.52× | 1.15× |
+| `floats` (synthetic GeoJSON) | 1.57× | 4.15× | 1.57× | 1.91× |
+| `canada` | 1.28× | 4.52× | 1.28× | 2.13× |
 | `dense` | 4.37× | 3.78× | 4.38× | 1.40× |
 | `sparse` | 8.26× | 2.69× | 7.18× | 1.55× |
 | `skip` | — | 1.94× | — | 1.40× |
@@ -466,8 +469,9 @@ encode columns moved on the string heavy rows, which is the word-at-a-time
 `ModeHTML` scan: `text-ascii` 2.23× → 2.91×, `unique-strings` 2.08× → 2.62×,
 `text-emoji` 1.17× → 1.54×. The v1 decode column is flat to +0.14×, as it
 should be — nothing on the September 12 branches touched the public API path
-it stays on. The two rows still below 1× are the same two as before, and for
-the same reason: `text-escaped` (0.86×) and `numbers` (0.91×) on v1 decode.
+it stays on. The two rows still below 1× were the same two as before, and for
+the same reason: `text-escaped` (0.86×) and `numbers` (0.91×) on v1 decode;
+the canada round since put `numbers` at 1.15× there.
 
 What held from the start: the ratios do not depend on document size
 (`page-3k` to `page-100k` are flat), on whitespace (`twitter-compact`,
@@ -499,7 +503,9 @@ What did not hold, and what was done about it:
   3.58×, the `text-*` rows 1.09–1.88×, and every v1 encode row is now above
   1×. v1 *decode* stays on the public path — its flags allow invalid
   UTF-8 and duplicate names, which the strict parsers refuse — so those rows
-  are unchanged, `text-escaped` (0.86×) and `numbers` (0.91×) among them.
+  are unchanged, `text-escaped` (0.86×) and `numbers` (0.91×) among them
+  (`numbers` has since moved to 1.15×, by the canada round's parser, which
+  that path shares).
 - **Non-ASCII text outside the CJK three byte range was slower than
   reflection.** The fused UTF-8 scan in `odjsonrt/utf8.go` settled only
   three byte sequences with leads E1–EC and EE–EF on its own and handed
@@ -685,7 +691,7 @@ would need 30), and replaced the 80%. In the
 
 | values | before | after |
 | --- | --- | --- |
-| 1024 full precision coordinates (`AppendFloatFull`) | 44 ns each (12 of them the short path declining, 32 `strconv`) | 27 ns each (2 of them the one-place round a coordinate pays before the gate turns it away) |
+| 1024 full precision coordinates (`AppendFloatFull`) | 44 ns each (12 of them the short path declining, 32 `strconv`) | 27 ns each (2 of them the one-place round a coordinate pays before the gate turns it away); 25 ns since the canada round below, and 32 rather than 34.5 on the file itself |
 | `40.8`, `-0.1`, `0.1`, `12.99`, `139.69171` (`AppendFloatShort`) | 12 ns each | 10.6 ns each |
 | 1024 values in exponent notation, magnitudes 1e-300 to 1e300 (`AppendFloatExp`) | 27 ns each (`strconv`) | 24 ns each |
 
@@ -719,6 +725,20 @@ What it does, and what was measured on the way there:
   where it must end in a scratch buffer, the fraction first and the integer
   part and the point over its padding, then copies the scratch out in four
   whole words. A value's shape changes offsets, not code paths.
+- **A coordinate is written in three words, none of them loaded back.**
+  Since the canada round (see "The canada round" below) a value whose
+  integer part has at most seven digits and whose fraction has 8 to 16,
+  which is every full precision coordinate, goes to `appendFixedWords`:
+  the integer digits with the point behind them, the first f−8 fraction
+  digits behind the point, and the last eight at the end, each word stored
+  straight into the output over the zero padding of the one before, in
+  that order, so that the scratch and its four-word copy-out are gone.
+  The integer part below 100 comes from a digit-pair table rather than a
+  `digits8` word, and the variable shifts are masked so that the compiler
+  drops its guards for a count of 64 or more. The writer alone was level
+  (27.0 → 26.8 µs on `AppendFloatFull`, so the store-forwarding stall the
+  scratch was suspected of was not the cost); the pair table and the
+  masks took it to 24.8 µs, −8%.
 - **Trailing zeros are counted, not divided out.** The search leaves them
   when the interval held a multiple of a hundred, and a short decimal is
   nothing but: 40.8 arrives as 4080000000000000. Dividing by ten in a loop
@@ -738,6 +758,26 @@ What it does, and what was measured on the way there:
   at most eight bytes that nearly all of them are. The same digits through two `digits8` words and a splice read
   15.6 ns per value against the old path's 12 on `small`'s three floats, and
   `small` +4%; the word-at-a-time loop reads 10.6 and `small` level.
+- **The rounds are not a loop any more.** The canada round (below) found
+  that the loop over the places was the formatter's one data-dependent
+  branch pattern, and that a real file of coordinates is exactly the
+  input that defeats it: three quarters of `canada.json` are within a
+  few ulps of a six place decimal, pass the gate, and fail the proof at
+  the fifth, sixth or seventh round, while one in ten is a short decimal
+  after all. Where the loop exits is data, so the predictors miss once or
+  twice per value: the gate cost 8 ns per value on the 1024 values of
+  `AppendFloatFull`, which the predictors learn, and 15 ns on the 111k of
+  `canada.json`. One and two places are still tried first, a round each,
+  since they are what most short decimals have. After that there is one
+  more round: the seven place candidate's trailing decimal zeros, four
+  divisibility tests done at once (a multiplication by the inverse of the
+  odd part, a rotation, a comparison taken as a borrow), say how many
+  places the decimal has, and one division proves or refuses that
+  candidate; the branch on the proof is the only one left whose outcome
+  depends on the value. `BenchmarkAppendFloatCanada`, which reads the
+  file from `ODJSON_BENCH_CORPUS`, exists for this: 34.5 → 31.9 ns per
+  value, the two place value of `AppendFloatShort` 2 ns cheaper, the
+  learned loop of `AppendFloatFull` +0.4 ns.
 - **Parity is byte for byte.** `TestAppendFloatMatchesStrconv` runs 55
   million values against `strconv` (every decimal of up to six significant
   digits and seven places with its float neighbours, random bit patterns
@@ -745,6 +785,59 @@ What it does, and what was measured on the way there:
   `TestFtoaPow10` recomputes the table with `math/big`, and
   `TestAppendFixedShapes` runs the writer on every digit count and point
   position against a byte loop.
+
+## Float parsing
+
+`strconv.ParseFloat` on a full precision coordinate measured 31 ns on the
+7950X, and the decoder around it paid more than that: `ParseSimpleFloat`
+read all seventeen digits before finding that they did not fit 2^53 and
+declining, `numberLiteral` scanned the literal again to find its end, and
+`strconv` scanned it a third time (`readFloat`, 29% of the `canada` decode
+on its own) before fitting it. `odjsonrt/atof.go` does the three in one
+pass and fits the digits itself, in 11 ns per coordinate:
+
+- **The digits are read eight at a time.** After the point, each word of
+  the fraction is tested for digits with one SWAR mask and, when it is all
+  digits, folded into the mantissa with three multiplications (pairs,
+  quads, the whole); the word that ends the fraction has its digits moved
+  to the top and the rest filled with zeros, which fold to the value of the
+  digits alone. A fraction of one digit, which most short decimals have,
+  takes the byte loop instead: the word's three multiplications cost more
+  than its one step. The integer part and the exponent stay byte loops;
+  they are one to three digits.
+- **The fit is Clinger's when it can be and Eisel-Lemire's otherwise.** A
+  mantissa below 2^53 and a decimal exponent within ±22 are both exact
+  floats, and one division or multiplication is correctly rounded, as
+  before. Anything else is the algorithm of Lemire's "Number Parsing at a
+  Gigabyte per Second" (2021), the one `strconv` itself runs after its
+  scan: the mantissa normalised to 64 bits times a truncated 128-bit
+  power of ten, whose high 54 bits are the result unless the truncation
+  could have moved them, in which case the low word of the power is folded
+  in. `pow10gen.go` writes that table too, 651 entries (q from −342 to
+  308, the whole float64 range) in floor form next to the rounded-up
+  entries the formatter's search multiplies by; the two are not
+  interchangeable, since each algorithm's proof assumes its own rounding,
+  and `TestAtofPow10` recomputes every entry with `math/big`.
+- **What it declines, it declines rather than guesses.** A literal that
+  lands exactly halfway between two floats as far as the product can tell,
+  a subnormal, an overflow, more than nineteen digits, and every malformed
+  spelling go to the general path, where `strconv` runs as before and is
+  the only thing that produces an error. Every accepted literal is bit for
+  bit `strconv.ParseFloat`'s: `atof_test.go` sweeps 200k random literals
+  of one to nineteen digits with the point at every position and exponents
+  across the range, the decimal expansions of the halfway points of random
+  floats to 15–18 digits, every byte that can follow a literal (the word
+  loads read past its end), and a canada-shaped ring in place.
+- **The product is written out rather than called.** A call, even one
+  never taken, gives `ParseSimpleFloat` a frame and a stack check that
+  every float would pay; the first version, with `eiselLemire` as a
+  function, read 5.5 ns on `40.8` against the old path's 4.4, and 5.8 on
+  `1234` against 4.0. Inlining it by hand recovered a little (5.3 and 5.4),
+  the rest is the exponent test and the wider fit, and the `small`
+  fixture's three short floats are what it costs: see the round.
+- **float32 keeps the old path.** Rounding the float64 result to 32 bits
+  would round twice; a float32 literal that Clinger's division cannot
+  settle exactly goes to `strconv`, as before.
 
 ## Measured and rejected, September 2026
 
@@ -1234,6 +1327,110 @@ left, minus one call per member: the strict skip at about 0.38 ns a byte,
 the string scan at about a cycle a byte with a call per string longer than
 a word, the whitespace at 2.5 ns a run, the 475 objects the target type
 dictates, and the collector's share of them.
+
+### The canada round
+
+A round on `main` at `e64880c` (after the re-measure of 2026-09-13), asked
+to take `canada.json` as far as it goes. A census of the file first: 2.25 MB,
+111,126 numbers, 90% of them seventeen significant digits with fifteen
+fraction places, none with an exponent, 46 integers; 55,563 two-element
+`[]float64` points in 480 rings. The gen rows read 4.45 ms to encode
+(1.17× against reflection) and 8.16 ms to decode on `json/v2` (1.32×),
+11.7 ms on `encoding/json` (1.09×). Three commits, in the order they were
+measured, each `-count 6` on `bench/shapes` against the base binary, since
+the moves are far above layout noise; the untouched rows were then read
+with the pooled procedure of the Measurement notes.
+
+**The decode profile said every literal was scanned three times** (see
+"Float parsing"): `strconv.readFloat` 29%, `ParseSimpleFloat` declining
+23%, `numberLiteral` 7%, the fit itself 12%. The one-pass parser with the
+Eisel-Lemire step took the `json/v2` decode from 8.16 to 2.68 ms (−67%)
+and `encoding/json`'s from 11.7 to 6.2 ms (−47%); `floats` −48% / −27%,
+`numbers` −38% / −21%, `twitter` and `dense` level. sonic's and go-json's
+gen rows moved the same way (−58% and −55%) and still trail those
+libraries' own decoders (4.0 ms against sonic's 3.4), which is the
+skip-and-validate floor of "The two third-party libraries", unchanged.
+
+**The encode profile was the formatter**: `AppendFloat` 88% of the row,
+of which `appendFixed` 33% (its `digits8` calls 17%), the short-decimal
+gate 30% flat (`appendShortFloat`, the one-place round and the 10^7 gate a
+coordinate pays before it is turned away), the search 12%. The
+three-word writer of "Float formatting" is what was kept first: −8% on
+the formatter, `canada` −3.3% and `floats` −4.2% on both libraries,
+`numbers` −1.3%.
+
+**Then the formatter was measured on the file rather than on a loop.**
+`AppendFloatFull`'s 1024 values read 24 ns each; the same code on
+`canada.json`'s 111k values read 34.5, and the gap closed as the loop
+shrank (28.5 ns on 512 of them, 30.5 on 1024, 34 on 8192 and beyond),
+which is the branch predictors running out of history. Timing the stages
+apart on both streams put the whole of it in `appendShortFloat`, 8 → 15
+ns, and a count of its outcomes said why: 81,816 of the 111,126 values
+pass the 10^7 gate, because a coordinate produced by arithmetic is a few
+ulps off a six place decimal, 73,818 of them then fail the proof at the
+sixth round, 7,245 at the fifth, and 11,840 are short decimals accepted at
+various rounds. Where the loop exits is data. The single round of "Float
+formatting" replaces it: `canada` −11% against `main` on both libraries
+(4.54 → 4.04 ms in that batch), `floats` −6.4%, `dense`, whose floats
+have two places, −6.7% from the two place round, `numbers` −3 to −4%,
+`twitter` level. The three-word writer and the single round together are
+what the encode column of the shapes table shows. The marshal rows of the
+README's two payloads, pooled again for the single round on their own
+(four fresh seeds a side, five runs, n=20): `json/v2` `twitter` and
+`small` level (p=0.95 and 0.13), `encoding/json` `twitter` +1.4% (p=0.02)
+and `small` level (p=0.12, ±6%); the three one place floats of `small`
+and the one of `twitter` take the same first round as before.
+
+**Then the allocations were a third of what was left**: 57,634 per decode,
+55k of them the points, and `mallocgc`, `makeslice`, `growslice` and the
+collector's share read 15–20% of the profile after the parser. The scalar
+slab (see `odjsonrt/slab.go`) took the `json/v2` decode from 2.68 to
+2.44 ms (−9%) and `encoding/json`'s from 6.2 to 5.98 (−3.5%), the
+allocations to 2,289 and the bytes from 6.35 to 5.51 MiB; `floats` reads
+24,002 → 1,052 allocations. The fourth decode round turned this idea down
+(see its list below) when it carved the scalar *fields* of a struct:
+`small`'s three field slices are three tiny allocations, a bump of the
+allocator each, and the carving cost more than it saved. This round
+carves only a scalar slice that is not a struct field, the element of a
+slice or map, where the count is in the thousands and a field's capacity
+hint is not there to help; a field keeps its hint and its own allocation,
+and `small`'s rows are not on the path.
+
+**Against reflection, after the three:** `canada` reads 1.28× / 4.52× / 1.28× / 2.13× (v2 Marshal / v2 Unmarshal / v1 Marshal / v1 Unmarshal, against 1.16× / 1.32× / 1.16× / 1.09× in the table above; the encode ratios are the single round's, the decode ratios were measured before it), `floats` 1.57× / 4.15× / 1.57× / 1.91× (from 1.50× / 2.02× / 1.53× / 1.35×) and `numbers` 1.52× / 1.87× / 1.52× / 1.15× (from 1.37× / 1.21× / 1.34× / 0.91×); `numbers` on `encoding/json` decode, one of the two rows that was below 1×, is above it now, since that path's `odjsonParse` runs the same parser. The absolute `json/v2` `canada` rows are 4.04 ms to encode and 2.42 ms to decode against reflection's 5.19 and 10.94; the table rows above are updated to these.
+
+**The untouched rows**, pooled (four `-randlayout` seeds a side, five
+interleaved runs, n=20): the `json/v2` decodes are level (`twitter` 390.6 → 389.6 µs, p=0.31; `small` 597 → 603 ns, p=0.10), the `encoding/json` decodes read `twitter` +3.0% (p=0.006) and `small` +2.6% (p=0.000), and the four marshal rows, which nothing on the branch touches (their floats are short decimals, on the path that did not change), read `twitter` level and `small` −6.0% / −7.1% at p≈0.035 with ±3–4% spreads: the batch's layout floor is at least that wide, and the two `encoding/json` decode moves sit inside it, as the same row's −5.2% did under an encoder-only branch in the survey. What the branch demonstrably costs those rows is the wider parser on their three and one short floats: 0.9 ns each in the micro-benchmark, under 0.3% of either row.
+
+**Not taken, with numbers:**
+
+- `eiselLemire` as its own function, the natural shape, costs every float
+  a frame and a stack check: 5.5 ns on `40.8` against the old 4.4, 5.8 ns
+  on `1234` against 4.0; hand-inlined it reads 5.3 and 5.4, and the
+  remaining half nanosecond is the exponent test and the wider fit.
+- The three-word writer on its own was level (27.0 → 26.8 µs on the 1024
+  coordinates): the scratch's store-forwarding stalls, named as the next
+  lever after the formatter round, were not a cost the hardware charged.
+  The digit-pair table for integer parts below 100 and the masked shifts
+  are the −8%.
+- Three branch-free rewrites tried on the same stream while hunting the
+  mispredicts, before the stages were timed apart: `numDigits` deciding
+  its correction by the sign of a difference and the integer part of up
+  to three digits assembled without a branch on its size read +3%
+  together on the stream and +6% on the learned loop, since those
+  branches are well predicted and the arithmetic is not free; the two
+  selects of the shortest search made branch-free, with the nearest
+  integer always computed, read −2% on the stream and +9% on the learned
+  loop, the cost of the multiplication it no longer skips. Neither kept.
+- The single round without its nearness early-out, every value paying
+  the divisibility tests and the division, read −4% on the stream and
+  +30% on `AppendFloatFull`'s random full precision values, which never
+  pass the gate; the early-out costs `canada` a mispredict on one value
+  in four and is kept for the files that are not coordinates.
+- The generated code still calls `ParseSimpleFloat` and, when it
+  declines, `ParseFloat`, which runs the fast path a second time before
+  `strconv`. After this round a decline is a halfway case, a subnormal or
+  twenty digits, rare enough that splitting a slow entry point out was not
+  worth a second exported function.
 
 ## Measurement notes
 

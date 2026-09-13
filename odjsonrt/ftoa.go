@@ -217,80 +217,131 @@ const roundMagic = 1.5 * (1 << 52)
 // with 1 to maxShortFrac fraction digits and fewer than nine integer
 // digits, and reports whether it did. abs is finite, not zero and not an
 // integer.
+//
+// One place is tried first, since it is what most values have and the
+// round is all they should pay. Everything else is settled by one more
+// round rather than a loop over the places: the candidate for seven places
+// is an integer for every decimal of at most seven, its trailing decimal
+// zeros say how many places the decimal has, and one division proves or
+// refuses that candidate. A loop that tried each count of places in turn
+// left the decision to a branch whose outcome changed with the value, and
+// on a stream of coordinates a few ulps off a six place decimal, which is
+// what a real file of them is (three quarters of canada.json pass the
+// seven place test and one in ten is a short decimal), it mispredicted
+// once or twice per value: 15 ns against 8 for the same code on a stream
+// short enough to be learned.
 func appendShortFloat(dst []byte, neg bool, abs float64) ([]byte, bool) {
-	// The places, fewest first: the first candidate that parses back is
-	// the shortest. One place is tried before anything else, since it is
-	// what most values have and the round is all they should pay.
-	for f := 1; f <= maxShortFrac; f++ {
-		if f == 2 {
-			// The gate, before the rest of the search: a full precision
-			// value leaves here, after one round instead of seven.
-			p := abs * 1e7
+	p := abs * 10
+	if p >= 1e15 {
+		// Beyond where an integer is exact in a float64 and the division
+		// is a proof.
+		return dst, false
+	}
+	// A decimal's product lands within a couple of ulps of its integer;
+	// 1e-15·p is about four. Rounding is two floating point operations
+	// (see roundMagic).
+	r := (p + roundMagic) - roundMagic
+	f := 1
+	if math.Abs(p-r) > 1e-15*p || r/10 != abs {
+		// Two places, the next most common (prices, percentages), for
+		// the same price again.
+		p = abs * 100
+		if p >= 1e15 {
+			return dst, false
+		}
+		r = (p + roundMagic) - roundMagic
+		f = 2
+		if math.Abs(p-r) > 1e-15*p || r/100 != abs {
+			p = abs * 1e7
 			if p >= 1e15 {
 				return dst, false
 			}
-			r := (p + roundMagic) - roundMagic
+			r = (p + roundMagic) - roundMagic
 			if math.Abs(p-r) > 1e-15*p {
+				// Not a decimal of seven places or fewer, nor within a
+				// few ulps of one. On a file of full precision values
+				// this is nearly every value and the branch is learned;
+				// on a file of coordinates it is one in four and costs a
+				// mispredict now and then, less than the tests below
+				// would.
+				return dst, false
+			}
+			// The places: seven less the trailing decimal zeros of the
+			// candidate, each power tested by a multiplication with the
+			// inverse of its odd part and a rotation (Granlund and
+			// Montgomery), all four at once and added up, since
+			// divisibility by a higher power implies the lower ones. Four
+			// rather than six: one and two places were refused above, and
+			// a candidate with more zeros than four is refused by the
+			// division below just the same, since the quotient it proves
+			// is the same real number.
+			n := uint64(int64(r))
+			tz := divisible(n, 0xcccccccccccccccd, 1, 0x1999999999999999) +
+				divisible(n, 0x8f5c28f5c28f5c29, 2, 0x028f5c28f5c28f5c) +
+				divisible(n, 0x1cac083126e978d5, 3, 0x004189374bc6a7ef) +
+				divisible(n, 0xd288ce703afb7e91, 4, 0x00068db8bac710cb)
+			f = maxShortFrac - tz
+			p = abs * pow10[f]
+			r = (p + roundMagic) - roundMagic
+			// The proof, on its own: an integer over an exact power of
+			// ten is a correctly rounded quotient, and equals abs exactly
+			// when the decimal is abs's. It is one division and one
+			// branch, and the branch is the only one here whose outcome
+			// depends on the value.
+			if r/pow10[f] != abs {
 				return dst, false
 			}
 		}
-		p := abs * pow10[f]
-		if p >= 1e15 {
-			// Beyond where an integer is exact in a float64 and the
-			// division is a proof.
-			return dst, false
-		}
-		// A decimal's product lands within a couple of ulps of its
-		// integer; 1e-15·p is about four. One branch on the absolute
-		// value: two, on the sign of a distance that is random for the
-		// values turned away, mispredict half the time. Rounding is two
-		// floating point operations (see roundMagic).
-		r := (p + roundMagic) - roundMagic
-		if math.Abs(p-r) > 1e-15*p || r/pow10[f] != abs {
-			continue
-		}
-		n := uint64(int64(r))
-		if n >= 1e7 || f == maxShortFrac {
-			// More than eight bytes: seven digits and the point behind
-			// an integer part, or seven places behind "0.".
-			return appendShortWide(dst, neg, abs, n, f)
-		}
-
-		// At most eight bytes: the digits are shifted into one word from
-		// the last, the point among them, so that the first ends in the
-		// low byte, and the word is stored whole.
-		var w uint64
-		for range f {
-			q := n / 10
-			w = w<<8 | '0' + n - q*10
-			n = q
-		}
-		w = w<<8 | '.'
-		l := f + 1
-		for {
-			q := n / 10
-			w = w<<8 | '0' + n - q*10
-			n = q
-			l++
-			if n == 0 {
-				break
-			}
-		}
-
-		if cap(dst)-len(dst) < 9 {
-			dst = slices.Grow(dst, 9)
-		}
-		k := len(dst)
-		out := dst[k : k+9]
-		if neg {
-			out[0] = '-'
-			out = out[1:]
-			k++
-		}
-		binary.LittleEndian.PutUint64(out[0:8], w)
-		return dst[:k+l], true
 	}
-	return dst, false
+	n := uint64(int64(r))
+	if n >= 1e7 || f == maxShortFrac {
+		// More than eight bytes: seven digits and the point behind
+		// an integer part, or seven places behind "0.".
+		return appendShortWide(dst, neg, abs, n, f)
+	}
+
+	// At most eight bytes: the digits are shifted into one word from
+	// the last, the point among them, so that the first ends in the
+	// low byte, and the word is stored whole.
+	var w uint64
+	for range f {
+		q := n / 10
+		w = w<<8 | '0' + n - q*10
+		n = q
+	}
+	w = w<<8 | '.'
+	l := f + 1
+	for {
+		q := n / 10
+		w = w<<8 | '0' + n - q*10
+		n = q
+		l++
+		if n == 0 {
+			break
+		}
+	}
+
+	if cap(dst)-len(dst) < 9 {
+		dst = slices.Grow(dst, 9)
+	}
+	k := len(dst)
+	out := dst[k : k+9]
+	if neg {
+		out[0] = '-'
+		out = out[1:]
+		k++
+	}
+	binary.LittleEndian.PutUint64(out[0:8], w)
+	return dst[:k+l], true
+}
+
+// divisible is 1 when n is divisible by 10^k and 0 otherwise, without a
+// branch: n·inv rotated right by k is at most max exactly then, for inv
+// the inverse of 5^k modulo 2^64 and max = ⌊(2^64−1)/10^k⌋, and the
+// comparison is the borrow of a subtraction.
+func divisible(n, inv uint64, k int, max uint64) int {
+	_, borrow := bits.Sub64(max, bits.RotateLeft64(n*inv, -k), 0)
+	return 1 - int(borrow)
 }
 
 // appendShortWide appends the decimal n·10^-f = abs, n of eight digits or
@@ -334,6 +385,15 @@ func appendShortWide(dst []byte, neg bool, abs float64, n uint64, f int) ([]byte
 	return dst[:k+ip+1+f], true
 }
 
+// digitPairs holds the two ASCII digits of each number below 100, the tens
+// digit in the low byte.
+var digitPairs = func() (t [100]uint16) {
+	for i := range t {
+		t[i] = uint16('0'+i/10) | uint16('0'+i%10)<<8
+	}
+	return t
+}()
+
 // nonzeroBytes returns w with bit 7 of each byte set exactly when the byte
 // is not zero.
 func nonzeroBytes(w uint64) uint64 {
@@ -369,6 +429,9 @@ func appendFixed(dst []byte, neg bool, abs float64, d uint64, p int) []byte {
 	f := -p
 	ip := max(dp, 1) // digits of integer part: a lone zero below one
 	i := uint64(int64(abs))
+	if i < 1e7 && f >= 8 && f <= 16 {
+		return appendFixedWords(dst, neg, i, ip, d-i*pow10u[f], f)
+	}
 	fr := d - i*pow10u[min(f, 19)] // zero above 1e17, where i is zero
 
 	// A 24 byte scratch: the number is at most 24 bytes, and starts 16 in
@@ -431,6 +494,62 @@ func appendFixed(dst []byte, neg bool, abs float64, d uint64, p int) []byte {
 	binary.LittleEndian.PutUint64(out[16:24], binary.LittleEndian.Uint64(src[16:24]))
 	binary.LittleEndian.PutUint64(out[24:32], binary.LittleEndian.Uint64(src[24:32]))
 	return dst[:n+end-tz-from]
+}
+
+// appendFixedWords appends i.fr, the integer part i of at most seven
+// digits (ip of them, a lone zero below one) and the fraction fr of f
+// digits, 8 to 16 of them: the shape of a full precision value with a
+// small integer part, which is what a coordinate is. It writes three words
+// straight into dst, each over the padding of the one before: the integer
+// digits with the point behind them, then the first f−8 fraction digits
+// behind the point, then the last eight at the end. Nothing is loaded back,
+// so there is no scratch to copy out and no store to wait for; the general
+// writer above pays a store-forwarding stall on each of its four copies.
+func appendFixedWords(dst []byte, neg bool, i uint64, ip int, fr uint64, f int) []byte {
+	if cap(dst)-len(dst) < 32 {
+		dst = slices.Grow(dst, 32)
+	}
+	q := fr / 1e8
+	lo := digits8(fr - q*1e8)
+	hi := digits8(q)
+	// The f−8 digits of q are the top of its digits8 word, behind 16−f
+	// zeros: shifted down, they start at the low byte. (For f = 8 the
+	// shift is 64, and the masked shift leaves the word whole; its store
+	// is then wholly overwritten by the last word, so it does not matter.)
+	a := hi >> (8 * uint(16-f) & 63)
+	// The integer part, one or two digits nearly always: a table pair.
+	var iw uint64
+	if i < 100 {
+		iw = uint64(digitPairs[i]) >> (8 * uint(2-ip) & 63)
+	} else {
+		iw = digits8(i) >> (8 * uint(8-ip) & 63)
+	}
+	iw |= '.' << (8 * uint(ip) & 63)
+	k := len(dst)
+	out := dst[k : k+32]
+	s := 0
+	if neg {
+		out[0] = '-'
+		s = 1
+	}
+	end := s + ip + 1 + f
+	binary.LittleEndian.PutUint64(out[s:s+8], iw)
+	binary.LittleEndian.PutUint64(out[s+ip+1:s+ip+9], a)
+	binary.LittleEndian.PutUint64(out[end-8:end], lo)
+
+	// Trailing zeros: leading zero bytes of the last word, then of the
+	// f−8 digits before it, which sit at the top of their word.
+	nz := nonzeroBytes(lo ^ digitZeros)
+	tz := bits.LeadingZeros64(nz) >> 3
+	if nz == 0 {
+		nz = nonzeroBytes(hi ^ digitZeros)
+		tz = 8 + min(bits.LeadingZeros64(nz)>>3, f-8)
+	}
+	if tz >= f {
+		// A fraction of nothing but zeros: an integer, without the point.
+		tz = f + 1
+	}
+	return dst[:k+end-tz]
 }
 
 // appendFixedInteger appends d followed by zeros zeros: a value of 1e15
