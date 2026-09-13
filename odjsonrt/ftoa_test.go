@@ -4,6 +4,8 @@ import (
 	"math"
 	"math/big"
 	"math/rand/v2"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 )
@@ -356,6 +358,43 @@ func BenchmarkAppendFloatExpRef(b *testing.B) {
 	for b.Loop() {
 		for _, v := range benchExp {
 			buf = appendFloatRef(buf[:0], v, 64)
+		}
+	}
+}
+
+// BenchmarkAppendFloatCanada formats every number of nativejson-benchmark's
+// canada.json, read from ODJSON_BENCH_CORPUS like bench/shapes does, and is
+// skipped without it. Unlike AppendFloatFull's 1024 values, which the
+// branch predictors learn within a few iterations, its 111k values are a
+// stream, and the difference between the two is what the short decimal
+// path's single round was measured on.
+func BenchmarkAppendFloatCanada(b *testing.B) {
+	dir := os.Getenv("ODJSON_BENCH_CORPUS")
+	if dir == "" {
+		b.Skip("ODJSON_BENCH_CORPUS not set")
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "canada.json"))
+	if err != nil {
+		b.Skip(err)
+	}
+	var vals []float64
+	for i := 0; i < len(data); i++ {
+		if c := data[i]; c == '-' || (c >= '0' && c <= '9') {
+			j := i + 1
+			for j < len(data) && (data[j] == '.' || (data[j] >= '0' && data[j] <= '9')) {
+				j++
+			}
+			if f, err := strconv.ParseFloat(string(data[i:j]), 64); err == nil {
+				vals = append(vals, f)
+			}
+			i = j
+		}
+	}
+	buf := make([]byte, 0, 64)
+	b.SetBytes(int64(len(vals)))
+	for b.Loop() {
+		for _, v := range vals {
+			buf, _ = AppendFloat(buf[:0], v, 64)
 		}
 	}
 }
