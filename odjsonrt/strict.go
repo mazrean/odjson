@@ -576,14 +576,17 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 			if len(stack) == 0 {
 				return p, nil
 			}
-			p = SkipSpace(data, p)
+			// An indented document has a newline and its indentation
+			// before every member and after the last; both are
+			// settled without the call (see SkipIndent).
+			p = SkipSpace(data, SkipIndent(data, p))
 			if uint(p) >= uint(len(data)) {
 				return p, errUnexpectedEnd(p)
 			}
 			closer := stack[len(stack)-1]
 			switch data[p] {
 			case ',':
-				p = SkipSpace(data, p+1)
+				p = SkipSpace(data, SkipIndent(data, p+1))
 				if closer == '}' {
 					var err error
 					if names, p, err = strictKey(data, p, names, &levels[len(levels)-1]); err != nil {

@@ -1140,6 +1140,97 @@ numbers and eleven member names. Two changes that each moved their
 micro-benchmark by four to eight percent moved neither row past the layout
 floor. Anything further here is either json/v2's, the runtime's, or SIMD.
 
+### The fourth decode round
+
+A round on top of the third, on `main` at `49531dd` (after the two encode
+rounds), asked to take the decode side as far as it goes. Every figure is
+the pooled procedure of the Measurement notes: four `-ldflags=-randlayout`
+seeds a side, five interleaved runs, n=20 per row, the marshal rows read as
+the untouched floor, and a touched row counted only at p<0.05 and above
+that floor. The micro-benchmarks are `odjsonrt/scan_bench_test.go`'s,
+pooled the same way; `BenchmarkParseStringTwitter`, every string of the
+document through `ParseStringStrict` with a pooled cache, was added for it.
+
+**Where the `twitter` decode goes**, from a profile of the `json/v2` row on
+the tree the third round left (415 µs): the strict skip of the 73
+`retweeted_status` values is 32% of the wall time, of which `strictKey`
+(the member names with their duplicate filter) is 12% and the rest the
+string scan and the whitespace; `User`'s decoder and what it calls is 29%;
+`scanStringStrict` is 16% and `skipSpaceSlow` 8% of the whole; the string
+table 6%; the zeroing of the chunks and the `Statuses` array 3%; the
+collector about 8% of a benchmark that allocates 247 KB per call (92 KB of
+chunks, 88 KB of `Statuses`, 40 KB of `any` maps and arrays, which are 312
+of the 475 objects). The document's 18,099 strings hold 369 KB, 58% of its
+bytes, at a mean of 20 bytes, 64% of them sixteen bytes or fewer; the
+whitespace is 168 KB in 15,481 runs. The `small` row is 600 ns, of which
+about 90 ns is the harness (`encoding/json/v2`'s decoder pool and
+arshaler), about 100 ns the five slice allocations the type dictates, and
+the rest the eleven members and four nested objects.
+
+**Kept: the indent before a member settled without a call.** The
+generated decoders emit, at the top of the member loop and of every array
+element, SkipSpace's own inline test and behind it
+`SkipSpace(data, SkipIndent(data, p))`: `SkipIndent` consumes the newline
+and the run of up to sixteen spaces the way `skipSpaceSlow` does and
+returns p for anything else, at exactly the inliner's budget, so the test
+on the byte it stops at is SkipSpace's; `SkipValueStrict`'s separator loop
+does the same. A document with no whitespace pays what it paid. `json/v2`
+`twitter` decode **404.8 → 397.3 µs (−1.85%**, p=0.002), `encoding/json`
+`twitter` decode **−2.2%** (p=0.021), both `small` rows and all four
+marshal rows level; the strict skip micro-benchmark 103.6 → 101.5 µs
+(−2.0%). A first form put SkipIndent ahead of SkipSpace's test at every
+site: `json/v2` `twitter` −2.17%, but `json/v2` `small` **+4.0%** (p=0.000)
+in a run whose untouched `encoding/json` `small` encode read +7.4%, so the
+guard was added and the pair re-measured on four fresh seeds; that is the
+figure above. This is not the rejected experiment of the first round,
+which forced skipSpaceSlow's whole body into every one of the 249 sites.
+
+**Rejected, with numbers:**
+
+- **`strictKey` with `shortName` spelled into it and the filter hash
+  taken from the two words the scan loaded** (`oneWordNameHash`,
+  `twoWordNameHash`, held to `nameHash` by a test), which removes the
+  `shortName` call and `nameHash`'s two loads from every name the strict
+  skip meets. Strict skip **106.3 → 109.9 µs (+3.4%**, n=20 pooled); with
+  the scan spelled in and the hash still taken from the bytes, +2.6% on a
+  single layout. Fewer calls, and slower: the two inlined `shortString`
+  bodies in a function that already holds the names list, the level and
+  the document cost more in register pressure than the leaf call did.
+- **`slot` under the inliner's budget** (cost 99 → 74: the two words read
+  in place through `unsafe` on the architectures with an unaligned load,
+  an `encoding/binary` spelling elsewhere and under `odjson_safe`, strings
+  under four bytes left to the chunk allocator), so that `Make`,
+  `MakeValid` and `MakeUTF8` pay no call for the hash. Every string of the
+  document through `ParseStringStrict`: **308.6 → 306.0 µs (−0.85%)**,
+  0.14 ns a string; the rows level. The call is not where a string's cost
+  is — the table load and `memequal` are — and two arch-gated files are
+  not worth 0.14 ns.
+- **Slices of scalars carved from the string chunks** (`CarveFor`,
+  `Carve`, `CarveEnd`: the room reserved off the chunk up front, the
+  elements appended into it, the capacity clamped to the length at the end
+  and the unused room given back when nothing carved behind it; `[]int`,
+  `[]float64` and `[]bool` fields, the pointer-free kinds the decoder
+  parses inline). `small`'s allocations 6 → 3 and 487 → 458 B — and
+  `json/v2` `small` **+2.8% and +3.5%** on two independent sets of four
+  layouts (p=0.000 and 0.001), `encoding/json` `small` +4.7% and +4.3%,
+  `encoding/json` `twitter` +5.6% and +3.3%, `json/v2` `twitter` level. A
+  noscan allocation of sixteen or thirty-two bytes is a bump of the tiny
+  allocator or a size-class free list, about what the two generic calls
+  and the reservation bookkeeping cost, so removing three of them buys
+  nothing and the code in the loop costs the rest. The string chunks pay
+  because a string was an allocation plus a copy plus a collector object
+  for each of thousands; a slice field is one per field.
+
+**Not levers, by these numbers.** Assembly or SIMD for the string scan: a
+Go assembly call costs more than one SWAR word, and 64% of the strings end
+inside two. Zeroing the chunks through a `runtime.mallocgc` linkname: about
+1% for a runtime dependency the direct path's gate does not cover. The
+harness share of `small`: json/v2's. What is left is what the third round
+left, minus one call per member: the strict skip at about 0.38 ns a byte,
+the string scan at about a cycle a byte with a call per string longer than
+a word, the whitespace at 2.5 ns a run, the 475 objects the target type
+dictates, and the collector's share of them.
+
 ## Measurement notes
 
 All figures on this page were re-measured together on an AMD Ryzen 9 7950X,

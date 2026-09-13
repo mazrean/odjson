@@ -50,7 +50,9 @@ func (v *secret) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) > 1 {
@@ -157,7 +159,9 @@ func (v *secret) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -465,7 +469,9 @@ func (v *lone) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) >= 6 && string(rest[:6]) == "\"flag\"" {
@@ -553,7 +559,9 @@ func (v *lone) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -850,7 +858,9 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) > 1 {
@@ -927,6 +937,9 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 					}
 					for {
 						var e37 secret
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						p, err = e37.odjsonParse(data, p, sc)
 						if err != nil {
 							return p, err
@@ -999,7 +1012,9 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -1089,6 +1104,9 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 					}
 					for {
 						var e43 secret
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						p, err = e43.odjsonParseV2(data, p, sc, strict)
 						if err != nil {
 							return p, err

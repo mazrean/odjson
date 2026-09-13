@@ -21,6 +21,26 @@ func SkipSpace(data []byte, p int) int {
 	return skipSpaceSlow(data, p)
 }
 
+// SkipIndent consumes the newline and the run of up to sixteen spaces an
+// indented document puts before an object member or an array element,
+// the way skipSpaceSlow does, and returns p itself when the bytes at p
+// are anything else. It settles nothing on its own: the caller writes
+// SkipSpace(data, SkipIndent(data, p)), and SkipSpace's one inline
+// compare then accepts the token the run ended on, or takes over for a
+// longer run. Both inline, so the run that every member of an indented
+// document begins with costs the generated decoders no call; it used to
+// reach skipSpaceSlow through one. It is exactly at the inliner's budget,
+// which is why the test on the byte it stops at is SkipSpace's and not
+// its own.
+func SkipIndent(data []byte, p int) int {
+	if uint(p+17) <= uint(len(data)) && data[p] == '\n' {
+		n0 := bits.TrailingZeros64(load64(data, p+1)^allSpaces) / 8
+		n1 := bits.TrailingZeros64(load64(data, p+9)^allSpaces) / 8
+		return p + 1 + n0 + n1&-(n0>>3)
+	}
+	return p
+}
+
 // skipSpaceSlow consumes an actual run of whitespace.
 func skipSpaceSlow(data []byte, p int) int {
 	// An indented document is mostly a newline followed by a run of

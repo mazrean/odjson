@@ -53,7 +53,9 @@ func (v *Nested) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) > 1 {
@@ -160,7 +162,9 @@ func (v *Nested) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -856,7 +860,9 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) > 1 {
@@ -1234,7 +1240,9 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					}
 					for {
 						var e75 int
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np76, ok77 := odjsonrt.ParseNull(data, p); ok77 {
 							p = np76
 						} else {
@@ -1291,7 +1299,9 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					}
 					for {
 						var e85 string
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np86, ok87 := odjsonrt.ParseNull(data, p); ok87 {
 							p = np86
 						} else {
@@ -1557,6 +1567,9 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					}
 					for {
 						var e129 Nested
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						p, err = e129.odjsonParse(data, p, sc)
 						if err != nil {
 							return p, err
@@ -1661,7 +1674,9 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					}
 					for {
 						var e141 any
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np142, ok143 := odjsonrt.ParseNull(data, p); ok143 {
 							p = np142
 							e141 = nil
@@ -1853,7 +1868,9 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					}
 					for {
 						var e187 int
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np188, ok189 := odjsonrt.ParseNull(data, p); ok189 {
 							p = np188
 						} else {
@@ -2031,7 +2048,9 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -2444,7 +2463,9 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					}
 					for {
 						var e243 int
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np244, ok245 := odjsonrt.ParseNull(data, p); ok245 {
 							p = np244
 							e243 = 0
@@ -2506,7 +2527,9 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					}
 					for {
 						var e253 string
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np254, ok255 := odjsonrt.ParseNull(data, p); ok255 {
 							p = np254
 							e253 = ""
@@ -2836,6 +2859,9 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					}
 					for {
 						var e301 Nested
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						p, err = e301.odjsonParseV2(data, p, sc, strict)
 						if err != nil {
 							return p, err
@@ -2968,7 +2994,9 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					}
 					for {
 						var e315 any
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np316, ok317 := odjsonrt.ParseNull(data, p); ok317 {
 							p = np316
 							e315 = nil
@@ -3213,7 +3241,9 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					}
 					for {
 						var e363 int
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np364, ok365 := odjsonrt.ParseNull(data, p); ok365 {
 							p = np364
 							e363 = 0
@@ -3713,7 +3743,9 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					}
 					for {
 						var e410 int
-						vp406 = odjsonrt.SkipSpace(val405, vp406)
+						if uint(vp406) >= uint(len(val405)) || val405[vp406] <= ' ' {
+							vp406 = odjsonrt.SkipSpace(val405, odjsonrt.SkipIndent(val405, vp406))
+						}
 						if np411, ok412 := odjsonrt.ParseNull(val405, vp406); ok412 {
 							vp406 = np411
 							e410 = 0
@@ -3778,7 +3810,9 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					}
 					for {
 						var e422 string
-						vp418 = odjsonrt.SkipSpace(val417, vp418)
+						if uint(vp418) >= uint(len(val417)) || val417[vp418] <= ' ' {
+							vp418 = odjsonrt.SkipSpace(val417, odjsonrt.SkipIndent(val417, vp418))
+						}
 						if np423, ok424 := odjsonrt.ParseNull(val417, vp418); ok424 {
 							vp418 = np423
 							e422 = ""
@@ -4179,7 +4213,9 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					}
 					for {
 						var e489 any
-						vp485 = odjsonrt.SkipSpace(val484, vp485)
+						if uint(vp485) >= uint(len(val484)) || val484[vp485] <= ' ' {
+							vp485 = odjsonrt.SkipSpace(val484, odjsonrt.SkipIndent(val484, vp485))
+						}
 						if np490, ok491 := odjsonrt.ParseNull(val484, vp485); ok491 {
 							vp485 = np490
 							e489 = nil
@@ -4424,7 +4460,9 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					}
 					for {
 						var e539 int
-						vp535 = odjsonrt.SkipSpace(val534, vp535)
+						if uint(vp535) >= uint(len(val534)) || val534[vp535] <= ' ' {
+							vp535 = odjsonrt.SkipSpace(val534, odjsonrt.SkipIndent(val534, vp535))
+						}
 						if np540, ok541 := odjsonrt.ParseNull(val534, vp535); ok541 {
 							vp535 = np540
 							e539 = 0
@@ -4701,7 +4739,9 @@ func (v *Memberless) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 		return p + 1, nil
 	}
 	for {
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		if idx >= 0 {
 			if np := odjsonrt.AfterName(data, p); np > 0 {
@@ -4762,7 +4802,9 @@ func (v *Memberless) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		if idx >= 0 {
@@ -4960,7 +5002,9 @@ func (v *Unit) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 		return p + 1, nil
 	}
 	for {
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		if idx >= 0 {
 			if np := odjsonrt.AfterName(data, p); np > 0 {
@@ -5021,7 +5065,9 @@ func (v *Unit) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		if idx >= 0 {
