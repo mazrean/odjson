@@ -445,11 +445,11 @@ level.
 | `map-items` (`map[string]Item`) | 2.19× | 2.01× | 2.04× | 1.32× |
 | `generic` (`any`) | 2.02× | 1.52× | 2.18× | 2.21× |
 | `text-ascii` | 2.65× | 2.59× | 1.85× | 1.06× |
-| `text-cjk` (as `twitter`) | 1.50× | 2.10× | 1.29× | 1.09× |
-| `text-hangul` | 1.23× | 1.84× | 1.06× | 1.11× |
-| `text-latin` | 1.48× | 1.91× | 1.34× | 1.07× |
-| `text-cyrillic` | 1.74× | 2.68× | 1.78× | 1.06× |
-| `text-emoji` | 1.42× | 1.35× | 1.22× | 1.08× |
+| `text-cjk` (as `twitter`) | 1.78× | 2.10× | 1.29× | 1.09× |
+| `text-hangul` | 1.60× | 1.84× | 1.06× | 1.11× |
+| `text-latin` | 2.13× | 1.91× | 1.34× | 1.07× |
+| `text-cyrillic` | 3.36× | 2.68× | 1.78× | 1.06× |
+| `text-emoji` | 1.49× | 1.35× | 1.22× | 1.08× |
 | `text-escaped` | 2.16× | 1.52× | 1.35× | **0.87×** |
 | `unique-strings` | 2.73× | 2.13× | 1.96× | 1.17× |
 | `numbers` | 1.51× | 1.91× | 1.52× | 1.16× |
@@ -502,11 +502,20 @@ since the ASCII-only rows did not lose, it is the non-ASCII copy rather than
 the ASCII scan's stores: `copyNonASCII` stores each word it validates, which
 is a win on `twitter`'s runs — 56 bytes on average, among ASCII — and a
 loss against the scan-then-`memmove` it replaced on a string that is
-nothing but Cyrillic or Hangul from its first byte to its last. The five rows
-are still above reflection, the narrowest Hangul at 1.23×, and `twitter`'s
-row is the one the README quotes; the trade is recorded here rather than
-left inside a table that used to read 2.37×, and the copy of a long dense
-non-ASCII run is the next encode lever.
+nothing but Cyrillic or Hangul from its first byte to its last. The text
+round (see "The text round" under "Measured and rejected") took that lever
+the same day: the five `json/v2` encode cells above are that round's, from
+its own three-way A/B (`4777ed8`, `main` at `088a337`, the round's tree,
+two rounds of `-count 6` each) rather than from the suite run the rest of
+the table comes from, and against `4777ed8` — the tree before the encode
+round — they now read `text-latin` −25%, `text-cyrillic` −28%,
+`text-hangul` −8%, `text-cjk` level and `text-emoji` +5% (all p < 0.001,
+n = 12), with the reflection side within ±1% throughout, `twitter` on the
+pooled `bench/gen` A/B level on both libraries, and the `encoding/json`
+encode column untouched, since that path's appender was not changed. The
+emoji row is the one residue of the encode round's trade: an emoji among
+ASCII costs its word store in the fused scan, which is the design that won
+`twitter` its 16%.
 
 What held from the start: the ratios do not depend on document size
 (`page-3k` to `page-100k` are flat), on whitespace (`twitter-compact`,
@@ -1104,7 +1113,8 @@ for the fused copy rather than gaining — `text-cyrillic` **+32%**,
 `text-hangul` +19%, `text-cjk` +16%, `text-emoji` +9%, `text-latin` +6% on
 the generated side (n=12, interleaved; the two merges after this round read
 the same on those rows, so it is this round's), against `twitter` −16% and
-`text-escaped` −15% in the same A/B. See "What the other shapes say".
+`text-escaped` −15% in the same A/B. See "What the other shapes say", and
+"The text round" below for what took it back.
 
 **Integer digits go straight into the buffer.** `AppendInt` and `AppendUint`
 were `strconv` wrappers, and `strconv` formats into a scratch array of its own
@@ -1475,6 +1485,125 @@ interleaved runs, n=20): the `json/v2` decodes are level (`twitter` 390.6 → 38
   `strconv`. After this round a decline is a halfway case, a subnormal or
   twenty digits, rare enough that splitting a slow entry point out was not
   worth a second exported function.
+
+### The text round
+
+A round on `main` at `088a337` (after the re-measure of 2026-09-13), asked
+to take back what the encode round had cost the five `text-*` encode rows
+whose strings are non-ASCII from end to end. Where those rows spent their
+time first, with a micro-benchmark shaped like them
+(`BenchmarkAppendBodyText` in `odjsonrt/scan_bench_test.go`: 96 lines of
+at least 80 bytes of one script's words, the corpora `bench/shapes` builds,
+through `AppendStringBodyChecked` under `ModeV2`): a line of Cyrillic ran
+at 1.25 GB/s, four cycles a byte. Its letters are two bytes and its spaces
+one, so `copyNonASCII`'s four-sequence word case took one word of each
+word of text and then the two letters before the space failed all four
+word tests, fell to `skipNonASCII` — which ran the same four tests again
+before its table — and came back through `copyRun`: two calls and some
+fourteen failed word tests per fifteen bytes. Hangul was worse for another
+reason: `cjkWord` refuses the lead ED, whose second byte is restricted, so
+every syllable above U+D000 sent the rest of its run to the table. Japanese
+and Korean words of two to five characters between spaces paid a call and a
+return to the ASCII scan per word. What the round did:
+
+- **Two byte text is taken a word at a time, at a fixed stride.** The
+  `ModeV2` body's two byte branch is now a loop over `swarTwoByte`, which
+  judges a word by three exact lane masks — leads (`11xxxxxx`),
+  continuations (`10xxxxxx`), and leads below C2 — and one comparison,
+  `cont == lead<<8 | carry`: every continuation follows a lead, every lead
+  but the top lane's is followed by one, and `carry` says whether the
+  previous word ended in a lead that this word's first byte must
+  continue. That is what `swarLatin` could not do — it refused a lead in
+  the top lane, and Cyrillic puts a sequence across every other word
+  boundary, which is why putting it in the scan loop had lost on Cyrillic
+  before. The loop advances eight bytes whatever the word held; a first
+  version advanced seven when the top lane was a lead, and read 4.3 µs on
+  the Cyrillic micro against 3.1 µs at the fixed stride, because a stride
+  that depends on the word's contents puts the next load behind the
+  judgement of the previous one. When the loop stops with a lead owed it
+  steps back onto it, its store standing, and the byte loop for the last
+  seven bytes judges the pair. The helper returns the lead mask and a
+  "bad" word rather than a verdict, at a cost of 59, so that it inlines;
+  as one function with the escape test folded in it cost 100 and was not
+  inlined, and cost 4.3 µs against 3.1 µs. Cyrillic **6.65 → 3.09 µs**
+  (−54%), Latin **4.53 → 3.05 µs** (−33%) on the micro, against 4.68 and
+  4.29 µs on `4777ed8`.
+- **`copyNonASCII` takes the words between runs of three byte text.**
+  Its `cjkWord` loop is as it was, six bytes a turn, and where it stops the
+  word is judged by `swarMixed` and `swarMixedRange` — a lane classifier
+  for two and three byte sequences among ASCII, the same carried-lead
+  idea with a carry of one or two lanes, E0 and ED tested by bit 5 of the
+  second byte as `cjkWord` tests them and refused in the top lane where
+  that byte is out of reach, the escape test `swarUnsafe`'s — and the next
+  word goes back to the `cjkWord` loop when it starts on a three byte
+  lead, or on through the same test when it does not; the first word with
+  no non-ASCII byte in it returns to the caller's scan. Split in two so
+  that each half inlines (68 and 56 against the budget of 80): as one
+  function of cost 160, called per word, the Japanese micro read 5.9 µs
+  against 5.0. CJK **5.73 → 4.91 µs** (−14%), Hangul **7.37 → 5.42 µs**
+  (−27%) on the micro, against 4.96 and 6.10 µs on `4777ed8`.
+- **The last sequences of a string come from four byte loads.** Most of
+  `twitter.json`'s runs end at the end of the string, in the seven bytes
+  the word loops cannot reach, and those went to the table and `copyRun`
+  one byte at a time; `cjkSeq`, the `cjkWord` test with the upper lanes
+  filled in, settles up to two of them from a `load32` first.
+- **The lone four byte sequence is judged from one load.** The hit path's
+  test for an emoji among ASCII was three indexed continuation checks; it
+  is one masked compare on a `load32` now, emoji **3.83 → 3.66 µs** on the
+  micro.
+
+**What the rows say.** Three-way `bench/shapes` A/B, `4777ed8` against
+`main` against this tree, interleaved, two rounds of `-count 6` (n = 12),
+`json/v2` encode, generated side: against `main`, `text-cyrillic`
+**−45.8%**, `text-latin` **−30.3%**, `text-hangul` **−21.9%**, `text-cjk`
+**−13.2%**, `text-emoji` −1.2%, `text-escaped` −0.9%, `unique-strings`
++0.5%, `text-ascii` +1.1%; against `4777ed8`, −27.7%, −24.8%, −7.8%,
++0.5% and +4.7%. The reflection side read within ±1% on every row, and the
+`encoding/json` column, whose appender was not touched, moved −0.9% to
++3.5% — the layout of a binary whose `copyNonASCII` grew, since the
+`skipNonASCII` those rows call is byte for byte what it was. The pooled
+`bench/gen` A/B (four `-randlayout` seeds a side, five runs, n = 20):
+`json/v2` `twitter` **+0.2%** (p = 0.55), `small` +0.9% (p = 0.43),
+`encoding/json` −0.5% (p = 0.18) and −1.5% (p = 0.48) — level, all four.
+The single-layout shapes binary read `twitter` +2.2% and `twitter-compact`
++2.8% on `json/v2` in the same A/B, which is what a single layout does
+(see "The second encode round"); the pooled figure is the one to trust.
+
+**Rejected, with numbers:**
+
+- **Widening `cjkWord` to E0 and ED in the hot loop.** The second-byte
+  test costs five operations in the six byte loop `twitter.json` spends
+  its string time in: Japanese micro **+15%**, `twitter` micro +5%, and
+  Hangul only −4.5%, because a word of Korean between two spaces is still
+  a call per word. The test lives in `swarMixedRange` instead, where a
+  word that has already left the loop pays it.
+- **Staying in the mixed loop once entered.** The first form judged every
+  word after the `cjkWord` loop by `swarMixed` until a word with no
+  non-ASCII byte came: `twitter` micro **+9.7%** across four layouts.
+  Tweets put a digit or a bracket between two stretches of Japanese every
+  few dozen bytes, and from then on a dense run cost sixty operations a
+  word instead of eight per six bytes. The loop returns to `cjkWord`
+  whenever a word starts on a three byte lead, and the mixed test is
+  gated on the word's first byte, so a word of pure Japanese never pays
+  it.
+- **Carrying the loaded word around the outer loop.** With `w` loaded at
+  the bottom of the loop and judged at the top, the `cjkWord` loop grew
+  four register moves a turn over `skipNonASCII`'s: `twitter` micro
+  +2.5%. Loaded inside the loop, as `skipNonASCII` does, and again after
+  it, the moves are gone.
+- **The escape test after the structure tests.** A run of `twitter.json`
+  that ends on a line break went through `swarMixed` and
+  `swarMixedRange` before `swarUnsafe` reported the `\n`; with
+  `swarUnsafe` first the `twitter` micro came from +2.5% to +1.5%, and
+  the four byte loads for the string's last sequences to +1.4% (p =
+  0.065), which is the residue the pooled rows cannot see.
+
+What is left on these rows: the emoji row's remaining 5% against
+`4777ed8` is the word store an emoji among ASCII pays in the fused scan,
+the design that won `twitter` its 16%; `swarMixed` refuses four byte
+sequences, so a document of dense emoji still goes through the table;
+and the mixed loop costs some sixty operations a word where the two byte
+loop costs twenty, because it classifies three sequence lengths at once.
 
 ## Measurement notes
 
