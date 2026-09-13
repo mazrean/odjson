@@ -246,6 +246,9 @@ func appendShortFloat(dst []byte, neg bool, abs float64) ([]byte, bool) {
 		// Two places, the next most common (prices, percentages), for
 		// the same price again.
 		p = abs * 100
+		if p >= 1e15 {
+			return dst, false
+		}
 		r = (p + roundMagic) - roundMagic
 		f = 2
 		if math.Abs(p-r) > 1e-15*p || r/100 != abs {
