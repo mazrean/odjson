@@ -1054,6 +1054,89 @@ which is not odjson's to remove — is 18%, and the dynamic members are 15%.
 scans and copies in two passes — not for want of trying; see the rejected
 list above. Its row moved only by the number writer.
 
+### The second encode round
+
+A round on top of the first one, on `main` at `8a12738`, asked to take the
+encode side as far as it goes. What it found is mostly where the floor is.
+Every figure is the pooled procedure of the Measurement notes: four
+`-ldflags=-randlayout` seeds a side, five interleaved runs, n=20 per row,
+the decode rows read as the untouched floor, and a touched row counted only
+at p<0.05 and above that floor.
+
+**Where the `twitter` encode goes**, from a profile of the `json/v2` row on
+the tree the first round left: the generated encoders and everything they
+call are about 70% of the row's wall time; `bytes.Clone`, which
+`encoding/json/v2`'s `Marshal` makes of the buffer, and the large allocation
+behind it are about 16%; the rest is the encoder pool and the collector's
+share of a benchmark that allocates 262 KB per call. Of odjson's part, the
+string writer is about 60% (17 µs of it the non-ASCII runs, whose six byte
+CJK loop is ALU bound at a little over a cycle a byte), the dynamic members
+about a quarter — most of that Go's map iterator over the `[]any` of
+`map[string]any` the URL entities decode to, which has no faster public
+form — and the integers about a seventh. The 4,754 value strings hold 200 KB,
+an average of 42 bytes, so the string writer's cost is its bytes rather than
+its calls: 38% of the strings are under eight bytes and take no loop at all.
+
+**Kept: two-shaped members fold into the literals around them.** A bool, a
+nil-able pointer, slice, map, `[]byte` or interface member is written by a
+branch, and the literal the encoder carries forward (`pending` in
+`encodeStruct`) had to be flushed ahead of it: two appends where one would
+do. Such a member is now held back with the text before it and flushed as an
+if/else whose arms each write that text, their own shape, and the text that
+came due after them, up to the next member's name — `true,"hots":` and
+`false,"hots":` for a bool, `[]` or `null` with the mode test for a nil
+slice, the opening bracket joined to the name for a non-nil one. The map
+key's closing quote and colon join its value the same way, and a struct with
+any unconditional member patches its opening brace statically.
+`Marshal/encoding-json/small` **−3.85%** (p=0.000); every other marshal row
+and every decode row level (`json/v2` `twitter` +0.8% at p=0.095). The
+twitter document's 2,791 bools and 1,946 nulls each save an append, but the
+arms carry the literals twice and the generated encoders grow by about a
+third, and on that row the two cancel.
+
+**Rejected, with numbers:**
+
+- **Testing `ModeV2` first in `appendStringBodyChecked`**, one comparison
+  instead of the three a `switch` over the other modes made ahead of it, and
+  the `len(src) == 0` test dropped. `BenchmarkAppendBodyTwitter` `v2`
+  **−4.55%** — and `v2html` **+5.67%**, though that mode's appender did not
+  change (its assembly is byte for byte the same) and the hand-off to it got
+  a comparison shorter. Pooled: `json/v2` `twitter` **−2.07%** (p=0.018),
+  `encoding/json` `twitter` **+2.04%** (p=0.004), both `small` rows level.
+  Four forms of the test (the mode the direct path writes first; `ModeV2HTML`
+  first; a five-way `switch` with `ModeV2` explicit; the first form with the
+  length test kept) all read the same way on the micro-benchmark, the
+  `v2html` loss tracking the size of the change rather than its shape: the
+  function shrank by exactly 32 bytes, which is the alignment the linker
+  gives a function, and a row whose work is all in a callee moved four
+  percent on that alone. Not something a source change controls, so not
+  taken; a gain on the primary row bought with the same loss on the
+  `encoding/json` one is not a gain.
+- **`ModeV2HTML` as one pass**, written a second time: the `ModeV2` body's
+  structure (room taken up front, every word stored before it is judged, the
+  backward word for the tail), a six-term `swarUnsafeHTMLOrHigh` mask, and
+  — to stay clear of what sank the first attempt — the byte loop for a
+  string shorter than a word and `skipNonASCII` plus `copyRun` for the
+  non-ASCII runs rather than `copyNonASCII`. `BenchmarkAppendBodyTwitter`
+  `v2html` **−7.59%** (p=0.002), `v2` −3.18% from the shared prologue. On the
+  rows, with the mode test above: every marshal row level (n=20, `encoding/json`
+  `twitter` p=0.989); without it, stacked on the fusion alone: level again
+  (`encoding/json` `twitter` **−0.2%**, p=0.529; `small` +1.3%, p=0.129). A
+  profile of the `encoding/json` `twitter` row shows the appender's share
+  fall by a tenth and the difference reappear inside `appendAny`, whose code
+  did not change. Not taken: `v2html_test.go`'s oracle passes on it, but
+  twice level on the row it exists for is not a state to ship more code in.
+
+**What the floor is.** On the `json/v2` `twitter` row, 30% of the wall time
+is `encoding/json/v2`'s own — the clone and the collector — and of odjson's
+70%, half is the string writer at about a cycle a byte with a scalar word
+scan and a branch-predicted loop exit per string, a quarter is the map
+iterator, and the generated code's own literals and tests are about 7%. The
+`small` row is 277 ns of which 105 ns are odjson's, three strings, five
+numbers and eleven member names. Two changes that each moved their
+micro-benchmark by four to eight percent moved neither row past the layout
+floor. Anything further here is either json/v2's, the runtime's, or SIMD.
+
 ## Measurement notes
 
 All figures on this page were re-measured together on an AMD Ryzen 9 7950X,
