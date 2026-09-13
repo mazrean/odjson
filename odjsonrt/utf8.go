@@ -161,6 +161,11 @@ func cjkWord(w uint64) bool {
 	return ((w&0xC0C0F0C0C0F0)^0x8080E08080E0)|((nonzero&notD)^carries) == 0
 }
 
+// cjkSeq is [cjkWord] for the one three byte sequence in the low three
+// lanes of w: the upper lanes are replaced by a sequence that passes, so
+// the same test judges the one that is left.
+func cjkSeq(w uint64) bool { return cjkWord(w&0xFFFFFF | 0x8080E1<<24) }
+
 // copyNonASCII is [skipNonASCII] with the copy folded in: it validates the
 // run of non-ASCII bytes that starts at i and stores it into d at n, and
 // returns the offset past what it wrote and the index of the first ASCII
@@ -168,29 +173,42 @@ func cjkWord(w uint64) bool {
 //
 // The encoder needs both, and doing them in two passes — validate, then copy
 // what was validated — reads a quarter of a document like twitter.json
-// twice. The word cases below, which are what a document full of one script
-// is made of, store the word they judged; a run that needs the byte-at-a-time
-// table hands the rest to skipNonASCII and copies what that validated, since
-// those sequences are rare enough not to be worth a second copy of the table.
+// twice. A dense run of CJK text, which is what twitter.json's runs are, is
+// taken six bytes a turn by the cjkWord loop, as skipNonASCII takes it.
+// Where that loop stops — at the run's last sequence, or at the ASCII
+// between the words of a document whose strings are Japanese, Korean or
+// Thai from end to end — the word is taken whole by swarMixed, eight bytes
+// at a fixed stride, the run's end and the next word's start in one store,
+// and the next word goes back to the cjkWord loop if it is dense text again
+// or on through swarMixed if it is not; the first word without a non-ASCII
+// byte is the caller's, whose ASCII scan is cheaper. Anything the two tests
+// refuse — a four byte sequence, an invalid byte, the last bytes of the
+// string — goes to skipNonASCII, and what that validated is copied after
+// it.
 //
 // d must have room for eight bytes past n, as [appendStringBodyV2]'s
 // reservation guarantees: a word case stores the whole word it loaded even
 // when the sequences in it are shorter, and the bytes past them are the ones
 // the next store writes anyway.
 func copyNonASCII(d []byte, n int, s []byte, i int) (int, int) {
-	for uint(i) < uint(len(s)) {
-		b := s[i]
-		if b < utf8.RuneSelf {
-			return n, i
-		}
-		if i+8 <= len(s) {
-			w := load64(s, i)
-			if cjkWord(w) {
-				store64(d, n, w)
-				n += 6
-				i += 6
+	if i+8 <= len(s) {
+		// carry is the lanes of the next word that the sequence the
+		// previous word left unfinished still owes (see swarMixed), prev
+		// that word; a word the cjkWord loop takes starts on a lead, so
+		// it never runs while a sequence is owed.
+		var carry, prev uint64
+		for {
+			// The two tests below need a three byte lead in the first
+			// lane, so a word that starts on anything else — the ASCII
+			// between two words of such text, or the continuation a
+			// sequence still owed — skips them. The loop is skipNonASCII's
+			// inner loop with the store added, and nothing else: a word
+			// carried around the outer loop cost it four register moves
+			// a turn, on the loop twitter.json's strings spend most of
+			// their time in.
+			if s[i]&0xF0 == 0xE0 {
 				for i+8 <= len(s) {
-					w = load64(s, i)
+					w := load64(s, i)
 					if !cjkWord(w) {
 						break
 					}
@@ -198,38 +216,147 @@ func copyNonASCII(d []byte, n int, s []byte, i int) (int, int) {
 					n += 6
 					i += 6
 				}
-				continue
-			}
-			if w&0xC0E0C0E0C0E0C0E0 == 0x80C080C080C080C0 {
-				t := w & 0x001E001E001E001E
-				if (t-0x0001000100010001)&^t&0x8000800080008000 == 0 {
+				if i+8 > len(s) {
+					goto rest
+				}
+				// One more sequence with the run's ASCII after it, which
+				// is how a run ends half the time: the loop's own test,
+				// with the upper lanes filled in, and the store is the
+				// whole word.
+				if w := load64(s, i); cjkSeq(w) {
 					store64(d, n, w)
-					n += 8
-					i += 8
-					continue
+					n += 3
+					i += 3
+					if i+8 > len(s) {
+						goto rest
+					}
 				}
 			}
-			if w&0xC0C0C0FCC0C0C0FC == 0x808080F0808080F0 &&
-				(b != 0xF0 || byte(w>>8) >= 0x90) && (byte(w>>32) != 0xF0 || byte(w>>40) >= 0x90) {
-				store64(d, n, w)
-				n += 8
-				i += 8
-				continue
+			w := load64(s, i)
+			// Nothing but ASCII in the word means the run has ended, unless
+			// a sequence is still owed, which the table below reports.
+			if w&swarHi == 0 {
+				if carry != 0 {
+					break
+				}
+				return n, i
 			}
-			if w&0xC0C0F0 == 0x8080E0 && cjkLead(b) {
-				store64(d, n, w)
-				n += 3
-				i += 3
-				continue
+			// The escape test first: a run that ends on a control byte, as
+			// twitter.json's do at every line break, is settled by it alone.
+			if swarUnsafe(w) != 0 {
+				break
+			}
+			lead, lead3, bad := swarMixed(w, carry)
+			if bad != 0 || swarMixedRange(w, lead3) != 0 {
+				break
+			}
+			store64(d, n, w)
+			n += 8
+			i += 8
+			carry = (lead3>>48)&0x8080 | (lead>>56)&0x80
+			prev = w
+			if i+8 > len(s) {
+				break
 			}
 		}
-		// What is left is a sequence the table settles, and after it a
-		// run that may be anything: skipNonASCII takes all of it.
-		j := skipNonASCII(s, i)
-		if j < 0 {
-			return n, -1
+		if carry != 0 {
+			// Step back onto the lead of the sequence the last word left
+			// unfinished, so that the table judges it whole: the last
+			// byte when it is that lead, the one before when the last
+			// byte is its first continuation. Both are stored already.
+			back := 1
+			if byte(prev>>56) < 0xC0 {
+				back = 2
+			}
+			n -= back
+			i -= back
+		} else if uint(i) >= uint(len(s)) || s[i] < utf8.RuneSelf {
+			// The run ended in the last word taken: the caller's scan
+			// takes it from here.
+			return n, i
 		}
-		return copyRun(d, n, s, i, j), j
 	}
-	return n, i
+rest:
+	// The last bytes of the string, fewer than a word: the three byte
+	// sequences among them are settled from four byte loads, which is how
+	// most of twitter.json's runs end, and what is left is a run the
+	// table settles: skipNonASCII takes all of it, and what it validated
+	// is copied after it.
+	for i+4 <= len(s) {
+		w := load32(s, i)
+		if !cjkSeq(uint64(w)) {
+			break
+		}
+		store32(d, n, w)
+		n += 3
+		i += 3
+	}
+	if uint(i) >= uint(len(s)) {
+		return n, i
+	}
+	j := skipNonASCII(s, i)
+	if j < 0 {
+		return n, -1
+	}
+	return copyRun(d, n, s, i, j), j
+}
+
+// swarMixed judges a word of text in which safe ASCII, two byte and three
+// byte sequences may be mixed: it reports the lanes of w that hold a lead
+// (11xxxxxx), the ones that hold a three byte lead (1110xxxx), and a word
+// that is nonzero when the sequences are not laid out as such text — a four
+// byte lead, a continuation with no lead before it or a lead without its
+// continuations, or an overlong two byte lead (C0, C1). A sequence is
+// allowed to straddle the word's end: a lead in the last lane, or a three
+// byte lead in the last two, needs no continuation inside the word, and
+// carry, the lanes of w that the previous word's unfinished sequence still
+// owes (lane 0 and perhaps lane 1), says which of the first lanes have to
+// be continuations. What it does not judge is the second byte of a three
+// byte sequence and the escapes among the ASCII: those are
+// [swarMixedRange]'s and [swarUnsafe]'s, so that each part stays inside
+// the inliner's budget.
+func swarMixed(w, carry uint64) (lead, lead3, bad uint64) {
+	hi := w & swarHi
+	// Bits 6, 5 and 4 of a non-ASCII byte, in turn: lead or continuation,
+	// three bytes or more, four bytes or more.
+	lead = (w << 1) & hi
+	cont := hi ^ lead
+	lead3 = (w << 2) & lead
+	// A two byte lead below C2 has bits 1-4 clear: adding 0x7E to those
+	// four bits reaches the lane's top bit exactly when they are not all
+	// zero, and never carries out of the lane.
+	nz := (w&0x1E1E1E1E1E1E1E1E + 0x7E7E7E7E7E7E7E7E) & swarHi
+	// The continuations are exactly the lanes after the leads: one after
+	// a two byte lead, two after a three byte one, the ones a shift drops
+	// off the top owed to the next word and the ones the previous word
+	// owed to this one added at the bottom.
+	bad = (w<<3)&lead3 | (cont ^ (lead<<8 | lead3<<16 | carry)) | (lead^lead3)&^nz
+	return lead, lead3, bad
+}
+
+// swarMixedRange is the rest of [swarMixed]'s judgement: nonzero when a
+// three byte lead's second byte is out of its range — an E0 whose second
+// byte is below A0 (overlong) or an ED whose second byte is above 9F (a
+// surrogate), and an E0 or ED in the top lane, whose second byte is out of
+// reach. The escapes among the ASCII are [swarUnsafe]'s to find.
+//
+// The lead's low nibble is tested as cjkWord tests it: a nibble plus
+// fifteen carries into the bit above it exactly when it is not zero,
+// XORing D in first turns that into a test for D, and bit 5 of the next
+// lane's byte, brought down onto the same bit, is what tells the two
+// halves of the second byte's range apart. E0 needs the high half and ED
+// the low.
+func swarMixedRange(w, lead3 uint64) uint64 {
+	const (
+		nibbles = 0x0F0F0F0F0F0F0F0F
+		carries = 0x1010101010101010
+		notED   = 0x0D0D0D0D0D0D0D0D
+		top     = 0x10 << 56 // the carry bit of the last lane
+	)
+	nib := w & nibbles
+	nonzero := (nib + nibbles) & carries
+	notD := ((nib ^ notED) + nibbles) & carries
+	high := (w >> 9) & carries
+	ok := (nonzero | high) & (notD | (^high &^ top))
+	return lead3 &^ (ok << 3)
 }

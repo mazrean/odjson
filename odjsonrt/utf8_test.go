@@ -241,3 +241,59 @@ func TestParseStringStrictMatchesJSONV2(t *testing.T) {
 		}
 	}
 }
+
+// TestAppendBodyV2TextMatchesJSONV2 drives the ModeV2 body over lines of
+// one script at a time — the shape bench/shapes' text-* corpora have, and
+// the one the word loops for two and three byte text are written for — at
+// every prefix length, so that a sequence straddles a word boundary at every
+// offset, and with each byte of each line corrupted in turn. The oracle is
+// encoding/json/v2.
+func TestAppendBodyV2TextMatchesJSONV2(t *testing.T) {
+	check := func(s []byte) {
+		t.Helper()
+		got, err := appendStringBodyChecked([]byte("x"), s, ModeV2)
+		want, werr := jsonv2.Marshal(string(s))
+		if (werr != nil) != (err != nil) {
+			t.Errorf("%q: err = %v, json/v2 err = %v", s, err, werr)
+			return
+		}
+		if err != nil {
+			if string(got) != "x" {
+				t.Errorf("%q: dst not restored on error: %q", s, got)
+			}
+			return
+		}
+		if !bytes.Equal(got[1:], want[1:len(want)-1]) {
+			t.Errorf("%q: got %q, want %q", s, got[1:], want[1:len(want)-1])
+		}
+	}
+	lines := []string{
+		"быстрая коричневая лиса прыгает через ленивую собаку пока семь инженеров",
+		"Ελληνικά κείμενο με τόνους και διαλυτικά σε κάθε λέξη της γραμμής αυτής",
+		"café naïve résumé façade jalapeño über straße smörgåsbord crème brûlée",
+		"a é aa éé aaa ééé aaaa éééé aaaaa ééééé aaaaaa éééééé aaaaaaa ééééééé b",
+		"素早い 茶色の 狐が 怠け者の 犬を 飛び越える 七人の 無口な 技術者が 測定する",
+		"빠른 갈색 여우가 게으른 개를 뛰어넘는다 일곱 명의 조용한 엔지니어가 한다",
+		"ภาษาไทย ตัวอักษร แต่ละตัว ขึ้นต้นด้วย E0 และ ต้องมี ไบต์ที่สอง ตั้งแต่ A0",
+		"힣힣 퀀퟿ 힣a힣 ￿ ퟿ end",
+		"🦊 jumps 🐕 over 🎉 the 🚀 lazy 🧪 dog 📊 while 🔬 seven 🛠️ engineers",
+		"mixed: café 日本語 быстро 한글 🦊 \"quoted\" back\\slash tab\tend <b>&</b>",
+		"日本語のテキストにéやüが混ざる: naïve な文字列, ผสม ไทย, and ASCII words",
+	}
+	for _, line := range lines {
+		b := []byte(line)
+		for n := 0; n <= len(b); n++ {
+			check(b[:n])
+			check(b[len(b)-n:])
+		}
+		for i := range b {
+			for _, c := range []byte{0x00, '"', '\\', 'a', 0x80, 0xBF, 0xC0, 0xC2, 0xDF, 0xE0, 0xED, 0xEF, 0xF0, 0xF4, 0xFF} {
+				m := append([]byte(nil), b...)
+				m[i] = c
+				check(m)
+				check(m[:i+1])
+				check(m[i:])
+			}
+		}
+	}
+}
