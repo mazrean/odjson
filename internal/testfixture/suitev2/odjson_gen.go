@@ -335,16 +335,16 @@ func (v *Raw) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *Value) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"x\":"...)
 	if v.X == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, "{\"x\":null}"...)
 	} else {
+		dst = append(dst, "{\"x\":"...)
 		dst, err = odjsonrt.AppendAnyMode(dst, v.X, m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, "}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -1002,31 +1002,40 @@ func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"b\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.B))
-	dst = append(dst, ",\"l\":"...)
-	if v.L == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+	if bool(v.B) {
+		dst = append(dst, ",\"b\":true,\"l\":"...)
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, ",\"b\":false,\"l\":"...)
+	}
+	if v.L == nil {
+		if m.V2() {
+			dst = append(dst, "[],\"m\":"...)
+		} else {
+			dst = append(dst, "null,\"m\":"...)
+		}
+	} else {
+		dst = append(dst, "["...)
 		for i14 := range v.L {
 			if i14 > 0 {
 				dst = append(dst, ',')
 			}
 			dst = odjsonrt.AppendInt(dst, int64(v.L[i14]))
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "],\"m\":"...)
 	}
-	dst = append(dst, ",\"m\":"...)
 	if v.M == nil {
-		dst = odjsonrt.AppendNilMap(dst, m)
+		if m.V2() {
+			dst = append(dst, "{},\"a\":"...)
+		} else {
+			dst = append(dst, "null,\"a\":"...)
+		}
 	} else {
 		keys15 := make([]string, 0, len(v.M))
 		for k16 := range v.M {
 			keys15 = append(keys15, string(k16))
 		}
 		slices.Sort(keys15)
-		dst = append(dst, '{')
+		dst = append(dst, "{"...)
 		for i17, k16 := range keys15 {
 			if i17 > 0 {
 				dst = append(dst, ',')
@@ -1036,36 +1045,34 @@ func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"', ':')
 			mv18 := v.M[k16]
-			dst = append(dst, '"')
+			dst = append(dst, "\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string(mv18), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
-		dst = append(dst, '}')
+		dst = append(dst, "},\"a\":"...)
 	}
-	dst = append(dst, ",\"a\":"...)
 	if v.A == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, "null,\"p\":"...)
 	} else {
 		dst, err = odjsonrt.AppendAnyMode(dst, v.A, m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, ",\"p\":"...)
 	}
-	dst = append(dst, ",\"p\":"...)
 	if v.P == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, "null}"...)
 	} else {
 		dst, err = (*v.P).odjsonAppend(dst, m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, "}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 

@@ -23,14 +23,10 @@ func (v *secret) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 		if err != nil {
 			return nil, err
 		}
-		dst = append(dst, '"')
+		dst = append(dst, "\""...)
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst[start] = '{'
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -441,9 +437,11 @@ func (v *secret) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 func (v *lone) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 	var err error
 	_ = err
-	dst = append(dst, "{\"flag\":"...)
-	dst = odjsonrt.AppendBool(dst, bool(v.Flag))
-	dst = append(dst, "}"...)
+	if bool(v.Flag) {
+		dst = append(dst, "{\"flag\":true}"...)
+	} else {
+		dst = append(dst, "{\"flag\":false}"...)
+	}
 	return dst, nil
 }
 
@@ -796,20 +794,25 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
-	dst = append(dst, ",\"ptr\":"...)
 	if v.Ptr == nil {
-		dst = append(dst, 'n', 'u', 'l', 'l')
+		dst = append(dst, ",\"ptr\":null,\"lis"...)
+		dst = append(dst, "t\":"...)
 	} else {
+		dst = append(dst, ",\"ptr\":"...)
 		dst, err = (*v.Ptr).odjsonAppend(dst, m)
 		if err != nil {
 			return nil, err
 		}
+		dst = append(dst, ",\"list\":"...)
 	}
-	dst = append(dst, ",\"list\":"...)
 	if v.List == nil {
-		dst = odjsonrt.AppendNilSlice(dst, m)
+		if m.V2() {
+			dst = append(dst, "[]}"...)
+		} else {
+			dst = append(dst, "null}"...)
+		}
 	} else {
-		dst = append(dst, '[')
+		dst = append(dst, "["...)
 		for i31 := range v.List {
 			if i31 > 0 {
 				dst = append(dst, ',')
@@ -819,9 +822,8 @@ func (v *Holder) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 				return nil, err
 			}
 		}
-		dst = append(dst, ']')
+		dst = append(dst, "]}"...)
 	}
-	dst = append(dst, "}"...)
 	return dst, nil
 }
 

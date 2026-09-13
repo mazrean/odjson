@@ -27,14 +27,10 @@ func (v *Address) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 		if err != nil {
 			return nil, err
 		}
-		dst = append(dst, '"')
+		dst = append(dst, "\""...)
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst[start] = '{'
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
@@ -444,36 +440,38 @@ func (v *Person) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	dst = append(dst, "\",\"age\":"...)
 	dst = odjsonrt.AppendInt(dst, int64(v.Age))
 	if v.Email != nil {
-		dst = append(dst, ",\"email\":"...)
 		if v.Email == nil {
-			dst = append(dst, 'n', 'u', 'l', 'l')
+			dst = append(dst, ",\"email\":null"...)
 		} else {
-			dst = append(dst, '"')
+			dst = append(dst, ",\"email\":\""...)
 			dst, err = odjsonrt.AppendStringBodyChecked(dst, string((*v.Email)), m)
 			if err != nil {
 				return nil, err
 			}
-			dst = append(dst, '"')
+			dst = append(dst, "\""...)
 		}
 	}
 	if len(v.Tags) != 0 {
-		dst = append(dst, ",\"tags\":"...)
 		if v.Tags == nil {
-			dst = odjsonrt.AppendNilSlice(dst, m)
+			if m.V2() {
+				dst = append(dst, ",\"tags\":[]"...)
+			} else {
+				dst = append(dst, ",\"tags\":null"...)
+			}
 		} else {
-			dst = append(dst, '[')
+			dst = append(dst, ",\"tags\":["...)
 			for i17 := range v.Tags {
 				if i17 > 0 {
 					dst = append(dst, ',')
 				}
-				dst = append(dst, '"')
+				dst = append(dst, "\""...)
 				dst, err = odjsonrt.AppendStringBodyChecked(dst, string(v.Tags[i17]), m)
 				if err != nil {
 					return nil, err
 				}
-				dst = append(dst, '"')
+				dst = append(dst, "\""...)
 			}
-			dst = append(dst, ']')
+			dst = append(dst, "]"...)
 		}
 	}
 	dst = append(dst, ",\"address\":"...)
@@ -481,12 +479,8 @@ func (v *Person) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
-	if len(dst) == start {
-		dst = append(dst, '{', '}')
-	} else {
-		dst[start] = '{'
-		dst = append(dst, '}')
-	}
+	dst[start] = '{'
+	dst = append(dst, "}"...)
 	return dst, nil
 }
 
