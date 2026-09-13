@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 **odjson**（*overdrive JSON*）は、`encoding/json/v2` をコード編集なしで [`bytedance/sonic`](https://github.com/bytedance/sonic) より速くする CLI コードジェネレータです。
-標準の `encoding/json/v2` をそのまま使って行っている JSON エンコード/デコードが、以下のコメントを追加し、`go generate` するだけで 2.8×〜4.2× 高速化します。
+標準の `encoding/json/v2` をそのまま使って行っている JSON エンコード/デコードが、以下のコメントを追加し、`go generate` するだけで 2.9×〜4.3× 高速化します。
 ```go
 //go:generate go tool odjson -type User
 ```
@@ -16,10 +16,10 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bench-dark.svg">
-  <img alt="1 操作あたりの時間、低いほど速い。Marshal large: encoding/json/v2 395 µs, odjson あり 94 µs, sonic 116 µs, go-json 242 µs。Marshal small: 1037 ns, odjson あり 266 ns, sonic 311 ns, go-json 404 ns。Unmarshal large: 1078 µs, odjson あり 380 µs, sonic 508 µs, go-json 656 µs。Unmarshal small: 1856 ns, odjson あり 530 ns, sonic 990 ns, go-json 784 ns。" src="./docs/assets/bench-light.svg" width="912">
+  <img alt="1 操作あたりの時間、低いほど速い。Marshal large: encoding/json/v2 402 µs, odjson あり 93 µs, sonic 122 µs, go-json 242 µs。Marshal small: 1068 ns, odjson あり 253 ns, sonic 313 ns, go-json 416 ns。Unmarshal large: 1089 µs, odjson あり 371 µs, sonic 521 µs, go-json 662 µs。Unmarshal small: 1864 ns, odjson あり 541 ns, sonic 1072 ns, go-json 799 ns。" src="./docs/assets/bench-light.svg" width="912">
 </picture>
 
-ベンチマーク上で、エンコード/デコードともに **`encoding/json/v2` に対して 2.8×〜4.2×** の速度向上を確認しています。また、[`goccy/go-json`](https://github.com/goccy/go-json) をいずれのベンチマークでも 1.5×〜2.6× 上回り、アセンブリを用いて JIT コンパイルや SIMD を用いる [`bytedance/sonic`](https://github.com/bytedance/sonic) も 4 つすべてで上回ります。内訳は large デコードが 1.34×、small デコードが 1.87×、2 つのエンコードが約 1.2× と約 1.15× です。エンコードは下表の測り方で 1.23× と 1.17×、別の測り方（[`bench/ab`](./bench/ab)、同一プロセス）で 1.17× と 1.14× となり、どちらで測っても実質的な差があります。エンコードは 2026 年 9 月まで sonic と同等でしたが、文字列の走査とコピーを 1 パスに融合したことで差がつきました（[docs/internals.md](./docs/internals.md)）。
+ベンチマーク上で、エンコード/デコードともに **`encoding/json/v2` に対して 2.9×〜4.3×** の速度向上を確認しています。また、[`goccy/go-json`](https://github.com/goccy/go-json) をいずれのベンチマークでも 1.5×〜2.6× 上回り、アセンブリを用いて JIT コンパイルや SIMD を用いる [`bytedance/sonic`](https://github.com/bytedance/sonic) も 4 つすべてで上回ります。内訳は large デコードが 1.41×、small デコードが 1.98×、2 つのエンコードが 1.1×〜1.3× です。エンコードは下表の測り方で 1.31× と 1.24×、別の測り方（[`bench/ab`](./bench/ab)、同一プロセス）で 1.17× と 1.12× となり、どちらで測っても実質的な差があります。エンコードは 2026 年 9 月まで sonic と同等でしたが、文字列の走査とコピーを 1 パスに融合したことで差がつきました（[docs/internals.md](./docs/internals.md)）。
 
 <details>
 <summary>ベンチマーク環境と再現方法</summary>
@@ -73,7 +73,7 @@ go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(json-v2|go-json|sonic)/' 
 
 Go 1.27 以降で動作します。生成コードが `encoding/json/jsontext` を import するため、1.26 以前ではコンパイルできません。
 
-また、1.27 以降の `encoding/json` でも内部的に `encoding/json/v2` を使うため効果はありますが、`encoding/json/v2` で使用する場合に最大限効果を発揮するようにチューニングしており、`encoding/json/v2` を使うことを推奨します。`encoding/json` 経由ではエンコードが 3.6×、デコードが 1.3×〜1.6× となります。エンコードは後述の内部バッファへの直接書き込みを使いますが、デコードは公開 API を経由します。`encoding/json` が設定するコーダのフラグが、直接経路の厳密なパーサでは拒否する入力を許容するためです。
+また、1.27 以降の `encoding/json` でも内部的に `encoding/json/v2` を使うため効果はありますが、`encoding/json/v2` で使用する場合に最大限効果を発揮するようにチューニングしており、`encoding/json/v2` を使うことを推奨します。`encoding/json` 経由ではエンコードが 3.6×〜3.7×、デコードが 1.25×〜1.6× となります。エンコードは後述の内部バッファへの直接書き込みを使いますが、デコードは公開 API を経由します。`encoding/json` が設定するコーダのフラグが、直接経路の厳密なパーサでは拒否する入力を許容するためです。
 
 ## Quick Start
 
