@@ -44,7 +44,9 @@ func (v *Raw) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) >= 3 && string(rest[:3]) == "\"x\"" {
@@ -118,7 +120,9 @@ func (v *Raw) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -368,7 +372,9 @@ func (v *Value) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) >= 3 && string(rest[:3]) == "\"x\"" {
@@ -449,7 +455,9 @@ func (v *Value) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -709,7 +717,9 @@ func (v *Typed) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) >= 3 && string(rest[:3]) == "\"x\"" {
@@ -783,7 +793,9 @@ func (v *Typed) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -1099,7 +1111,9 @@ func (v *Inner) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) > 1 {
@@ -1228,7 +1242,9 @@ func (v *Inner) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 					}
 					for {
 						var e34 int
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np35, ok36 := odjsonrt.ParseNull(data, p); ok36 {
 							p = np35
 						} else {
@@ -1391,7 +1407,9 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -1540,7 +1558,9 @@ func (v *Inner) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 					}
 					for {
 						var e69 int
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np70, ok71 := odjsonrt.ParseNull(data, p); ok71 {
 							p = np70
 							e69 = 0
@@ -1863,7 +1883,9 @@ func (v *Inner) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 					}
 					for {
 						var e102 int
-						vp98 = odjsonrt.SkipSpace(val97, vp98)
+						if uint(vp98) >= uint(len(val97)) || val97[vp98] <= ' ' {
+							vp98 = odjsonrt.SkipSpace(val97, odjsonrt.SkipIndent(val97, vp98))
+						}
 						if np103, ok104 := odjsonrt.ParseNull(val97, vp98); ok104 {
 							vp98 = np103
 							e102 = 0

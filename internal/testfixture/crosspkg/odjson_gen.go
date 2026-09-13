@@ -140,7 +140,9 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) > 1 {
@@ -240,6 +242,9 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 					}
 					for {
 						var e12 other.Thing
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						p, err = odjsonOtherThingParse(data, &e12, p, sc)
 						if err != nil {
 							return p, err
@@ -332,7 +337,9 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 					}
 					for {
 						var e21 *other.Wrapper
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np22, ok23 := odjsonrt.ParseNull(data, p); ok23 {
 							e21 = nil
 							p = np22
@@ -413,7 +420,9 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -530,6 +539,9 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 					}
 					for {
 						var e29 other.Thing
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						p, err = odjsonOtherThingParseV2(data, &e29, p, sc, strict)
 						if err != nil {
 							return p, err
@@ -646,7 +658,9 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 					}
 					for {
 						var e40 *other.Wrapper
-						p = odjsonrt.SkipSpace(data, p)
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						if np41, ok42 := odjsonrt.ParseNull(data, p); ok42 {
 							e40 = nil
 							p = np41
@@ -1050,7 +1064,9 @@ func odjsonOtherThingParse(data []byte, v *other.Thing, p int, sc *odjsonrt.Stri
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) > 1 {
@@ -1157,7 +1173,9 @@ func odjsonOtherThingParseV2(data []byte, v *other.Thing, p int, sc *odjsonrt.St
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -1419,7 +1437,9 @@ func odjsonOtherWrapperParse(data []byte, v *other.Wrapper, p int, sc *odjsonrt.
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) > 1 {
@@ -1496,6 +1516,9 @@ func odjsonOtherWrapperParse(data []byte, v *other.Wrapper, p int, sc *odjsonrt.
 					}
 					for {
 						var e81 other.Thing
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						p, err = odjsonOtherThingParse(data, &e81, p, sc)
 						if err != nil {
 							return p, err
@@ -1568,7 +1591,9 @@ func odjsonOtherWrapperParseV2(data []byte, v *other.Wrapper, p int, sc *odjsonr
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
@@ -1658,6 +1683,9 @@ func odjsonOtherWrapperParseV2(data []byte, v *other.Wrapper, p int, sc *odjsonr
 					}
 					for {
 						var e87 other.Thing
+						if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+							p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+						}
 						p, err = odjsonOtherThingParseV2(data, &e87, p, sc, strict)
 						if err != nil {
 							return p, err

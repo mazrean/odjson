@@ -25,6 +25,25 @@ func (c ctx) skipSpace() ast.Stmt {
 	return assign(c.posV(), callRT("SkipSpace", c.dataV(), c.posV()))
 }
 
+// skipIndent renders the whitespace skip before an object member or an
+// array element, where an indented document has a newline and its
+// indentation on every one:
+//
+//	if uint(pos) >= uint(len(data)) || data[pos] <= ' ' {
+//		pos = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, pos))
+//	}
+//
+// The test is SkipSpace's own, spelled here so that a document with no
+// whitespace pays exactly what it paid before; behind it, SkipIndent
+// consumes the run and SkipSpace settles the byte it ended on, or takes
+// over for anything SkipIndent declined. Both inline, so the run costs no
+// call, where it used to reach skipSpaceSlow through one on every member.
+func (g *generator) skipIndent(b *block, c ctx) {
+	g.ifStmt(b, nil, bin(c.atEnd(), token.LOR, bin(c.at(), token.LEQ, chr(' '))), func(b *block) {
+		g.emit(b, assign(c.posV(), callRT("SkipSpace", c.dataV(), callRT("SkipIndent", c.dataV(), c.posV()))))
+	})
+}
+
 // parseNull renders np, ok := odjsonrt.ParseNull(data, pos).
 func (c ctx) parseNull(np, ok *ast.Ident) ast.Stmt {
 	return assignN(token.DEFINE, []ast.Expr{np, ok}, callRT("ParseNull", c.dataV(), c.posV()))
@@ -101,7 +120,7 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 		if keyUsed {
 			g.emit(b, varDecl("key", sliceType(id("byte"))))
 		}
-		g.emit(b, c.skipSpace())
+		g.skipIndent(b, c)
 		if c.strict {
 			g.emit(b, define(kp, p))
 		}
@@ -772,7 +791,13 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 		})
 		g.loop(b, func(b *block) {
 			g.emit(b, varDecl(e.Name, typ(t.Elem.Expr)))
-			g.decode(b, t.Elem, e, c)
+			// The element's leading whitespace is an indent run in an
+			// indented document, settled here without a call; the
+			// element decoder then starts on its first byte.
+			g.skipIndent(b, c)
+			ec := c
+			ec.trimmed = true
+			g.decode(b, t.Elem, e, ec)
 			g.emit(b, assign(s, call(id("append"), s, e)))
 			g.separator(b, c, ']', "after array element")
 		})

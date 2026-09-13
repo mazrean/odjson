@@ -98,7 +98,9 @@ func (v *Fallbacks) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (i
 	}
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		idx := -1
 		rest := data[p:]
 		if len(rest) > 1 {
@@ -336,7 +338,9 @@ func (v *Fallbacks) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, 
 	unknown, umark := odjsonrt.UnknownNames(sc)
 	for {
 		var key []byte
-		p = odjsonrt.SkipSpace(data, p)
+		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
+			p = odjsonrt.SkipSpace(data, odjsonrt.SkipIndent(data, p))
+		}
 		kp := p
 		idx := -1
 		rest := data[p:]
