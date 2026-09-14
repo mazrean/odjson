@@ -83,6 +83,25 @@ mid-pack among the reflection libraries on every row, so a row for it adds
 height without adding a point. Its figures are in `docs/internals.md`; do
 not add it to the chart without a reason that was not true on 2026-09-14.
 
+`bench/shapes` carries the same baselines over its 27 shapes, so the
+comparison against them can be read past the README's three payloads: the
+reflection libraries and `sonic.ConfigStd` on the `plain` declaration,
+easyjson on `bench/shapes/easyjson` (its generator, run by `go generate`),
+and gojay and simdjson-go on the reference rows only (`twitter`, `small`,
+`twitter-compact`), because their code is hand-written per type and the
+other 24 shapes would each need a codec of their own; those rows skip with
+that reason rather than silently missing. easyjson also has no row for the
+two top-level collections (`array-items`, `map-items`): it generates for
+struct types. `TestShapes` holds every baseline to `encoding/json`'s reading
+of the plain value on every shape. The table is under "The other libraries
+on the shapes" in `docs/internals.md`, measured 2026-09-14 against `main`
+at `2adac1d`; re-measure before restating any of it. That run is a third
+binary for the sonic encode question above, and it does **not** reproduce
+the `small` margin: odjson's rows are within 3% of `bench/gen`'s, sonic's
+13-15% below `bench/plain`'s, so it reads 1.19x on `twitter` (the hedged
+figure) and 1.03x on `small`. Treat the `small` encode over sonic as level
+until a run explains where sonic's row lands per binary.
+
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,
 because their parity oracle is `encoding/json` v1, which folds case.
@@ -224,8 +243,8 @@ Every fixture's generated file is committed, and `internal/generate`'s tests
 regenerate each one and fail on any difference. Regenerate with
 `go generate ./...` from the repo root (and again from `bench/` — a separate
 module, whose `gen` and `shapes/gen` packages both carry a directive, and
-whose `easyjson` package carries one that runs easyjson's generator instead)
-whenever the generator changes.
+whose `easyjson` and `shapes/easyjson` packages carry one that runs
+easyjson's generator instead) whenever the generator changes.
 - `docs/internals.md` — the measurement record and the implementation detail
   behind `README.md`'s summary: the public API ceiling, the direct path, what
   the decode side pays, the v1/v2 semantics table, and why sonic and go-json
