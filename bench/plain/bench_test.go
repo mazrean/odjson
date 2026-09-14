@@ -10,14 +10,23 @@ import (
 
 	"github.com/bytedance/sonic"
 	gojson "github.com/goccy/go-json"
+	jsoniter "github.com/json-iterator/go"
+	simdjson "github.com/minio/simdjson-go"
+	segmentio "github.com/segmentio/encoding/json"
+	"github.com/wI2L/jettison"
 )
 
 // codec is one of the host JSON libraries under test. Every library is driven
 // through the same `any`-based signature so the benchmark table stays uniform.
+// A library that only does one direction leaves the other side nil, and the
+// tests and benchmarks skip that side rather than fail on it.
 type codec struct {
 	name      string
 	marshal   func(any) ([]byte, error)
 	unmarshal func([]byte, any) error
+	// skip, when set and returning a reason, says why this codec cannot run
+	// on this machine.
+	skip func() string
 }
 
 var codecs = []codec{
@@ -50,6 +59,48 @@ var codecs = []codec{
 		marshal:   sonic.ConfigStd.Marshal,
 		unmarshal: sonic.ConfigStd.Unmarshal,
 	},
+	{
+		// ConfigCompatibleWithStandardLibrary rather than ConfigDefault: the
+		// default neither sorts map keys nor escapes HTML, and the row is
+		// about the drop-in replacement people reach for.
+		name:      "json-iterator",
+		marshal:   jsoniter.ConfigCompatibleWithStandardLibrary.Marshal,
+		unmarshal: jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal,
+	},
+	{
+		name:      "segmentio",
+		marshal:   segmentio.Marshal,
+		unmarshal: segmentio.Unmarshal,
+	},
+	{
+		// jettison is an encoder only; it has no Unmarshal.
+		name:    "jettison",
+		marshal: jettison.Marshal,
+	},
+	{
+		// simdjson-go is a parser only, and it parses into a tape rather
+		// than into a struct. The row walks that tape into the target type
+		// (see simdjson.go), so it does the same job as every other
+		// Unmarshal row; the parse alone would be a different measurement.
+		name:      "simdjson-go",
+		unmarshal: simdjsonUnmarshal,
+		skip: func() string {
+			if !simdjson.SupportedCPU() {
+				return "simdjson-go needs AVX2 and CLMUL"
+			}
+			return ""
+		},
+	},
+}
+
+// skipUnsupported skips the test or benchmark when the codec cannot run here.
+func (c codec) skipUnsupported(tb testing.TB) {
+	tb.Helper()
+	if c.skip != nil {
+		if reason := c.skip(); reason != "" {
+			tb.Skip(reason)
+		}
+	}
 }
 
 // payload is a single JSON document plus the Go type it decodes into.
@@ -134,7 +185,8 @@ func payloads(tb testing.TB) []payload {
 // without error, and that re-encoding the decoded value with encoding/json
 // yields valid JSON. It is a sanity check on the fixtures and on the library
 // wiring, not a conformance test: the libraries are not required to agree
-// byte-for-byte on their output.
+// byte-for-byte on their output. An encode-only library is checked the other
+// way round: its output must be valid JSON that encoding/json reads back.
 func TestPayloadsRoundTrip(t *testing.T) {
 	for _, p := range payloads(t) {
 		t.Run(p.name, func(t *testing.T) {
@@ -144,6 +196,18 @@ func TestPayloadsRoundTrip(t *testing.T) {
 
 			for _, c := range codecs {
 				t.Run(c.name, func(t *testing.T) {
+					c.skipUnsupported(t)
+					if c.unmarshal == nil {
+						out, err := c.marshal(p.decoded)
+						if err != nil {
+							t.Fatalf("marshal: %v", err)
+						}
+						if err := jsonv1.Unmarshal(out, p.newValue()); err != nil {
+							t.Fatalf("encoding/json cannot read the output back: %v", err)
+						}
+						return
+					}
+
 					v := p.newValue()
 					if err := c.unmarshal(p.data, v); err != nil {
 						t.Fatalf("unmarshal: %v", err)
@@ -169,7 +233,11 @@ func BenchmarkMarshal(b *testing.B) {
 	ps := payloads(b)
 
 	for _, c := range codecs {
+		if c.marshal == nil {
+			continue
+		}
 		b.Run(c.name, func(b *testing.B) {
+			c.skipUnsupported(b)
 			for _, p := range ps {
 				b.Run(p.name, func(b *testing.B) {
 					// Warm up: sonic JIT-compiles and go-json builds its
@@ -197,7 +265,11 @@ func BenchmarkUnmarshal(b *testing.B) {
 	ps := payloads(b)
 
 	for _, c := range codecs {
+		if c.unmarshal == nil {
+			continue
+		}
 		b.Run(c.name, func(b *testing.B) {
+			c.skipUnsupported(b)
 			for _, p := range ps {
 				b.Run(p.name, func(b *testing.B) {
 					if err := c.unmarshal(p.data, p.newValue()); err != nil {

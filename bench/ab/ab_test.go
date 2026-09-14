@@ -17,12 +17,20 @@ import (
 
 	"github.com/bytedance/sonic"
 	gojson "github.com/goccy/go-json"
+	jsoniter "github.com/json-iterator/go"
+	segmentio "github.com/segmentio/encoding/json"
+	"github.com/wI2L/jettison"
 
 	"github.com/mazrean/odjson/bench/gen"
 	"github.com/mazrean/odjson/bench/plain"
 )
 
 var twitterJSON, mediumJSON []byte
+
+// jsoniterStd is json-iterator as the drop-in replacement it is used as; its
+// ConfigDefault neither sorts map keys nor escapes HTML. jettison has no
+// Unmarshal, so it appears on the Marshal side only.
+var jsoniterStd = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func TestMain(m *testing.M) {
 	b, err := os.ReadFile("../testdata/twitter.json")
@@ -233,6 +241,9 @@ func BenchmarkMarshalTwitter(b *testing.B) {
 	})
 	b.Run("sonic", func(b *testing.B) { runMarshal(b, ss, len(twitterJSON), sonic.Marshal) })
 	b.Run("go-json", func(b *testing.B) { runMarshal(b, ss, len(twitterJSON), gojson.Marshal) })
+	b.Run("json-iterator", func(b *testing.B) { runMarshal(b, ss, len(twitterJSON), jsoniterStd.Marshal) })
+	b.Run("segmentio", func(b *testing.B) { runMarshal(b, ss, len(twitterJSON), segmentio.Marshal) })
+	b.Run("jettison", func(b *testing.B) { runMarshal(b, ss, len(twitterJSON), jettison.Marshal) })
 }
 
 func BenchmarkMarshalMedium(b *testing.B) {
@@ -243,6 +254,9 @@ func BenchmarkMarshalMedium(b *testing.B) {
 	})
 	b.Run("sonic", func(b *testing.B) { runMarshal(b, ss, len(mediumJSON), sonic.Marshal) })
 	b.Run("go-json", func(b *testing.B) { runMarshal(b, ss, len(mediumJSON), gojson.Marshal) })
+	b.Run("json-iterator", func(b *testing.B) { runMarshal(b, ss, len(mediumJSON), jsoniterStd.Marshal) })
+	b.Run("segmentio", func(b *testing.B) { runMarshal(b, ss, len(mediumJSON), segmentio.Marshal) })
+	b.Run("jettison", func(b *testing.B) { runMarshal(b, ss, len(mediumJSON), jettison.Marshal) })
 }
 
 func BenchmarkMarshalSmall(b *testing.B) {
@@ -254,6 +268,9 @@ func BenchmarkMarshalSmall(b *testing.B) {
 	})
 	b.Run("sonic", func(b *testing.B) { runMarshal(b, ss, n, sonic.Marshal) })
 	b.Run("go-json", func(b *testing.B) { runMarshal(b, ss, n, gojson.Marshal) })
+	b.Run("json-iterator", func(b *testing.B) { runMarshal(b, ss, n, jsoniterStd.Marshal) })
+	b.Run("segmentio", func(b *testing.B) { runMarshal(b, ss, n, segmentio.Marshal) })
+	b.Run("jettison", func(b *testing.B) { runMarshal(b, ss, n, jettison.Marshal) })
 }
 
 func BenchmarkUnmarshalTwitter(b *testing.B) {
@@ -264,6 +281,8 @@ func BenchmarkUnmarshalTwitter(b *testing.B) {
 	})
 	b.Run("sonic", func(b *testing.B) { runUnmarshal(b, ss, twitterJSON, sonic.Unmarshal) })
 	b.Run("go-json", func(b *testing.B) { runUnmarshal(b, ss, twitterJSON, gojson.Unmarshal) })
+	b.Run("json-iterator", func(b *testing.B) { runUnmarshal(b, ss, twitterJSON, jsoniterStd.Unmarshal) })
+	b.Run("segmentio", func(b *testing.B) { runUnmarshal(b, ss, twitterJSON, segmentio.Unmarshal) })
 }
 
 func BenchmarkUnmarshalMedium(b *testing.B) {
@@ -274,6 +293,8 @@ func BenchmarkUnmarshalMedium(b *testing.B) {
 	})
 	b.Run("sonic", func(b *testing.B) { runUnmarshal(b, ss, mediumJSON, sonic.Unmarshal) })
 	b.Run("go-json", func(b *testing.B) { runUnmarshal(b, ss, mediumJSON, gojson.Unmarshal) })
+	b.Run("json-iterator", func(b *testing.B) { runUnmarshal(b, ss, mediumJSON, jsoniterStd.Unmarshal) })
+	b.Run("segmentio", func(b *testing.B) { runUnmarshal(b, ss, mediumJSON, segmentio.Unmarshal) })
 }
 
 func BenchmarkUnmarshalSmall(b *testing.B) {
@@ -285,6 +306,8 @@ func BenchmarkUnmarshalSmall(b *testing.B) {
 	})
 	b.Run("sonic", func(b *testing.B) { runUnmarshal(b, ss, data, sonic.Unmarshal) })
 	b.Run("go-json", func(b *testing.B) { runUnmarshal(b, ss, data, gojson.Unmarshal) })
+	b.Run("json-iterator", func(b *testing.B) { runUnmarshal(b, ss, data, jsoniterStd.Unmarshal) })
+	b.Run("segmentio", func(b *testing.B) { runUnmarshal(b, ss, data, segmentio.Unmarshal) })
 }
 
 // BenchmarkOdjsonVsSonicStd puts an unchanged encoding/json/v2 call site
