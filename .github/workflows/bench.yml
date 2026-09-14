@@ -60,14 +60,25 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends librsvg2-bin
 
-      # Only the three libraries the chart draws, which keeps the run to a few
-      # minutes. -count 5 is what the median is taken over.
+      # Only the libraries the chart draws, and only where it draws them:
+      # every row but odjson's own comes from plain, easyjson or gojay, so gen
+      # runs json/v2 alone. The chart refuses to draw with a row missing, so
+      # every codec it names has to be in this list. -count 5 is what the
+      # median is taken over.
       - name: run the benchmarks
         working-directory: bench
         run: |
-          go test -run '^$' -benchmem -count 5 \
-            -bench '/^(json-v2|sonic|go-json)$/' \
-            ./plain ./gen | tee "$RUNNER_TEMP/bench.txt"
+          {
+            go test -run '^$' -benchmem -count 5 \
+              -bench '/^(json-v2|sonic|go-json|json-iterator|segmentio|jettison|simdjson-go)$/' \
+              ./plain
+            go test -run '^$' -benchmem -count 5 \
+              -bench '/^json-v2$/' \
+              ./gen
+            go test -run '^$' -benchmem -count 5 \
+              -bench '/^(easyjson|gojay)$/' \
+              ./easyjson ./gojay
+          } | tee "$RUNNER_TEMP/bench.txt"
 
       - name: render the chart
         working-directory: bench
