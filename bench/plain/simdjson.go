@@ -22,7 +22,10 @@ import (
 // target value is still a fresh zero value on every call.
 var simdjsonPool sync.Pool
 
-func simdjsonUnmarshal(data []byte, v any) error {
+// SimdjsonUnmarshal decodes data into v, which must be a *TwitterStruct or a
+// *Book, by walking simdjson-go's tape; it is exported so bench/shapes can
+// measure the same walk on its reference rows.
+func SimdjsonUnmarshal(data []byte, v any) error {
 	reuse, _ := simdjsonPool.Get().(*simdjson.ParsedJson)
 	pj, err := simdjson.Parse(data, reuse)
 	if err != nil {

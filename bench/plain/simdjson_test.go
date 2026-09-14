@@ -16,5 +16,5 @@ func TestSimdjsonParity(t *testing.T) {
 		t.Skip("simdjson-go needs AVX2 and CLMUL")
 	}
 	ps := harness.Load(t, func() any { return new(TwitterStruct) }, func() any { return new(Book) })
-	harness.Parity(t, ps, nil, simdjsonUnmarshal)
+	harness.Parity(t, ps, nil, SimdjsonUnmarshal)
 }

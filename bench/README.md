@@ -247,17 +247,39 @@ provenance is less clear than `twitter.json`'s. Fetch them from
 `miloyip/nativejson-benchmark`'s `data/` directory and point the variable at
 it.
 
+The other libraries run over the same shapes too, as the baselines they are
+in the tables above, so the comparison against them can be read past the
+three payloads. Each is measured on the declaration that carries its code,
+which the `side=` key names:
+
+| `lib=` | `side=` | shapes |
+| --- | --- | --- |
+| `encoding-json`, `json-v2`, `sonic`, `go-json` | `gen` and `plain` | all: the hosts, and the ratio between the two sides is what the package is about |
+| `sonic-std`, `json-iterator`, `segmentio`, `jettison` (Marshal only), `sonnet` | `plain` | all: reflection, as they ship |
+| `simdjson-go` (Unmarshal only) | `plain` | `twitter`, `small`, `twitter-compact`: the hand-written walk in `plain/simdjson.go` knows those two types |
+| `easyjson` | `easyjson` | all but `array-items` and `map-items`: `shapes/easyjson` is `plain/types.go` with easyjson's generated code, and easyjson generates for struct types only |
+| `gojay` | `gojay` | `twitter`, `small`, `twitter-compact`: the hand-written codec in `bench/gojay` |
+
+A row a library cannot run skips with the reason, so a missing cell in a
+`benchstat` table is never silent. `TestShapes` holds every baseline to
+`encoding/json`'s reading of the plain value on every shape, the way
+`TestParity` does in `easyjson/` and `gojay/`.
+
 ```sh
 cd bench
-go test -run TestShapes -v ./shapes/                 # every shape, its size and what it varies
+go test -run TestShapes -v ./shapes/                 # every shape, its size, what it varies, and which rows skip
 go test -run '^$' -bench . -benchmem -count 6 ./shapes/ > shapes.txt
-benchstat -col /side -row .name,/shape,/lib shapes.txt
+benchstat -col /side -row .name,/shape,/lib shapes.txt                                       # gen against plain, per host
+benchstat -filter '-/side:gen OR /lib:json-v2' -col /lib,/side -row .name,/shape shapes.txt  # every library on its own declaration
 ```
 
 The benchmark names carry `shape=`, `lib=` and `side=` keys so `benchstat`
 can pivot on them: `-col /side` puts gen and plain side by side with the
-ratio between them. What the shapes found is recorded in
-[`docs/internals.md`](../docs/internals.md#what-the-other-shapes-say).
+ratio between them, and the second form drops the hosts' `gen` rows but
+json/v2's, so it reads one column per library with odjson's own column
+(`json-v2` / `gen`) among them. What the shapes found is recorded in
+[`docs/internals.md`](../docs/internals.md#what-the-other-shapes-say), and
+the baselines' table under "The other libraries on the shapes" there.
 
 ## `floor`
 

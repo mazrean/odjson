@@ -93,7 +93,7 @@ var codecs = []codec{
 		// (see simdjson.go), so it does the same job as every other
 		// Unmarshal row; the parse alone would be a different measurement.
 		name:      "simdjson-go",
-		unmarshal: simdjsonUnmarshal,
+		unmarshal: SimdjsonUnmarshal,
 		skip: func() string {
 			if !simdjson.SupportedCPU() {
 				return "simdjson-go needs AVX2 and CLMUL"
