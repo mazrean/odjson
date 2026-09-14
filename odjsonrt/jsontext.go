@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json/jsontext"
+	"os"
 	"strconv"
 	"sync"
 	"unicode/utf8"
@@ -284,8 +285,21 @@ func PutStringCache(c *StringCache) {
 		// tail back; nothing reachable points into it.
 		c.slab.free, c.slab.reserved = c.slab.reserved, nil
 	}
+	if coldTable {
+		// EXPERIMENT ONLY (not for merge): drop the intern table so that
+		// every decode starts with a cold one, which is what a workload of
+		// distinct documents sees. The slab, the scratch and the boxes are
+		// left alone: they carry no cross-decode state worth speaking of.
+		clear(c.s[:])
+		clear(c.valid[:])
+	}
 	stringCachePool.Put(c)
 }
+
+// coldTable is the experiment switch, read once at init so that the cost on
+// the path is one load of a package variable per decode.
+var coldTable = os.Getenv("ODJSON_COLD_TABLE") != ""
+
 
 // Make returns b as a string, reusing an earlier result when the cache holds
 // an equal string. A nil cache simply allocates.
