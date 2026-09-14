@@ -27,6 +27,17 @@ Files and their upstream sources
     Copied unmodified except for the package clause, which was changed from
     `package testdata` to `package plain`.
 
+  bench/gen/twitter.go, bench/gen/small.go
+  bench/gojay/twitter.go, bench/gojay/small.go
+    Further copies of the two files above, unmodified except for the package
+    clause (`package gen`, `package gojay`).
+
+  bench/easyjson/twitter.go, bench/easyjson/small.go
+    Further copies, with the package clause changed to `package easyjson` and,
+    in small.go only, the two `// easyjson:skip` comment lines removed: sonic
+    carries them to keep easyjson out of its own benchmark, and this package
+    exists to put easyjson in.
+
   bench/testdata/medium.json
     https://github.com/bytedance/sonic/blob/v1.15.4/decoder/testdata_test.go
     The body of that file's `TwitterJson` string constant, which sonic's own

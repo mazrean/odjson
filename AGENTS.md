@@ -60,6 +60,29 @@ weaker method per row. The decodes are 1.34x / 1.69x / 1.76x (1.41x / 1.71x
 `bench/shapes` on 2026-09-13 at `7d57f14`; re-measure before restating any
 of it.
 
+Six more libraries sit in the tables and the chart as **baselines only**,
+added 2026-09-14: `json-iterator/go` (as
+`ConfigCompatibleWithStandardLibrary`), `segmentio/encoding/json` and
+`wI2L/jettison` (encode only) honour the v1 interfaces, so they are hosts —
+`bench/gen` and `bench/ab` carry rows for them so that
+`TestGeneratedMatchesReflection` proves the routing — but the chart and the
+tables show them as they ship, from `bench/plain`, like sonic and go-json.
+`mailru/easyjson` and `francoispqt/gojay` are code generators and get a
+package each, `bench/easyjson` (easyjson's own generator, run by `go
+generate`, with `-no_std_marshalers`) and `bench/gojay` (hand-written,
+because gojay's generator rejects `interface{}` fields); `minio/simdjson-go`
+parses into a tape and has no struct decoder, so `bench/plain/simdjson.go`
+walks the tape into the types by hand, and the row is that parse plus that
+walk, not the parse alone. Each of the three hand-written or foreign-generated
+codecs has a parity test against `encoding/json`; keep it green before
+quoting the row. None of the six is a target: nothing in odjson is tuned
+against them, and a "with odjson" column for any of them stays out.
+`sugawarayuuta/sonnet` is measured too (rows in `plain`, `gen` and `ab`)
+but **deliberately kept out of the chart and the tables**: it lands
+mid-pack among the reflection libraries on every row, so a row for it adds
+height without adding a point. Its figures are in `docs/internals.md`; do
+not add it to the chart without a reason that was not true on 2026-09-14.
+
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,
 because their parity oracle is `encoding/json` v1, which folds case.
@@ -135,7 +158,7 @@ Three Go modules:
 | Path       | Module                            | Purpose                                        |
 | ---------- | --------------------------------- | ---------------------------------------------- |
 | `.` (root) | `github.com/mazrean/odjson`       | `package main` — the `odjson` CLI + `odjsonrt` |
-| `bench/`   | `github.com/mazrean/odjson/bench` | Benchmarks against the four JSON libraries     |
+| `bench/`   | `github.com/mazrean/odjson/bench` | Benchmarks against the comparison libraries    |
 | `tools/`   | `github.com/mazrean/odjson/tools` | `lint` and `apicompat` (see Tooling)           |
 
 Both nested modules exist to keep dependencies **out of the root module's
@@ -200,8 +223,9 @@ Within the root module:
 Every fixture's generated file is committed, and `internal/generate`'s tests
 regenerate each one and fail on any difference. Regenerate with
 `go generate ./...` from the repo root (and again from `bench/` — a separate
-module, whose `gen` and `shapes/gen` packages both carry a directive) whenever
-the generator changes.
+module, whose `gen` and `shapes/gen` packages both carry a directive, and
+whose `easyjson` package carries one that runs easyjson's generator instead)
+whenever the generator changes.
 - `docs/internals.md` — the measurement record and the implementation detail
   behind `README.md`'s summary: the public API ceiling, the direct path, what
   the decode side pays, the v1/v2 semantics table, and why sonic and go-json
@@ -298,7 +322,8 @@ Four workflows, all under `.github/workflows/`:
 
 - `ci.yml` — build, test, lint, the `apicompat` gate, and a compile-only pass
   over the `bench/` module.
-- `bench.yml` — runs `bench/plain` and `bench/gen` on the PR head, renders the
+- `bench.yml` — runs `bench/plain`, `bench/gen`, `bench/easyjson` and
+  `bench/gojay` on the PR head, renders the
   README's chart from those numbers (`go run ./chart -input …`), and comments
   the image on the PR. **Those numbers are not the README's**: a shared
   two-core runner is much noisier than the machine `README.md` and

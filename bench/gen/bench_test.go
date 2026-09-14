@@ -12,10 +12,22 @@ import (
 
 	"github.com/bytedance/sonic"
 	gojson "github.com/goccy/go-json"
+	jsoniter "github.com/json-iterator/go"
+	segmentio "github.com/segmentio/encoding/json"
+	"github.com/sugawarayuuta/sonnet"
+	"github.com/wI2L/jettison"
 )
 
 // codec is one of the host JSON libraries under test. Every library is driven
 // through the same `any`-based signature so the benchmark table stays uniform.
+// A library that only does one direction leaves the other side nil, and the
+// tests and benchmarks skip that side rather than fail on it.
+//
+// Every library here honours json.Marshaler / json.Unmarshaler, so every row
+// reaches the generated codec; TestGeneratedMatchesReflection checks that it
+// does. easyjson, gojay and simdjson-go do not — they have entry points of
+// their own — so they have no row here and are measured in their own
+// packages instead.
 type codec struct {
 	name      string
 	marshal   func(any) ([]byte, error)
@@ -59,6 +71,26 @@ var codecs = []codec{
 		name:      "sonic-std",
 		marshal:   sonic.ConfigStd.Marshal,
 		unmarshal: sonic.ConfigStd.Unmarshal,
+	},
+	{
+		name:      "json-iterator",
+		marshal:   jsoniter.ConfigCompatibleWithStandardLibrary.Marshal,
+		unmarshal: jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal,
+	},
+	{
+		name:      "segmentio",
+		marshal:   segmentio.Marshal,
+		unmarshal: segmentio.Unmarshal,
+	},
+	{
+		// jettison is an encoder only; it has no Unmarshal.
+		name:    "jettison",
+		marshal: jettison.Marshal,
+	},
+	{
+		name:      "sonnet",
+		marshal:   sonnet.Marshal,
+		unmarshal: sonnet.Unmarshal,
 	},
 }
 
@@ -194,8 +226,9 @@ func TestGeneratedMatchesReflection(t *testing.T) {
 			}
 
 			// odjson's premise: every host library honours the generated
-			// codec. sonic and go-json call MarshalJSON, so their bytes must
-			// equal that method's exactly. encoding/json and encoding/json/v2
+			// codec. sonic, go-json, json-iterator, segmentio, jettison and
+			// sonnet call MarshalJSON, so their bytes must equal that
+			// method's exactly. encoding/json and encoding/json/v2
 			// are both json/v2 on this toolchain and call MarshalJSONTo, which
 			// deliberately follows json/v2's own semantics (nil slices encode
 			// as [], not null), so for those the check is that the value
@@ -270,6 +303,17 @@ func TestPayloadsRoundTrip(t *testing.T) {
 
 			for _, c := range codecs {
 				t.Run(c.name, func(t *testing.T) {
+					if c.unmarshal == nil {
+						out, err := c.marshal(p.decoded)
+						if err != nil {
+							t.Fatalf("marshal: %v", err)
+						}
+						if err := jsonv1.Unmarshal(out, p.newValue()); err != nil {
+							t.Fatalf("encoding/json cannot read the output back: %v", err)
+						}
+						return
+					}
+
 					v := p.newValue()
 					if err := c.unmarshal(p.data, v); err != nil {
 						t.Fatalf("unmarshal: %v", err)
@@ -295,6 +339,9 @@ func BenchmarkMarshal(b *testing.B) {
 	ps := payloads(b)
 
 	for _, c := range codecs {
+		if c.marshal == nil {
+			continue
+		}
 		b.Run(c.name, func(b *testing.B) {
 			for _, p := range ps {
 				b.Run(p.name, func(b *testing.B) {
@@ -323,6 +370,9 @@ func BenchmarkUnmarshal(b *testing.B) {
 	ps := payloads(b)
 
 	for _, c := range codecs {
+		if c.unmarshal == nil {
+			continue
+		}
 		b.Run(c.name, func(b *testing.B) {
 			for _, p := range ps {
 				b.Run(p.name, func(b *testing.B) {

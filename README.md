@@ -16,10 +16,12 @@ Deleting the generated file (`odjson_gen.go`) puts everything back to plain `enc
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bench-dark.svg">
-  <img alt="Time per operation, lower is better. Marshal large: encoding/json/v2 401 µs, with odjson 95 µs, sonic 117 µs, go-json 251 µs. Marshal medium: 12259 ns, with odjson 2790 ns, sonic 3606 ns, go-json 4571 ns. Marshal small: 1033 ns, with odjson 255 ns, sonic 323 ns, go-json 402 ns. Unmarshal large: 1100 µs, with odjson 376 µs, sonic 505 µs, go-json 662 µs. Unmarshal medium: 22222 ns, with odjson 8263 ns, sonic 13941 ns, go-json 14991 ns. Unmarshal small: 1853 ns, with odjson 547 ns, sonic 964 ns, go-json 788 ns." src="./docs/assets/bench-light.svg" width="912">
+  <img alt="Time per operation, lower is better. Marshal large: encoding/json/v2 401 µs, with odjson 95 µs, sonic 117 µs, go-json 251 µs, json-iterator 405 µs, segmentio/encoding 217 µs, jettison 298 µs, easyjson 433 µs, gojay 395 µs. Marshal medium: 12259 ns, with odjson 2790 ns, sonic 3606 ns, go-json 4571 ns, json-iterator 9011 ns, segmentio/encoding 4721 ns, jettison 7817 ns, easyjson 9787 ns, gojay 17719 ns. Marshal small: 1033 ns, with odjson 255 ns, sonic 323 ns, go-json 402 ns, json-iterator 537 ns, segmentio/encoding 379 ns, jettison 464 ns, easyjson 660 ns, gojay 636 ns. Unmarshal large: 1100 µs, with odjson 376 µs, sonic 505 µs, go-json 662 µs, json-iterator 1064 µs, segmentio/encoding 837 µs, simdjson-go 607 µs, easyjson 1086 µs, gojay 2570 µs. Unmarshal medium: 22222 ns, with odjson 8263 ns, sonic 13941 ns, go-json 14991 ns, json-iterator 21630 ns, segmentio/encoding 16306 ns, simdjson-go 30207 ns, easyjson 18376 ns, gojay 25770 ns. Unmarshal small: 1853 ns, with odjson 547 ns, sonic 964 ns, go-json 788 ns, json-iterator 1113 ns, segmentio/encoding 1108 ns, simdjson-go 1572 ns, easyjson 1158 ns, gojay 1069 ns." src="./docs/assets/bench-light.svg" width="912">
 </picture>
 
 The benchmarks measure **2.7×–4.4× over `encoding/json/v2`** on encode and decode alike, across the three payload sizes sonic's own benchmarks use. They also put odjson ahead of [`goccy/go-json`](https://github.com/goccy/go-json) on every measurement, by 1.4×–2.6×, and ahead of [`bytedance/sonic`](https://github.com/bytedance/sonic) — which JIT-compiles hand-written assembly and uses SIMD — on all six: 1.34×, 1.69× and 1.76× on the three decodes, and 1.2×–1.3× on the three encodes — the tables below read 1.23×, 1.29× and 1.27×, a second method ([`bench/ab`](./bench/ab), one process) reads 1.19×, 1.47× and 1.23×, so the margin is real either way. The encodes were level with sonic until September 2026, when the string writer stopped scanning and copying in two passes; see [docs/internals.md](./docs/internals.md).
+
+The other six rows — [`json-iterator/go`](https://github.com/json-iterator/go), [`segmentio/encoding`](https://github.com/segmentio/encoding), [`jettison`](https://github.com/wI2L/jettison), [`simdjson-go`](https://github.com/minio/simdjson-go), [`easyjson`](https://github.com/mailru/easyjson) and [`gojay`](https://github.com/francoispqt/gojay) — are baselines, measured as they ship; easyjson and gojay are code generators like odjson and carry their own generated (easyjson) or hand-written (gojay) code, and simdjson-go's row includes a hand-written walk of its tape into the struct, so that every decode row does the same job. odjson is ahead of each of them on every row it has, by 1.5×–6.6× in the same run; the narrowest are segmentio's small encode (1.47×) and simdjson-go's large decode (1.53×).
 
 <details>
 <summary>Benchmark environment and how to reproduce it</summary>
@@ -32,7 +34,9 @@ The chart's figures come from the command below, with `benchstat` taking the med
 
 ```sh
 cd bench
-go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(json-v2|go-json|sonic)/' -benchmem -count 10 ./gen/ ./plain/
+go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(json-v2|go-json|sonic|json-iterator|segmentio|jettison|simdjson-go)/' -benchmem -count 10 ./plain/
+go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/json-v2/' -benchmem -count 10 ./gen/
+go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(easyjson|gojay)/' -benchmem -count 10 ./easyjson/ ./gojay/
 ```
 
 ### Environment
@@ -42,13 +46,15 @@ go test -run xxx -bench 'Benchmark(Marshal|Unmarshal)/(json-v2|go-json|sonic)/' 
 | CPU | AMD Ryzen 9 7950X |
 | OS | Linux (WSL2) |
 | Go | 1.27.1 |
-| Method | `bench/gen` and `bench/plain` each run 10 times; the median is quoted |
+| Method | `bench/plain`, `bench/gen`, `bench/easyjson` and `bench/gojay` each run 10 times; the median is quoted |
 | Variance | measured with [`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) |
 
 ### What is measured
 
-Four subjects: `encoding/json` v1, `encoding/json/v2`, `sonic` and `goccy/go-json`. The benchmark names are `BenchmarkMarshal/<library>/<input>` and `BenchmarkUnmarshal/<library>/<input>`; the `large` input is the benchmarks' `twitter`.
+Ten subjects: `encoding/json` v1, `encoding/json/v2`, [`sonic`](https://github.com/bytedance/sonic), [`goccy/go-json`](https://github.com/goccy/go-json), [`json-iterator/go`](https://github.com/json-iterator/go) (as `ConfigCompatibleWithStandardLibrary`), [`segmentio/encoding`](https://github.com/segmentio/encoding), [`jettison`](https://github.com/wI2L/jettison) (encode only), [`simdjson-go`](https://github.com/minio/simdjson-go) (decode only), [`easyjson`](https://github.com/mailru/easyjson) and [`gojay`](https://github.com/francoispqt/gojay). The benchmark names are `BenchmarkMarshal/<library>/<input>` and `BenchmarkUnmarshal/<library>/<input>`; the `large` input is the benchmarks' `twitter`.
 All three inputs are the ones [`bytedance/sonic`](https://github.com/bytedance/sonic)'s own benchmarks use.
+
+Every library but odjson is measured as it ships, with two qualifications. easyjson and gojay are code generators like odjson, so their rows carry their own generated code — easyjson's from its generator, gojay's written by hand, because its generator rejects the `interface{}` fields these types have. simdjson-go parses into a tape and has no struct decoder, so its row is that parse plus a hand-written walk of the tape into the struct, the same job as the other decode rows rather than the parse alone. Each of those three has a parity test against `encoding/json` in [`bench/`](./bench).
 
 | Input | Size | Go type | Content |
 | --- | ---: | --- | --- |
