@@ -50,9 +50,12 @@ type row struct {
 	module, codec string
 }
 
-// A panel is one benchmark: four libraries on a scale of their own. The
+// A panel is one benchmark: the libraries on a scale of their own. The
 // panels are drawn in two columns, Marshal on the left and Unmarshal on the
 // right, so the slice lists every Marshal panel and then every Unmarshal one.
+// The two sides do not carry the same rows — jettison only encodes and
+// simdjson-go only decodes — so a panel's height is its own, and the two
+// panels that share a grid row take the taller one's.
 type panel struct {
 	title string
 	sub   string
@@ -65,6 +68,12 @@ type panel struct {
 	payload string
 }
 
+// The rows are in one fixed order: the baseline and odjson under it, then the
+// reflection libraries, then the two other code generators. easyjson's row is
+// its generated code and gojay's is hand-written against its API (its
+// generator rejects interface{} fields); simdjson-go's is a parse plus a
+// hand-written walk of its tape into the struct, so that it does the same job
+// as the other Unmarshal rows. See bench/README.md.
 var panels = []panel{
 	{
 		title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "4.22", payload: "twitter",
@@ -73,6 +82,11 @@ var panels = []panel{
 			{label: "+ odjson", value: 95, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
 			{label: "sonic", value: 117, module: "plain", codec: "sonic"},
 			{label: "go-json", value: 251, module: "plain", codec: "go-json"},
+			{label: "json-iterator", value: 405, module: "plain", codec: "json-iterator"},
+			{label: "segmentio/encoding", value: 217, module: "plain", codec: "segmentio"},
+			{label: "jettison", value: 298, module: "plain", codec: "jettison"},
+			{label: "easyjson (codegen)", value: 433, module: "easyjson", codec: "easyjson"},
+			{label: "gojay (hand-written)", value: 395, module: "gojay", codec: "gojay"},
 		},
 	},
 	{
@@ -82,6 +96,11 @@ var panels = []panel{
 			{label: "+ odjson", value: 2790, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
 			{label: "sonic", value: 3606, module: "plain", codec: "sonic"},
 			{label: "go-json", value: 4571, module: "plain", codec: "go-json"},
+			{label: "json-iterator", value: 9011, module: "plain", codec: "json-iterator"},
+			{label: "segmentio/encoding", value: 4721, module: "plain", codec: "segmentio"},
+			{label: "jettison", value: 7817, module: "plain", codec: "jettison"},
+			{label: "easyjson (codegen)", value: 9787, module: "easyjson", codec: "easyjson"},
+			{label: "gojay (hand-written)", value: 17719, module: "gojay", codec: "gojay"},
 		},
 	},
 	{
@@ -91,6 +110,11 @@ var panels = []panel{
 			{label: "+ odjson", value: 255, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
 			{label: "sonic", value: 323, module: "plain", codec: "sonic"},
 			{label: "go-json", value: 402, module: "plain", codec: "go-json"},
+			{label: "json-iterator", value: 537, module: "plain", codec: "json-iterator"},
+			{label: "segmentio/encoding", value: 379, module: "plain", codec: "segmentio"},
+			{label: "jettison", value: 464, module: "plain", codec: "jettison"},
+			{label: "easyjson (codegen)", value: 660, module: "easyjson", codec: "easyjson"},
+			{label: "gojay (hand-written)", value: 636, module: "gojay", codec: "gojay"},
 		},
 	},
 	{
@@ -100,6 +124,11 @@ var panels = []panel{
 			{label: "+ odjson", value: 376, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
 			{label: "sonic", value: 505, module: "plain", codec: "sonic"},
 			{label: "go-json", value: 662, module: "plain", codec: "go-json"},
+			{label: "json-iterator", value: 1064, module: "plain", codec: "json-iterator"},
+			{label: "segmentio/encoding", value: 837, module: "plain", codec: "segmentio"},
+			{label: "simdjson-go", value: 607, module: "plain", codec: "simdjson-go"},
+			{label: "easyjson (codegen)", value: 1086, module: "easyjson", codec: "easyjson"},
+			{label: "gojay (hand-written)", value: 2570, module: "gojay", codec: "gojay"},
 		},
 	},
 	{
@@ -109,6 +138,11 @@ var panels = []panel{
 			{label: "+ odjson", value: 8263, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
 			{label: "sonic", value: 13941, module: "plain", codec: "sonic"},
 			{label: "go-json", value: 14991, module: "plain", codec: "go-json"},
+			{label: "json-iterator", value: 21630, module: "plain", codec: "json-iterator"},
+			{label: "segmentio/encoding", value: 16306, module: "plain", codec: "segmentio"},
+			{label: "simdjson-go", value: 30207, module: "plain", codec: "simdjson-go"},
+			{label: "easyjson (codegen)", value: 18376, module: "easyjson", codec: "easyjson"},
+			{label: "gojay (hand-written)", value: 25770, module: "gojay", codec: "gojay"},
 		},
 	},
 	{
@@ -118,6 +152,11 @@ var panels = []panel{
 			{label: "+ odjson", value: 547, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
 			{label: "sonic", value: 964, module: "plain", codec: "sonic"},
 			{label: "go-json", value: 788, module: "plain", codec: "go-json"},
+			{label: "json-iterator", value: 1113, module: "plain", codec: "json-iterator"},
+			{label: "segmentio/encoding", value: 1108, module: "plain", codec: "segmentio"},
+			{label: "simdjson-go", value: 1572, module: "plain", codec: "simdjson-go"},
+			{label: "easyjson (codegen)", value: 1158, module: "easyjson", codec: "easyjson"},
+			{label: "gojay (hand-written)", value: 1069, module: "gojay", codec: "gojay"},
 		},
 	},
 }
@@ -157,7 +196,7 @@ const (
 	panelGapX = 24
 	panelGapY = 26
 
-	labelW = 132 // library names
+	labelW = 150 // library names: the longest, "gojay (hand-written)", is 20 characters of 11px mono
 	valueW = 62  // the direct label after each bar
 	gutter = 10
 	barsW  = panelW - labelW - valueW - 2*gutter
@@ -173,7 +212,7 @@ const (
 
 // readmeFooter describes the machine the literals above were measured on. Any
 // other set of numbers needs its own caption, via -footer.
-const readmeFooter = "Medians of 10 runs · AMD Ryzen 9 7950X · Linux · Go 1.27.1 · bench/plain and bench/gen"
+const readmeFooter = "Medians of 10 runs · AMD Ryzen 9 7950X · Linux · Go 1.27.1 · bench/plain, gen, easyjson and gojay"
 
 func main() {
 	input := flag.String("input", "", "`go test -bench` output to take the numbers from; the README's literals are used when empty")
@@ -227,22 +266,39 @@ func main() {
 }
 
 // table restates the chart as Markdown. A PNG of the chart carries no alt
-// text, so wherever the image goes this goes with it.
+// text, so wherever the image goes this goes with it. The columns are every
+// label any panel carries, in first-seen order, with an em dash where a panel
+// has no such row: jettison only encodes and simdjson-go only decodes.
 func table(footer string) []byte {
+	var labels []string
+	for _, p := range panels {
+		for _, r := range p.rows {
+			if !slices.Contains(labels, r.label) {
+				labels = append(labels, r.label)
+			}
+		}
+	}
+
 	var b bytes.Buffer
 	b.WriteString("| Benchmark |")
-	for _, r := range panels[0].rows {
-		fmt.Fprintf(&b, " %s |", r.label)
+	for _, l := range labels {
+		fmt.Fprintf(&b, " %s |", l)
 	}
 	b.WriteString("\n| --- |")
-	for range panels[0].rows {
+	for range labels {
 		b.WriteString(" ---: |")
 	}
 	b.WriteByte('\n')
 
 	for _, p := range panels {
 		fmt.Fprintf(&b, "| %s · %s |", p.title, p.sub)
-		for _, r := range p.rows {
+		for _, l := range labels {
+			i := slices.IndexFunc(p.rows, func(r row) bool { return r.label == l })
+			if i < 0 {
+				b.WriteString(" — |")
+				continue
+			}
+			r := p.rows[i]
 			if r.odjson {
 				fmt.Fprintf(&b, " **%s %s** (%s×) |", fmtVal(r.value), p.unit, p.ratio)
 				continue
@@ -280,10 +336,28 @@ func perColumn() int {
 	return (len(panels) + 1) / 2
 }
 
-func render(t theme, footer string) []byte {
-	panelH := titleH + rowH*len(panels[0].rows)
+// gridRows lays the panels out: the height of each grid row, which is the
+// taller of the two panels sharing it, and the y offset each starts at.
+func gridRows() (heights, tops []int) {
 	rows := perColumn()
-	svgH := headerH + rows*panelH + (rows-1)*panelGapY + footerH
+	heights = make([]int, rows)
+	tops = make([]int, rows)
+	for i, p := range panels {
+		r := i % rows
+		heights[r] = max(heights[r], titleH+rowH*len(p.rows))
+	}
+	y := headerH
+	for r := range rows {
+		tops[r] = y
+		y += heights[r] + panelGapY
+	}
+	return heights, tops
+}
+
+func render(t theme, footer string) []byte {
+	heights, tops := gridRows()
+	rows := perColumn()
+	svgH := tops[rows-1] + heights[rows-1] + footerH
 
 	var b bytes.Buffer
 	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-label="%s">`,
@@ -296,11 +370,11 @@ text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,san
 	fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="%s"/>`, svgW, svgH, t.surface)
 
 	fmt.Fprintf(&b, `<text class="t1" x="%d" y="26" font-size="16" font-weight="600">encoding/json/v2, with and without odjson</text>`, padX)
-	fmt.Fprintf(&b, `<text class="t2" x="%d" y="46" font-size="12">Time per operation — lower is better. Each panel has its own scale.</text>`, padX)
+	fmt.Fprintf(&b, `<text class="t2" x="%d" y="46" font-size="12">Time per operation — lower is better. Each panel has its own scale. The other libraries are baselines, as they ship.</text>`, padX)
 
 	for i, p := range panels {
 		x := padX + (i/rows)*(panelW+panelGapX)
-		y := headerH + (i%rows)*(panelH+panelGapY)
+		y := tops[i%rows]
 		drawPanel(&b, t, p, x, y)
 	}
 
