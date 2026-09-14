@@ -1738,7 +1738,7 @@ kept their earlier figures; how they came back is the drift to read the new
 rows against. `json/v2`'s reflection reproduced within 4% on all six
 (398 µs / 12.16 µs / 1.01 µs and 1.059 ms / 21.7 µs / 1.86 µs), sonic's and
 go-json's `twitter` and `medium` rows within 3%, and odjson's `json/v2`
-encodes within 3% (95.1 µs / 2.69 µs / 259 ns) — but odjson's `medium` and
+encodes within 4% (95.1 µs / 2.69 µs / 259 ns) — but odjson's `medium` and
 `small` decodes came back 8–9% slower (8.92 µs and 596 ns against 8.26 µs
 and 547 ns, with `twitter` at 396 µs, 5%), and so did sonic's `small` decode
 (1.04 µs against 964 ns, its known second mode) while its and go-json's
