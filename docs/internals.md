@@ -28,6 +28,11 @@ rows are here rather than in the chart, which is about the `json/v2` story.
 | **encoding/json** | 410 µs | **115 µs** | **3.58× faster** |
 | sonic | 117 µs | — | |
 | go-json | 251 µs | — | |
+| json-iterator | 405 µs | — | |
+| segmentio | 217 µs | — | |
+| jettison | 298 µs | — | |
+| easyjson | 433 µs | — | |
+| gojay | 395 µs | — | |
 
 | Marshal `medium` | on its own | with odjson | change |
 | --- | --- | --- | --- |
@@ -35,6 +40,11 @@ rows are here rather than in the chart, which is about the `json/v2` story.
 | **encoding/json** | 12.21 µs | **3.29 µs** | **3.71× faster** |
 | sonic | 3.61 µs | — | |
 | go-json | 4.57 µs | — | |
+| json-iterator | 9.01 µs | — | |
+| segmentio | 4.72 µs | — | |
+| jettison | 7.82 µs | — | |
+| easyjson | 9.79 µs | — | |
+| gojay | 17.72 µs | — | |
 
 | Marshal `small` | on its own | with odjson | change |
 | --- | --- | --- | --- |
@@ -42,6 +52,11 @@ rows are here rather than in the chart, which is about the `json/v2` story.
 | **encoding/json** | 1.047 µs | **276 ns** | **3.80× faster** |
 | sonic | 323 ns | — | |
 | go-json | 402 ns | — | |
+| json-iterator | 537 ns | — | |
+| segmentio | 379 ns | — | |
+| jettison | 464 ns | — | |
+| easyjson | 660 ns | — | |
+| gojay | 636 ns | — | |
 
 | Unmarshal `twitter` | on its own | with odjson | change |
 | --- | --- | --- | --- |
@@ -49,6 +64,11 @@ rows are here rather than in the chart, which is about the `json/v2` story.
 | **encoding/json** | 1.457 ms | **1.147 ms** | **1.27× faster** |
 | sonic | 505 µs | — | |
 | go-json | 662 µs | — | |
+| json-iterator | 1.064 ms | — | |
+| segmentio | 837 µs | — | |
+| simdjson-go | 607 µs | — | |
+| easyjson | 1.086 ms | — | |
+| gojay | 2.570 ms | — | |
 
 | Unmarshal `medium` | on its own | with odjson | change |
 | --- | --- | --- | --- |
@@ -56,6 +76,11 @@ rows are here rather than in the chart, which is about the `json/v2` story.
 | **encoding/json** | 28.99 µs | **24.35 µs** | **1.19× faster** |
 | sonic | 13.94 µs | — | |
 | go-json | 14.99 µs | — | |
+| json-iterator | 21.63 µs | — | |
+| segmentio | 16.31 µs | — | |
+| simdjson-go | 30.21 µs | — | |
+| easyjson | 18.38 µs | — | |
+| gojay | 25.77 µs | — | |
 
 | Unmarshal `small` | on its own | with odjson | change |
 | --- | --- | --- | --- |
@@ -63,6 +88,21 @@ rows are here rather than in the chart, which is about the `json/v2` story.
 | **encoding/json** | 2.287 µs | **1.412 µs** | **1.62× faster** |
 | sonic | 964 ns | — | |
 | go-json | 788 ns | — | |
+| json-iterator | 1.113 µs | — | |
+| segmentio | 1.108 µs | — | |
+| simdjson-go | 1.572 µs | — | |
+| easyjson | 1.158 µs | — | |
+| gojay | 1.069 µs | — | |
+
+The last five rows of each table — json-iterator (as
+`ConfigCompatibleWithStandardLibrary`), segmentio/encoding, jettison (an
+encoder only), simdjson-go (a parser only, plus the hand-written walk of its
+tape into the struct that `bench/plain/simdjson.go` is), easyjson (its
+generated code) and gojay (hand-written against its API, since its generator
+rejects `interface{}` fields) — were added on 2026-09-14 and come from a
+separate run on the same machine, of the tree that added them; see
+"Measurement notes" for how the rows above reproduced in that run. They are
+baselines: nothing in odjson is tuned against them.
 
 `medium` is the 13 KiB document sonic's README benchmarks under that name:
 `twitter.json`'s shape at four statuses instead of a hundred, decoded into
@@ -120,6 +160,37 @@ and 1.08× / 1.05× in `ab`, which was the honest reading of "level".
 `sonic.Marshal`'s default configuration neither escapes HTML nor validates
 UTF-8, so its encode rows are not doing equal work; `sonic.ConfigStd`, which
 does both, measures 136 µs, 3.61 µs and 370 ns, and its `twitter` decode 591 µs.
+
+Against the six baselines added on 2026-09-14, in that run's own process
+(where odjson's `json/v2` rows read 95.1 µs / 2.69 µs / 259 ns on the encodes
+and 396 µs / 8.92 µs / 596 ns on the decodes — the run is described under
+"Measurement notes"):
+
+| `twitter` / `medium` / `small` | Marshal | Unmarshal |
+| --- | --- | --- |
+| vs json-iterator | 4.26× / 3.35× / 2.08× | 2.68× / 2.43× / 1.87× |
+| vs segmentio/encoding | 2.28× / 1.75× / **1.47×** | 2.11× / 1.83× / 1.86× |
+| vs jettison | 3.14× / 2.90× / 1.80× | — |
+| vs simdjson-go | — | **1.53×** / 3.39× / 2.63× |
+| vs easyjson | 4.55× / 3.63× / 2.55× | 2.74× / 2.06× / 1.94× |
+| vs gojay | 4.16× / 6.58× / 2.46× | 6.48× / 2.89× / 1.79× |
+
+Ahead on every row, the narrowest being segmentio's `small` encode and
+simdjson-go's `twitter` decode. Two of these deserve a word. easyjson is the
+comparison that is like for like — a code generator attaching dedicated
+methods to the same types — and it lands at or behind `encoding/json/v2`'s
+reflection on this toolchain (433 vs 398 µs on the `twitter` encode, with
+3,117 allocations to json/v2's 466, since its writer grows a chunk list),
+which is a statement about how far json/v2's reflection has come rather than
+about easyjson. simdjson-go's SIMD front end is the fastest way to find the
+structure of `twitter.json`, but the row has to build the struct too, and the
+walk from its tape — string materialisation, `interface{}` conversion for the
+untyped members — costs more than the parse saves: 607 µs against odjson's
+396, and on `small`, where there is no structure to find, the per-call cost
+of a tape puts it last at 1.57 µs. gojay's `twitter` decode, 2.57 ms, is what
+its `interface{}` handling costs — it hands each such member to
+`encoding/json` — and the fourteen such fields in these types are the
+document's `null`s and its `user_mentions` objects.
 
 **On sonic's small decode**, which looks slow next to go-json's: it is real,
 and it is not an artefact of how this suite measures. sonic v1.15.3 on Go 1.27
@@ -677,6 +748,25 @@ under both. They are in the README as the **yardstick**, not as targets:
 odjson does not make them faster, and the reason is arithmetic rather than
 tuning, which is why their "with odjson" columns are absent from the
 benchmark tables rather than merely unflattering.
+
+The same holds for the three hosts added on 2026-09-14. json-iterator,
+segmentio/encoding and jettison honour the v1 interfaces, so
+`TestGeneratedMatchesReflection` in `bench/gen` proves the generated bytes
+reach them unchanged, and `bench/ab` measures each with and without the
+generated methods in one process (`-count 5`, that run): json-iterator's
+`twitter` encode is 2.48× faster with odjson attached (169 vs 420 µs — it
+writes a marshaler's bytes without re-scanning them) and its `small` encode
+1.56×, but its decodes are 1.2× slower on all three payloads; segmentio's
+decodes are 1.2× / 1.2× / 1.35× faster with odjson and its encodes 2.9×–3.2×
+slower on `twitter` and `small`, since it re-parses what a marshaler returns;
+jettison's encodes are 2.5×–2.8× slower for the same reason. Their `medium`
+encodes over generated types read worse still (2.9×, 11.5× and 7.7×), and
+that is an artefact worth knowing about: `bench/ab` runs `twitter` before
+`medium` in one process, and `odjsonrt.SizeHint` remembers the largest
+encoding a type has produced, so every `medium` `MarshalJSON` after that
+allocates a `twitter`-sized buffer (305 KB/op against 9.5 KB). None of this
+moves the positioning: like sonic and go-json, these three stay as they ship
+in the tables, and no "with odjson" column is added for them.
 
 `bench/floor` measures what a library charges for routing through those
 interfaces at all: its marshaler returns an already encoded document and its
@@ -1637,7 +1727,27 @@ The measured tables and the ratio tables on this page were re-measured on
 `97c4e84`, the tree after the text round, in the run that added `medium` to
 the suite: `bench/plain` and `bench/gen` at `-count=10` and `bench/ab` at
 `-count=5`, each binary built once and run alone, one after another, on an
-otherwise idle machine. The floor figures, the shapes table and the
+otherwise idle machine.
+
+The six baseline rows added on 2026-09-14 (json-iterator, segmentio,
+jettison, simdjson-go, easyjson, gojay) are a second sitting the same day, on
+the branch that added them, the same way: `bench/plain`, `bench/gen`,
+`bench/easyjson` and `bench/gojay` at `-count=10` and `bench/ab` at
+`-count=5`. The rows already on this page were run again in that sitting and
+kept their earlier figures; how they came back is the drift to read the new
+rows against. `json/v2`'s reflection reproduced within 4% on all six
+(398 µs / 12.16 µs / 1.01 µs and 1.059 ms / 21.7 µs / 1.86 µs), sonic's and
+go-json's `twitter` and `medium` rows within 3%, and odjson's `json/v2`
+encodes within 3% (95.1 µs / 2.69 µs / 259 ns) — but odjson's `medium` and
+`small` decodes came back 8–9% slower (8.92 µs and 596 ns against 8.26 µs
+and 547 ns, with `twitter` at 396 µs, 5%), and so did sonic's `small` decode
+(1.04 µs against 964 ns, its known second mode) while its and go-json's
+`small` encodes came back 5–6% faster. Nothing in `odjsonrt` or the
+generated file changed between the two trees; that is the run-to-run drift
+of this suite, and it is why the ratios against the new rows in "The
+measured tables" are computed within the second sitting rather than across
+the two. The new rows themselves were within ±2.5% by spread but segmentio's
+`twitter` and `medium` encodes (±3.5%). The floor figures, the shapes table and the
 `odjson_safe` figures below are the previous sitting's, 2026-09-13 on
 `7d57f14`: `bench/floor` at `-count=6`, `bench/ab` under `-tags odjson_safe`
 at `-count=5`, and `bench/shapes` at `-count=6` for the two standard
