@@ -13,6 +13,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	simdjson "github.com/minio/simdjson-go"
 	segmentio "github.com/segmentio/encoding/json"
+	"github.com/sugawarayuuta/sonnet"
 	"github.com/wI2L/jettison"
 )
 
@@ -76,6 +77,14 @@ var codecs = []codec{
 		// jettison is an encoder only; it has no Unmarshal.
 		name:    "jettison",
 		marshal: jettison.Marshal,
+	},
+	{
+		// A drop-in for encoding/json written without unsafe. It has no
+		// tagged release; the row is its latest commit (2023-10). Not in the
+		// chart yet: whether it goes there is decided on its numbers.
+		name:      "sonnet",
+		marshal:   sonnet.Marshal,
+		unmarshal: sonnet.Unmarshal,
 	},
 	{
 		// simdjson-go is a parser only, and it parses into a tape rather

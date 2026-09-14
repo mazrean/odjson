@@ -13,6 +13,7 @@ require (
 	github.com/mazrean/odjson v0.0.0-00010101000000-000000000000
 	github.com/minio/simdjson-go v0.4.5
 	github.com/segmentio/encoding v0.5.4
+	github.com/sugawarayuuta/sonnet v0.0.0-20231004000330-239c7b6e4ce8
 	github.com/wI2L/jettison v0.7.4
 )
 

@@ -14,6 +14,7 @@ import (
 	gojson "github.com/goccy/go-json"
 	jsoniter "github.com/json-iterator/go"
 	segmentio "github.com/segmentio/encoding/json"
+	"github.com/sugawarayuuta/sonnet"
 	"github.com/wI2L/jettison"
 )
 
@@ -85,6 +86,11 @@ var codecs = []codec{
 		// jettison is an encoder only; it has no Unmarshal.
 		name:    "jettison",
 		marshal: jettison.Marshal,
+	},
+	{
+		name:      "sonnet",
+		marshal:   sonnet.Marshal,
+		unmarshal: sonnet.Unmarshal,
 	},
 }
 
@@ -220,9 +226,9 @@ func TestGeneratedMatchesReflection(t *testing.T) {
 			}
 
 			// odjson's premise: every host library honours the generated
-			// codec. sonic, go-json, json-iterator, segmentio and jettison
-			// call MarshalJSON, so their bytes must equal that method's
-			// exactly. encoding/json and encoding/json/v2
+			// codec. sonic, go-json, json-iterator, segmentio, jettison and
+			// sonnet call MarshalJSON, so their bytes must equal that
+			// method's exactly. encoding/json and encoding/json/v2
 			// are both json/v2 on this toolchain and call MarshalJSONTo, which
 			// deliberately follows json/v2's own semantics (nil slices encode
 			// as [], not null), so for those the check is that the value
