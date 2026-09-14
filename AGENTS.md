@@ -99,8 +99,10 @@ at `2adac1d`; re-measure before restating any of it. That run is a third
 binary for the sonic encode question above, and it does **not** reproduce
 the `small` margin: odjson's rows are within 3% of `bench/gen`'s, sonic's
 13-15% below `bench/plain`'s, so it reads 1.19x on `twitter` (the hedged
-figure) and 1.03x on `small`. Treat the `small` encode over sonic as level
-until a run explains where sonic's row lands per binary.
+figure) and 1.03x on `small`. GC pacing is a first-order term for both
+(`GOGC=800` moves sonic's encodes -17..-21% and odjson's -13..-19%) but
+does not explain that binary on its own; treat the `small` encode over
+sonic as level until a run does.
 
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,

@@ -884,11 +884,20 @@ here than in `plain` (`twitter` 106.3 µs against 120.0; `small` 267.6 ns
 against 312.8; `ConfigStd` 127 µs / 351 ns against 141 µs / 384 ns). So
 this binary reads the `twitter` encode at 1.19× — the figure the
 positioning already hedges to — and the `small` encode at 1.03×, which no
-figure hedged to. Where sonic's rows land is a property of the binary they
-are linked into, as "Measurement notes" records for `ab`, and the `small`
-encode margin over sonic is the one README claim a third binary does not
-reproduce; the decode rows (1.40× / 1.87× here) and every other library are
-unaffected.
+figure hedged to. The cause is not established. The obvious candidate is
+GC pacing — this binary keeps all 27 decoded documents live, so a cycle
+comes far less often per allocated byte than in `plain`'s — and it is a
+first-order term for both libraries: `GOGC=800` against the default, each
+in its own binary at `-count 10`, moves sonic's `twitter` / `small` encodes
+−21% / −17% (120 → 94.7 µs, 314 → 261 ns), odjson's −19% / −13% (100 →
+80.8 µs, 264 → 230 ns) and `json/v2`'s reflection −6% / −5%. But it does
+not explain this binary on its own: here sonic's rows sit where `plain`'s
+do at `GOGC=800` while odjson's sit where `gen`'s do at the default, and a
+pacing effect would have moved both. What stands is that the GC's share of
+an encode row (13–21% for either library) is larger than the `small`
+margin between them, and that the `small` encode margin over sonic is the
+one README claim a third binary does not reproduce; the decode rows (1.40×
+/ 1.87× here) and every other library are unaffected.
 
 The raw output of the run is not committed; the pivot that produced the
 tables is `benchstat -filter '-/side:gen OR /lib:json-v2' -col /lib,/side
