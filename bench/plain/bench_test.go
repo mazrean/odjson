@@ -80,8 +80,9 @@ var codecs = []codec{
 	},
 	{
 		// A drop-in for encoding/json written without unsafe. It has no
-		// tagged release; the row is its latest commit (2023-10). Not in the
-		// chart yet: whether it goes there is decided on its numbers.
+		// tagged release; the row is its latest commit (2023-10). Measured
+		// but kept out of the chart on purpose: it lands mid-pack among the
+		// reflection libraries and would add a row without adding a point.
 		name:      "sonnet",
 		marshal:   sonnet.Marshal,
 		unmarshal: sonnet.Unmarshal,

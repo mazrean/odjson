@@ -38,7 +38,7 @@ Ten libraries, driven through one uniform table:
 | `segmentio` | `github.com/segmentio/encoding/json` | both |
 | `jettison` | `github.com/wI2L/jettison` | Marshal only: it is an encoder |
 | `simdjson-go` | `github.com/minio/simdjson-go`, plus a hand-written walk of its tape into the struct | Unmarshal only: it is a parser |
-| `sonnet` | `github.com/sugawarayuuta/sonnet` (no tagged release; its latest commit, 2023-10) | both; measured, not yet in the chart |
+| `sonnet` | `github.com/sugawarayuuta/sonnet` (no tagged release; its latest commit, 2023-10) | both; measured, kept out of the chart |
 | `easyjson` | `github.com/mailru/easyjson`, with its generated code | both, in `bench/easyjson` |
 | `gojay` | `github.com/francoispqt/gojay`, with hand-written marshalers | both, in `bench/gojay` |
 
@@ -46,9 +46,11 @@ The first nine are measured as they ship, in `plain`. The last two are code
 generators like odjson, so they need code attached to the types and get a
 package each, the way odjson gets `gen`; see "The other code generators"
 below. A library that does one direction only has no row on the other side,
-in the tables and in the chart alike. `sonnet` is in the tables here but not
-in the chart: it honours the v1 interfaces, so `gen` and `ab` carry it too,
-and whether it earns a chart row is decided on its numbers.
+in the tables and in the chart alike. `sonnet` is measured but deliberately
+not drawn: it honours the v1 interfaces, so `gen` and `ab` carry it too, and
+its numbers put it in the middle of the reflection libraries on every row
+(see `docs/internals.md`), so a chart row for it would say nothing the
+existing rows do not.
 
 Three payloads, the three sizes sonic's own README benchmarks: `twitter`
 (~616 KiB, decoded into `TwitterStruct` — deeply nested, lots of strings and

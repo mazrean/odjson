@@ -192,6 +192,24 @@ its `interface{}` handling costs — it hands each such member to
 `encoding/json` — and the fourteen such fields in these types are the
 document's `null`s and its `user_mentions` objects.
 
+One more library is measured and, on purpose, not drawn:
+`sugawarayuuta/sonnet`, a drop-in for `encoding/json` written without
+`unsafe`, at its latest commit (2023-10; it has no tagged release). In its
+own sitting the same day (`bench/plain` at `-count=10`, with odjson's rows
+in the same run at 100 µs / 2.76 µs / 254 ns and 399 µs / 8.69 µs / 598 ns)
+it encodes `twitter` / `medium` / `small` in 226 µs / 6.25 µs / 726 ns and
+decodes them in 753 µs / 19.0 µs / 1.26 µs (that `medium` decode ±14%, the
+rest within ±5%): between segmentio and go-json on the large encode, behind
+go-json and jettison on the small one, between go-json and segmentio on the
+large decode, behind easyjson and json-iterator on the small one. odjson is
+2.25× / 2.27× / 2.86× ahead on the encodes and 1.89× / 2.19× / 2.11× on the
+decodes, inside the range the six rows above already span, which is why it
+stays out of the chart. As a host it compacts a marshaler's output the way
+segmentio does, so `bench/ab` reads its encodes over generated types 1.4–1.8×
+slower (and its `medium` encode 6×, the `SizeHint` artefact described under
+"The two third-party libraries"), its `medium` decode level and its `small`
+decode 1.29× faster.
+
 **On sonic's small decode**, which looks slow next to go-json's: it is real,
 and it is not an artefact of how this suite measures. sonic v1.15.3 on Go 1.27
 amd64 uses its JIT decoder (`internal/decoder/jitdec`; the `compat` fallback

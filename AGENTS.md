@@ -77,6 +77,11 @@ walk, not the parse alone. Each of the three hand-written or foreign-generated
 codecs has a parity test against `encoding/json`; keep it green before
 quoting the row. None of the six is a target: nothing in odjson is tuned
 against them, and a "with odjson" column for any of them stays out.
+`sugawarayuuta/sonnet` is measured too (rows in `plain`, `gen` and `ab`)
+but **deliberately kept out of the chart and the tables**: it lands
+mid-pack among the reflection libraries on every row, so a row for it adds
+height without adding a point. Its figures are in `docs/internals.md`; do
+not add it to the chart without a reason that was not true on 2026-09-14.
 
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,
