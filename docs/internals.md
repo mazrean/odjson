@@ -1313,6 +1313,17 @@ straight to `odjsonParseV2` with `strict` set. That is the same route
 only the entry point while the gain against `encoding/json` is **a factor of
 three on every payload**.
 
+That factor of three is the largest number `-direct` produces, and it is the
+one to be most careful quoting: it is **not** a free speed-up of an existing
+`encoding/json` call site, because `UnmarshalT` decodes under json/v2's rules.
+A v1 call site that relied on a case-insensitive member match, on a duplicate
+name being accepted, on an array being padded or truncated to fit, or on
+`null` leaving a field untouched will *behave differently*, not merely faster.
+Those are exactly the allowances that keep `UnmarshalJSONFrom` off the direct
+path in the first place — which is to say the 3× and the semantics change are
+the same fact seen from two sides, and `-case-insensitive` does not bridge it.
+See "Which semantics a generated method follows" above.
+
 **The `json/v2` Marshal row above is not like for like, and neither is its
 ordering.** Taken at face value it says `MarshalT` is 17.8% *slower* than
 `json/v2`'s Marshal on `twitter` — which cannot be right, since `MarshalT`
@@ -1389,9 +1400,25 @@ With both removed — identical bytes, one row per process, interleaved,
 
 Never slower, and faster by exactly as much as the entry point is worth
 relative to the document: invisible at 257 KiB, a quarter of the call at 344
-bytes. The decode side of the same package agrees — `twitter` ~ (p=0.065),
-`medium` −2.3%, `small` −20.6% — and those were *not* isolated, so they
-understate rather than flatter.
+bytes. The decode side, given the same treatment:
+
+| | `json/v2` + odjson | `UnmarshalT` | |
+| --- | --- | --- | --- |
+| `twitter` | 400.9 µs ± 1% | 396.9 µs ± 2% | ~ (p=0.240) |
+| `medium` | 8.914 µs ± 1% | **8.722 µs** ± 2% | −2.15% (p=0.002) |
+| `small` | 596.4 ns ± 2% | **471.0 ns** ± 2% | −21.0% (p=0.002) |
+
+Allocation counts are identical on all three (475 / 18 / 6) and the bytes
+differ by 0.2%, which is the decoder's own scratch and not the entry point.
+Reading the saving in nanoseconds rather than per cent is what makes the three
+rows one number: 125 ns on `small`, 192 ns on `medium`, and on `twitter` a
+4 µs difference that a 1–2% spread cannot resolve. **The entry point is a
+constant, so the percentage is really a statement about the document.**
+
+Unlike the encode rows, the decode ones barely move under isolation — in a
+single process they read ~ / −2.3% / −20.6%. Two effects cancel: the heap the
+earlier rows churned costs the later one, and the `json/v2` rows running first
+warm the slab and the string cache that both sides share.
 
 The `bench/gen` tables further up have `odjson-direct` running last too, which
 makes their encode figures against `encoding/json` conservative in the same

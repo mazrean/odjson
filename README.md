@@ -198,10 +198,11 @@ An unexported `T` gets `marshalT` / `appendT` / `unmarshalT`, so the functions a
 
 They call the same generated encoder and parser the methods call, with `encoding/json`'s interface dispatch, option decoding and buffer handover taken out of the way, and they follow `encoding/json/v2`'s semantics — so `-case-insensitive` does not reach them, and under the default `-escape-html` `MarshalT(&v)` is byte for byte what `json.Marshal(&v)` produces.
 
-Two things to weigh:
+Three things to weigh:
 
 - Nothing here goes through [the direct path](docs/internals.md), so the speed also survives `-tags odjson_safe` and a Go release that path has not been verified against yet.
 - A call site written against `MarshalT` no longer compiles once the generated file is deleted. That is the property the default stance protects, and the reason `-direct` is off by default.
+- `UnmarshalT` is ~3× faster than `encoding/json`'s `Unmarshal` ([why](docs/internals.md)), but that is **not** a free speed-up: it decodes under json/v2's rules. A call site that relied on v1 accepting a duplicate name, matching a member name case-insensitively, padding a short array, or leaving a field untouched on `null` will behave differently, not merely faster. Against `encoding/json/v2` there is no such difference — only the call overhead, which is a flat ~120–200 ns and so matters on small values and disappears on large ones.
 
 ## How it works
 
