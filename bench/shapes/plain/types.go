@@ -66,6 +66,148 @@ type Numbers struct {
 	Sci []float64 `json:"sci"`
 }
 
+// Ints, Uints, Floats and Floats32 are one numeric slice each, where Numbers
+// is all six at once. A benchmark shape cannot attribute its time to a
+// spelling when one document carries every spelling, so the characteristic
+// shapes vary the values of one of these instead: how many digits an integer
+// has, how many significant digits a float needs, whether the shortest
+// spelling of a float carries an exponent.
+type Ints struct {
+	Values []int64 `json:"values"`
+}
+
+// Uints is the unsigned counterpart of Ints, so the top of the uint64 range
+// has a shape of its own.
+type Uints struct {
+	Values []uint64 `json:"values"`
+}
+
+// Floats is a slice of float64: the shapes vary the magnitude and the number
+// of significant digits, which is what decides which branch of the formatter
+// and of the parser runs.
+type Floats struct {
+	Values []float64 `json:"values"`
+}
+
+// Floats32 is the float32 counterpart of Floats.
+type Floats32 struct {
+	Values []float32 `json:"values"`
+}
+
+// Bools is an array of the one value a JSON document spells as a keyword
+// rather than as a literal, so a codec's `true`/`false` path is a row of its
+// own.
+type Bools struct {
+	Values []bool `json:"values"`
+}
+
+// Opts is an array half of whose elements are null: the other keyword, and
+// the one that makes a decoder choose between zeroing a pointer and
+// allocating behind it.
+type Opts struct {
+	Values []*int64 `json:"values"`
+}
+
+// Matrix is an array of arrays. A flat array amortises its brackets over
+// every element; a nested one pays for a pair per row, and a decoder pays
+// for a slice per row too.
+type Matrix struct {
+	Values [][]int64 `json:"values"`
+}
+
+// StrMap and IntMap are an object used as a dictionary rather than as a
+// record: the member names are data, so nothing about them is known at
+// compile time and a generated codec has no advantage left to take.
+type StrMap struct {
+	Values map[string]string `json:"values"`
+}
+
+// IntMap is StrMap with integer values.
+type IntMap struct {
+	Values map[string]int64 `json:"values"`
+}
+
+// RecDoc and MapDoc read the very same document: RecDoc as a record, whose
+// member names the generator knows, and MapDoc as a dictionary, whose member
+// names it cannot know. The pair is the whole struct against map question in
+// one measurement.
+type RecDoc struct {
+	Rows []Rec `json:"rows"`
+}
+
+// Rec is sixteen short string members under short names.
+type Rec struct {
+	F00 string `json:"f00"`
+	F01 string `json:"f01"`
+	F02 string `json:"f02"`
+	F03 string `json:"f03"`
+	F04 string `json:"f04"`
+	F05 string `json:"f05"`
+	F06 string `json:"f06"`
+	F07 string `json:"f07"`
+	F08 string `json:"f08"`
+	F09 string `json:"f09"`
+	F10 string `json:"f10"`
+	F11 string `json:"f11"`
+	F12 string `json:"f12"`
+	F13 string `json:"f13"`
+	F14 string `json:"f14"`
+	F15 string `json:"f15"`
+}
+
+// MapDoc is RecDoc's document read as a dictionary.
+type MapDoc struct {
+	Rows []map[string]string `json:"rows"`
+}
+
+// LongDoc is RecDoc with the same values under names of 24 bytes: how much
+// of a decoder's time goes into matching a name, and how much of an
+// encoder's into writing one.
+type LongDoc struct {
+	Rows []Long `json:"rows"`
+}
+
+// Long is Rec under long member names.
+type Long struct {
+	F00 string `json:"attribute_identifier_00"`
+	F01 string `json:"attribute_identifier_01"`
+	F02 string `json:"attribute_identifier_02"`
+	F03 string `json:"attribute_identifier_03"`
+	F04 string `json:"attribute_identifier_04"`
+	F05 string `json:"attribute_identifier_05"`
+	F06 string `json:"attribute_identifier_06"`
+	F07 string `json:"attribute_identifier_07"`
+	F08 string `json:"attribute_identifier_08"`
+	F09 string `json:"attribute_identifier_09"`
+	F10 string `json:"attribute_identifier_10"`
+	F11 string `json:"attribute_identifier_11"`
+	F12 string `json:"attribute_identifier_12"`
+	F13 string `json:"attribute_identifier_13"`
+	F14 string `json:"attribute_identifier_14"`
+	F15 string `json:"attribute_identifier_15"`
+}
+
+// DeepDoc is a list of chains, and Deep is one link of a chain: a document
+// that is deep rather than wide, where every other shape here is wide.
+type DeepDoc struct {
+	Rows []Deep `json:"rows"`
+}
+
+// Deep nests the next link inside itself.
+type Deep struct {
+	V int64 `json:"v"`
+	N *Deep `json:"n,omitempty"`
+}
+
+// Empties is the degenerate values: an empty array, an empty object and an
+// empty string all cost structure and carry no content, and a codec that
+// opens a loop before checking for them pays for every one.
+type Empties struct {
+	Arrays  [][]int64           `json:"arrays"`
+	Objects []map[string]string `json:"objects"`
+	Strings []string            `json:"strings"`
+}
+
 // DenseDoc is a list of Dense rows.
 type DenseDoc struct {
 	Rows []Dense `json:"rows"`

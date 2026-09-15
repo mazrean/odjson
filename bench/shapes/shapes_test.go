@@ -499,6 +499,168 @@ func numbers(r *rand.Rand) plain.Numbers {
 	return n
 }
 
+// numValues is how many values each characteristic shape carries. The
+// `numbers` shape above is six spellings in one document, which is the shape
+// a real payload has and the shape no measurement can be attributed to; the
+// characteristic shapes are one spelling each, all the same length, so a
+// row's time divided by numValues is a per value cost that reads across
+// them.
+const numValues = 1024
+
+func ints(r *rand.Rand, pick func(*rand.Rand) int64) plain.Ints {
+	v := make([]int64, numValues)
+	for i := range v {
+		v[i] = pick(r)
+	}
+	return plain.Ints{Values: v}
+}
+
+func uints(r *rand.Rand, pick func(*rand.Rand) uint64) plain.Uints {
+	v := make([]uint64, numValues)
+	for i := range v {
+		v[i] = pick(r)
+	}
+	return plain.Uints{Values: v}
+}
+
+func float64s(r *rand.Rand, pick func(*rand.Rand) float64) plain.Floats {
+	v := make([]float64, numValues)
+	for i := range v {
+		v[i] = pick(r)
+	}
+	return plain.Floats{Values: v}
+}
+
+func float32s(r *rand.Rand, pick func(*rand.Rand) float32) plain.Floats32 {
+	v := make([]float32, numValues)
+	for i := range v {
+		v[i] = pick(r)
+	}
+	return plain.Floats32{Values: v}
+}
+
+func bools(r *rand.Rand) plain.Bools {
+	v := make([]bool, numValues)
+	for i := range v {
+		v[i] = r.IntN(2) == 0
+	}
+	return plain.Bools{Values: v}
+}
+
+// opts is an array half of whose elements are null.
+func opts(r *rand.Rand) plain.Opts {
+	v := make([]*int64, numValues)
+	for i := range v {
+		if r.IntN(2) == 0 {
+			n := r.Int64N(1000000)
+			v[i] = &n
+		}
+	}
+	return plain.Opts{Values: v}
+}
+
+// matrix holds the same numValues integers as int-small, in rows of width,
+// so the difference between the two rows is the nesting and nothing else.
+func matrix(r *rand.Rand, width int) plain.Matrix {
+	rows := make([][]int64, numValues/width)
+	for i := range rows {
+		row := make([]int64, width)
+		for j := range row {
+			row[j] = int64(r.IntN(1000))
+		}
+		rows[i] = row
+	}
+	return plain.Matrix{Values: rows}
+}
+
+// recs builds n records of sixteen short strings, the document behind
+// obj-record, obj-map and obj-long-names alike.
+func recs(r *rand.Rand, n int) []plain.Rec {
+	out := make([]plain.Rec, n)
+	for i := range out {
+		v := reflect.ValueOf(&out[i]).Elem()
+		for j := range v.NumField() {
+			v.Field(j).SetString(sentence(r, 2))
+		}
+	}
+	return out
+}
+
+// asLong re-spells a Rec document under Long's 24 byte member names, by
+// decoding and re-encoding through the twin declarations.
+func asLong(rows []plain.Rec) plain.LongDoc {
+	out := make([]plain.Long, len(rows))
+	for i, row := range rows {
+		src := reflect.ValueOf(row)
+		dst := reflect.ValueOf(&out[i]).Elem()
+		for j := range src.NumField() {
+			dst.Field(j).SetString(src.Field(j).String())
+		}
+	}
+	return plain.LongDoc{Rows: out}
+}
+
+// chains builds n chains of depth links each: the same member count as a
+// wide document, nested instead of listed.
+func chains(r *rand.Rand, n, depth int) plain.DeepDoc {
+	rows := make([]plain.Deep, n)
+	for i := range rows {
+		link := plain.Deep{V: int64(r.IntN(1000))}
+		for range depth - 1 {
+			next := link
+			link = plain.Deep{V: int64(r.IntN(1000)), N: &next}
+		}
+		rows[i] = link
+	}
+	return plain.DeepDoc{Rows: rows}
+}
+
+// empties is arrays, objects and strings that are all empty.
+func empties(n int) plain.Empties {
+	e := plain.Empties{
+		Arrays:  make([][]int64, n),
+		Objects: make([]map[string]string, n),
+		Strings: make([]string, n),
+	}
+	for i := range n {
+		e.Arrays[i] = []int64{}
+		e.Objects[i] = map[string]string{}
+	}
+	return e
+}
+
+// dict builds a map of n entries under keys that are data rather than
+// member names: the object as a dictionary.
+func dict(r *rand.Rand, n int) (plain.StrMap, plain.IntMap) {
+	s := plain.StrMap{Values: make(map[string]string, n)}
+	i := plain.IntMap{Values: make(map[string]int64, n)}
+	for range n {
+		k := uuid(r)
+		s.Values[k] = sentence(r, 2)
+		i.Values[k] = int64(r.IntN(1000000))
+	}
+	return s, i
+}
+
+// expDoc writes the values by hand, in exponent notation at an ordinary
+// magnitude. Every encoder here spells a float the shortest way, so it only
+// writes an exponent for a value too large or too small to spell otherwise;
+// a hand written document is the only way to put `1.234567e+02` in front of
+// a parser without also making the value 1e300. The shape is unmarshal only
+// for the same reason: re-encoding it would not produce it back.
+func expDoc(r *rand.Rand) []byte {
+	var sb strings.Builder
+	sb.WriteString(`{"values":[`)
+	for i := range numValues {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		fmt.Fprintf(&sb, "%.6e", r.Float64()*2000-1000)
+	}
+	sb.WriteString("]}")
+	return []byte(sb.String())
+}
+
 func floatsDoc(r *rand.Rand) plain.Canada {
 	// The real canada.json has 480 polygons and 111k points; a fifth of that
 	// is enough to be the same shape.
@@ -529,6 +691,11 @@ var loadShapes = sync.OnceValue(func() []shape {
 	if err := jsonv1.Unmarshal(medium, &generic); err != nil {
 		panic(err)
 	}
+	// obj-record and obj-map are the same bytes read two ways, so the
+	// document is built once.
+	rows := recs(r, 128)
+	recDoc := mustJSON(plain.RecDoc{Rows: rows})
+	strDict, intDict := dict(r, numValues)
 	return []shape{
 		// The reference rows: what bench/gen and bench/plain measure, so the
 		// other rows can be read against them from the same process.
@@ -560,9 +727,41 @@ var loadShapes = sync.OnceValue(func() []shape {
 		build[gen.Text, plain.Text, easyjson.Text]("text-emoji", "strings with four byte sequences among ASCII", mustJSON(text(r, pickFrom(emojiWords)))),
 		build[gen.Text, plain.Text, easyjson.Text]("text-escaped", "strings full of quotes, backslashes, control characters and HTML", mustJSON(text(r, pickFrom(escapedWords)))),
 		build[gen.IDs, plain.IDs, easyjson.IDs]("unique-strings", "512 UUIDs: every string misses the decoder's cache", mustJSON(plain.IDs{Values: lines(r, 512, 1, uuid)})),
+		build[gen.Text, plain.Text, easyjson.Text]("text-ascii-short", "1024 ASCII strings of ~8 bytes: per string overhead rather than per byte", mustJSON(plain.Text{Lines: lines(r, numValues, 8, pickFrom(asciiWords))})),
+		build[gen.Text, plain.Text, easyjson.Text]("text-cjk-short", "1024 three byte sequence strings of ~9 bytes: the same overhead over multibyte", mustJSON(plain.Text{Lines: lines(r, numValues, 8, pickFrom(cjkWords))})),
 
 		build[gen.Numbers, plain.Numbers, easyjson.Numbers]("numbers", "full precision floats, exponents, float32, int64/uint64 extremes", mustJSON(numbers(r))),
 		build[gen.Canada, plain.Canada, easyjson.Canada]("floats", "GeoJSON polygons: 23k coordinate pairs of full precision floats", mustJSON(floatsDoc(r))),
+
+		// One numeric spelling each, 1024 values each, so that a row is
+		// about the spelling and not about the mix.
+		build[gen.Ints, plain.Ints, easyjson.Ints]("int-small", "1024 int64 of one to three digits, no sign", mustJSON(ints(r, func(r *rand.Rand) int64 { return int64(r.IntN(1000)) }))),
+		build[gen.Ints, plain.Ints, easyjson.Ints]("int-18", "1024 int64 of exactly 18 digits: the last width odjsonrt.ParseDecimal accumulates in one pass", mustJSON(ints(r, func(r *rand.Rand) int64 { return 1e17 + r.Int64N(9e17) }))),
+		build[gen.Ints, plain.Ints, easyjson.Ints]("int-large", "1024 int64 over the whole range: 19 digits, half of them negative", mustJSON(ints(r, func(r *rand.Rand) int64 { return r.Int64() - math.MaxInt64/2 }))),
+		build[gen.Uints, plain.Uints, easyjson.Uints]("uint-large", "1024 uint64 over the whole range: 20 digits, never a sign", mustJSON(uints(r, func(r *rand.Rand) uint64 { return r.Uint64() }))),
+		build[gen.Floats, plain.Floats, easyjson.Floats]("float-short", "1024 float64 of two decimal places, the spelling a price or a score has", mustJSON(float64s(r, func(r *rand.Rand) float64 { return math.Round(r.Float64()*1000000) / 100 }))),
+		build[gen.Floats, plain.Floats, easyjson.Floats]("float-full", "1024 float64 that need all 17 significant digits", mustJSON(float64s(r, func(r *rand.Rand) float64 { return r.Float64()*360 - 180 }))),
+		build[gen.Floats32, plain.Floats32, easyjson.Floats32]("float32", "1024 float32, which need at most 9 significant digits", mustJSON(float32s(r, func(r *rand.Rand) float32 { return r.Float32() * 1000 }))),
+		build[gen.Floats, plain.Floats, easyjson.Floats]("float-exp", "1024 float64 of magnitude 1e21 to 1e300 and their reciprocals: the shortest spelling carries an exponent", mustJSON(float64s(r, func(r *rand.Rand) float64 {
+			k := 21 + r.IntN(280)
+			if r.IntN(2) == 0 {
+				k = -k
+			}
+			return math.Pow(10, float64(k)) * (1 + r.Float64())
+		}))),
+		unmarshalOnly(build[gen.Floats, plain.Floats, easyjson.Floats]("float-exp-input", "1024 ordinary float64 spelled 1.234567e+02 by hand: exponent input no encoder here writes", expDoc(r))),
+
+		// The data forms themselves: what a value is, not what it spells.
+		build[gen.Bools, plain.Bools, easyjson.Bools]("bool-array", "1024 booleans: the keyword path", mustJSON(bools(r))),
+		build[gen.Opts, plain.Opts, easyjson.Opts]("null-array", "1024 optional integers, half of them null", mustJSON(opts(r))),
+		build[gen.Matrix, plain.Matrix, easyjson.Matrix]("array-nested", "the same 1024 short integers as int-small, in 128 rows of 8: a pair of brackets and a slice per row", mustJSON(matrix(r, 8))),
+		build[gen.StrMap, plain.StrMap, easyjson.StrMap]("map-string-1k", "an object of 1024 entries used as a dictionary: UUID keys, sentence values", mustJSON(strDict)),
+		build[gen.IntMap, plain.IntMap, easyjson.IntMap]("map-int-1k", "the same 1024 keys with integer values", mustJSON(intDict)),
+		build[gen.RecDoc, plain.RecDoc, easyjson.RecDoc]("obj-record", "128 rows of 16 short strings read as a struct", recDoc),
+		build[gen.MapDoc, plain.MapDoc, easyjson.MapDoc]("obj-map", "the obj-record document read as []map[string]string instead", recDoc),
+		build[gen.LongDoc, plain.LongDoc, easyjson.LongDoc]("obj-long-names", "the obj-record values under member names of 24 bytes", mustJSON(asLong(rows))),
+		build[gen.DeepDoc, plain.DeepDoc, easyjson.DeepDoc]("deep-nest", "32 chains of 32 nested objects: a document that is deep rather than wide", mustJSON(chains(r, 32, 32))),
+		build[gen.Empties, plain.Empties, easyjson.Empties]("empties", "1024 empty arrays, 1024 empty objects and 1024 empty strings", mustJSON(empties(1024))),
 		build[gen.DenseDoc, plain.DenseDoc, easyjson.DenseDoc]("dense", "56 short scalar members per row, ~9 bytes per member", mustJSON(dense(r, 40))),
 		build[gen.SparseDoc, plain.SparseDoc, easyjson.SparseDoc]("sparse", "48 optional members per row, 10 present and 3 of them null", sparseDoc(r, 60)),
 		unmarshalOnly(build[gen.Page, plain.Page, easyjson.Page]("skip", "page whose items each carry 14 unknown members to skip", skipDoc(r, 50))),
