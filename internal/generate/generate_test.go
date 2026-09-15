@@ -15,6 +15,7 @@ func TestFixturesAreUpToDate(t *testing.T) {
 	cases := []struct {
 		dir             string
 		caseInsensitive bool
+		direct          bool
 		command         string
 	}{
 		{dir: "../testfixture", caseInsensitive: true, command: "odjson -case-insensitive"},
@@ -26,6 +27,7 @@ func TestFixturesAreUpToDate(t *testing.T) {
 		{dir: "../testfixture/v2parity/gen", command: "odjson"},
 		{dir: "../testfixture/withmethods", command: "odjson"},
 		{dir: "../testfixture/unexported", command: "odjson"},
+		{dir: "../testfixture/direct", direct: true, command: "odjson -direct"},
 	}
 
 	for _, tc := range cases {
@@ -35,6 +37,7 @@ func TestFixturesAreUpToDate(t *testing.T) {
 				Recursive:       true,
 				EscapeHTML:      true,
 				CaseInsensitive: tc.caseInsensitive,
+				Direct:          tc.direct,
 				Command:         tc.command,
 			}
 			got, err := generate.Source(tc.dir, cfg)
