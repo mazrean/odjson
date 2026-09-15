@@ -18,6 +18,18 @@
 // and overwrites the literals below. Those numbers are not the README's:
 // say where they came from in -footer, because the caption is the only place
 // the chart admits which machine it is describing.
+//
+// -chart picks which chart to draw. "readme" is the one above, and the
+// default, so CI's invocation is unchanged. "direct" draws odjson's -direct
+// functions against the standard entry points on the same types, from
+// bench/direct, into docs/assets/direct-{light,dark}.svg:
+//
+//	go run ./chart -chart direct
+//
+// Its -input wants one row per process, concatenated — see bench/README.md's
+// `direct` section. A single `go test -bench .` file renders too, but the
+// odjson-direct rows come last in it and carry about 5% of ordering artefact
+// on the encode side.
 package main
 
 import (
@@ -48,6 +60,11 @@ type row struct {
 	// (`plain` measures the libraries as they ship, `gen` measures them on
 	// odjson-generated types) and the codec label the benchmark uses.
 	module, codec string
+	// bench names the benchmark outright, for a row whose measurement does
+	// not follow the Benchmark<panel title>/<codec>/<payload> shape the rest
+	// of the chart is built on — BenchmarkAppendDirect/<payload> has no
+	// codec segment, because it is not one of a table of libraries.
+	bench string
 }
 
 // A panel is one benchmark: the libraries on a scale of their own. The
@@ -61,11 +78,37 @@ type panel struct {
 	sub   string
 	unit  string
 	ratio string // odjson against encoding/json/v2, as the README's tables state it
-	rows  []row
+	// verdict replaces the ratio when benchstat resolved no difference
+	// between the two rows. "1.01x faster" would be a claim the measurement
+	// does not make, so the panel carries benchstat's own token instead, and
+	// it is drawn in secondary ink rather than the accent. -input clears it:
+	// medians alone cannot say whether a difference is significant.
+	verdict string
+	rows    []row
 
 	// Which benchmark -input reads for this panel, matching the names in
 	// `go test -bench` output: BenchmarkMarshal/<codec>/<payload>.
 	payload string
+}
+
+// A chartDef is one complete chart: its panels, the words around them and the
+// base name of the files it is written to. The renderer below draws any of
+// them; -chart picks which.
+type chartDef struct {
+	// id is what -chart takes; file is the stem of what it writes,
+	// <file>-light.svg and <file>-dark.svg. They differ for the README's
+	// chart, whose files the README and the image branch already reference
+	// as bench-*.svg.
+	id, file string
+	// heading and sub are the two lines above the panels.
+	heading string
+	sub     string
+	// vs opens the phrase naming what the highlighted row is measured
+	// against, in each panel's subtitle and in the Markdown summary.
+	vs string
+	// footer is the default caption, naming where the numbers come from.
+	footer string
+	panels []panel
 }
 
 // The rows are in one fixed order: the baseline and odjson under it, then the
@@ -74,92 +117,173 @@ type panel struct {
 // generator rejects interface{} fields); simdjson-go's is a parse plus a
 // hand-written walk of its tape into the struct, so that it does the same job
 // as the other Unmarshal rows. See bench/README.md.
-var panels = []panel{
-	{
-		title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "4.22", payload: "twitter",
-		rows: []row{
-			{label: "encoding/json/v2", value: 401, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 95, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 117, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 251, module: "plain", codec: "go-json"},
-			{label: "json-iterator", value: 405, module: "plain", codec: "json-iterator"},
-			{label: "segmentio/encoding", value: 217, module: "plain", codec: "segmentio"},
-			{label: "jettison", value: 298, module: "plain", codec: "jettison"},
-			{label: "easyjson (codegen)", value: 433, module: "easyjson", codec: "easyjson"},
-			{label: "gojay (hand-written)", value: 395, module: "gojay", codec: "gojay"},
+var readmeChart = chartDef{
+	id:      "readme",
+	file:    "bench",
+	heading: "encoding/json/v2, with and without odjson",
+	sub:     "Time per operation — lower is better. Each panel has its own scale. The other libraries are baselines, as they ship.",
+	vs:      "odjson vs",
+	footer:  "Medians of 10 runs · AMD Ryzen 9 7950X · Linux · Go 1.27.1 · bench/plain, gen, easyjson and gojay",
+	panels: []panel{
+		{
+			title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "4.22", payload: "twitter",
+			rows: []row{
+				{label: "encoding/json/v2", value: 401, module: "plain", codec: "json-v2"},
+				{label: "+ odjson", value: 95, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+				{label: "sonic", value: 117, module: "plain", codec: "sonic"},
+				{label: "go-json", value: 251, module: "plain", codec: "go-json"},
+				{label: "json-iterator", value: 405, module: "plain", codec: "json-iterator"},
+				{label: "segmentio/encoding", value: 217, module: "plain", codec: "segmentio"},
+				{label: "jettison", value: 298, module: "plain", codec: "jettison"},
+				{label: "easyjson (codegen)", value: 433, module: "easyjson", codec: "easyjson"},
+				{label: "gojay (hand-written)", value: 395, module: "gojay", codec: "gojay"},
+			},
 		},
-	},
-	{
-		title: "Marshal", sub: "medium · 13 KiB", unit: "ns", ratio: "4.39", payload: "medium",
-		rows: []row{
-			{label: "encoding/json/v2", value: 12259, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 2790, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 3606, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 4571, module: "plain", codec: "go-json"},
-			{label: "json-iterator", value: 9011, module: "plain", codec: "json-iterator"},
-			{label: "segmentio/encoding", value: 4721, module: "plain", codec: "segmentio"},
-			{label: "jettison", value: 7817, module: "plain", codec: "jettison"},
-			{label: "easyjson (codegen)", value: 9787, module: "easyjson", codec: "easyjson"},
-			{label: "gojay (hand-written)", value: 17719, module: "gojay", codec: "gojay"},
+		{
+			title: "Marshal", sub: "medium · 13 KiB", unit: "ns", ratio: "4.39", payload: "medium",
+			rows: []row{
+				{label: "encoding/json/v2", value: 12259, module: "plain", codec: "json-v2"},
+				{label: "+ odjson", value: 2790, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+				{label: "sonic", value: 3606, module: "plain", codec: "sonic"},
+				{label: "go-json", value: 4571, module: "plain", codec: "go-json"},
+				{label: "json-iterator", value: 9011, module: "plain", codec: "json-iterator"},
+				{label: "segmentio/encoding", value: 4721, module: "plain", codec: "segmentio"},
+				{label: "jettison", value: 7817, module: "plain", codec: "jettison"},
+				{label: "easyjson (codegen)", value: 9787, module: "easyjson", codec: "easyjson"},
+				{label: "gojay (hand-written)", value: 17719, module: "gojay", codec: "gojay"},
+			},
 		},
-	},
-	{
-		title: "Marshal", sub: "small · 340 B", unit: "ns", ratio: "4.05", payload: "small",
-		rows: []row{
-			{label: "encoding/json/v2", value: 1033, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 255, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 323, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 402, module: "plain", codec: "go-json"},
-			{label: "json-iterator", value: 537, module: "plain", codec: "json-iterator"},
-			{label: "segmentio/encoding", value: 379, module: "plain", codec: "segmentio"},
-			{label: "jettison", value: 464, module: "plain", codec: "jettison"},
-			{label: "easyjson (codegen)", value: 660, module: "easyjson", codec: "easyjson"},
-			{label: "gojay (hand-written)", value: 636, module: "gojay", codec: "gojay"},
+		{
+			title: "Marshal", sub: "small · 340 B", unit: "ns", ratio: "4.05", payload: "small",
+			rows: []row{
+				{label: "encoding/json/v2", value: 1033, module: "plain", codec: "json-v2"},
+				{label: "+ odjson", value: 255, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+				{label: "sonic", value: 323, module: "plain", codec: "sonic"},
+				{label: "go-json", value: 402, module: "plain", codec: "go-json"},
+				{label: "json-iterator", value: 537, module: "plain", codec: "json-iterator"},
+				{label: "segmentio/encoding", value: 379, module: "plain", codec: "segmentio"},
+				{label: "jettison", value: 464, module: "plain", codec: "jettison"},
+				{label: "easyjson (codegen)", value: 660, module: "easyjson", codec: "easyjson"},
+				{label: "gojay (hand-written)", value: 636, module: "gojay", codec: "gojay"},
+			},
 		},
-	},
-	{
-		title: "Unmarshal", sub: "large · 616 KiB", unit: "µs", ratio: "2.93", payload: "twitter",
-		rows: []row{
-			{label: "encoding/json/v2", value: 1100, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 376, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 505, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 662, module: "plain", codec: "go-json"},
-			{label: "json-iterator", value: 1064, module: "plain", codec: "json-iterator"},
-			{label: "segmentio/encoding", value: 837, module: "plain", codec: "segmentio"},
-			{label: "simdjson-go", value: 607, module: "plain", codec: "simdjson-go"},
-			{label: "easyjson (codegen)", value: 1086, module: "easyjson", codec: "easyjson"},
-			{label: "gojay (hand-written)", value: 2570, module: "gojay", codec: "gojay"},
+		{
+			title: "Unmarshal", sub: "large · 616 KiB", unit: "µs", ratio: "2.93", payload: "twitter",
+			rows: []row{
+				{label: "encoding/json/v2", value: 1100, module: "plain", codec: "json-v2"},
+				{label: "+ odjson", value: 376, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+				{label: "sonic", value: 505, module: "plain", codec: "sonic"},
+				{label: "go-json", value: 662, module: "plain", codec: "go-json"},
+				{label: "json-iterator", value: 1064, module: "plain", codec: "json-iterator"},
+				{label: "segmentio/encoding", value: 837, module: "plain", codec: "segmentio"},
+				{label: "simdjson-go", value: 607, module: "plain", codec: "simdjson-go"},
+				{label: "easyjson (codegen)", value: 1086, module: "easyjson", codec: "easyjson"},
+				{label: "gojay (hand-written)", value: 2570, module: "gojay", codec: "gojay"},
+			},
 		},
-	},
-	{
-		title: "Unmarshal", sub: "medium · 13 KiB", unit: "ns", ratio: "2.69", payload: "medium",
-		rows: []row{
-			{label: "encoding/json/v2", value: 22222, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 8263, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 13941, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 14991, module: "plain", codec: "go-json"},
-			{label: "json-iterator", value: 21630, module: "plain", codec: "json-iterator"},
-			{label: "segmentio/encoding", value: 16306, module: "plain", codec: "segmentio"},
-			{label: "simdjson-go", value: 30207, module: "plain", codec: "simdjson-go"},
-			{label: "easyjson (codegen)", value: 18376, module: "easyjson", codec: "easyjson"},
-			{label: "gojay (hand-written)", value: 25770, module: "gojay", codec: "gojay"},
+		{
+			title: "Unmarshal", sub: "medium · 13 KiB", unit: "ns", ratio: "2.69", payload: "medium",
+			rows: []row{
+				{label: "encoding/json/v2", value: 22222, module: "plain", codec: "json-v2"},
+				{label: "+ odjson", value: 8263, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+				{label: "sonic", value: 13941, module: "plain", codec: "sonic"},
+				{label: "go-json", value: 14991, module: "plain", codec: "go-json"},
+				{label: "json-iterator", value: 21630, module: "plain", codec: "json-iterator"},
+				{label: "segmentio/encoding", value: 16306, module: "plain", codec: "segmentio"},
+				{label: "simdjson-go", value: 30207, module: "plain", codec: "simdjson-go"},
+				{label: "easyjson (codegen)", value: 18376, module: "easyjson", codec: "easyjson"},
+				{label: "gojay (hand-written)", value: 25770, module: "gojay", codec: "gojay"},
+			},
 		},
-	},
-	{
-		title: "Unmarshal", sub: "small · 340 B", unit: "ns", ratio: "3.39", payload: "small",
-		rows: []row{
-			{label: "encoding/json/v2", value: 1853, module: "plain", codec: "json-v2"},
-			{label: "+ odjson", value: 547, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
-			{label: "sonic", value: 964, module: "plain", codec: "sonic"},
-			{label: "go-json", value: 788, module: "plain", codec: "go-json"},
-			{label: "json-iterator", value: 1113, module: "plain", codec: "json-iterator"},
-			{label: "segmentio/encoding", value: 1108, module: "plain", codec: "segmentio"},
-			{label: "simdjson-go", value: 1572, module: "plain", codec: "simdjson-go"},
-			{label: "easyjson (codegen)", value: 1158, module: "easyjson", codec: "easyjson"},
-			{label: "gojay (hand-written)", value: 1069, module: "gojay", codec: "gojay"},
+		{
+			title: "Unmarshal", sub: "small · 340 B", unit: "ns", ratio: "3.39", payload: "small",
+			rows: []row{
+				{label: "encoding/json/v2", value: 1853, module: "plain", codec: "json-v2"},
+				{label: "+ odjson", value: 547, indent: true, odjson: true, emphasis: true, module: "gen", codec: "json-v2"},
+				{label: "sonic", value: 964, module: "plain", codec: "sonic"},
+				{label: "go-json", value: 788, module: "plain", codec: "go-json"},
+				{label: "json-iterator", value: 1113, module: "plain", codec: "json-iterator"},
+				{label: "segmentio/encoding", value: 1108, module: "plain", codec: "segmentio"},
+				{label: "simdjson-go", value: 1572, module: "plain", codec: "simdjson-go"},
+				{label: "easyjson (codegen)", value: 1158, module: "easyjson", codec: "easyjson"},
+				{label: "gojay (hand-written)", value: 1069, module: "gojay", codec: "gojay"},
+			},
 		},
 	},
 }
+
+// directChart answers a different question from the one above, which is why
+// it is a chart of its own rather than three more rows: not where odjson sits
+// among the host libraries, but what odjson's own -direct functions are worth
+// against its own standard entry points.
+//
+// Every bar here runs the identical generated codec. The baseline row is a
+// plain json.Marshal / json.Unmarshal from encoding/json/v2 reaching the
+// generated methods; the accented row is the package level function -direct
+// adds. Only the call differs — and bench/direct is generated with
+// -escape-html=false so that the bytes do not, which TestDirectMatchesJSONV2
+// holds it to.
+//
+// AppendT sits in the Marshal panels as a third row rather than the accented
+// one: it writes into a buffer the caller keeps, so it is not the like-for-
+// like comparison the ratio is about. Its label says so.
+var directChart = chartDef{
+	id:      "direct",
+	file:    "direct",
+	heading: "odjson's -direct functions, against its own standard entry points",
+	sub:     "Lower is better. Each panel: the standard call reaching the generated codec, and the -direct function under it — same codec, same bytes.",
+	vs:      "vs",
+	footer:  "One row per process, interleaved · 6 runs · benchstat medians · AMD Ryzen 9 7950X · Linux · Go 1.27.1 · bench/direct",
+	panels: []panel{
+		{
+			title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "1.01", verdict: "~ p=0.394", payload: "twitter",
+			rows: []row{
+				{label: "json/v2 + odjson", value: 106.3, module: "direct", codec: "json-v2"},
+				{label: "+ MarshalT", value: 104.9, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
+				{label: "AppendT · 0 allocs", value: 58.56, emphasis: true, module: "direct", bench: "AppendDirect/twitter"},
+			},
+		},
+		{
+			title: "Marshal", sub: "medium · 13 KiB", unit: "ns", ratio: "1.06", payload: "medium",
+			rows: []row{
+				{label: "json/v2 + odjson", value: 2924, module: "direct", codec: "json-v2"},
+				{label: "+ MarshalT", value: 2749, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
+				{label: "AppendT · 0 allocs", value: 1096, emphasis: true, module: "direct", bench: "AppendDirect/medium"},
+			},
+		},
+		{
+			title: "Marshal", sub: "small · 365 B", unit: "ns", ratio: "1.32", payload: "small",
+			rows: []row{
+				{label: "json/v2 + odjson", value: 275.2, module: "direct", codec: "json-v2"},
+				{label: "+ MarshalT", value: 208.7, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
+				{label: "AppendT · 0 allocs", value: 107.3, emphasis: true, module: "direct", bench: "AppendDirect/small"},
+			},
+		},
+		{
+			title: "Unmarshal", sub: "large · 616 KiB", unit: "µs", ratio: "1.01", verdict: "~ p=0.240", payload: "twitter",
+			rows: []row{
+				{label: "json/v2 + odjson", value: 400.9, module: "direct", codec: "json-v2"},
+				{label: "+ UnmarshalT", value: 396.9, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
+			},
+		},
+		{
+			title: "Unmarshal", sub: "medium · 13 KiB", unit: "ns", ratio: "1.02", payload: "medium",
+			rows: []row{
+				{label: "json/v2 + odjson", value: 8914, module: "direct", codec: "json-v2"},
+				{label: "+ UnmarshalT", value: 8722, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
+			},
+		},
+		{
+			title: "Unmarshal", sub: "small · 365 B", unit: "ns", ratio: "1.27", payload: "small",
+			rows: []row{
+				{label: "json/v2 + odjson", value: 596.4, module: "direct", codec: "json-v2"},
+				{label: "+ UnmarshalT", value: 471.0, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
+			},
+		},
+	},
+}
+
+var charts = []*chartDef{&readmeChart, &directChart}
 
 // A theme is the set of colour roles the chart is written against. Both are
 // selected for their own surface rather than one being a flip of the other;
@@ -210,16 +334,22 @@ const (
 	footerH = 30
 )
 
-// readmeFooter describes the machine the literals above were measured on. Any
-// other set of numbers needs its own caption, via -footer.
-const readmeFooter = "Medians of 10 runs · AMD Ryzen 9 7950X · Linux · Go 1.27.1 · bench/plain, gen, easyjson and gojay"
-
 func main() {
-	input := flag.String("input", "", "`go test -bench` output to take the numbers from; the README's literals are used when empty")
-	out := flag.String("out", "", "directory to write bench-light.svg and bench-dark.svg into (default docs/assets)")
-	footer := flag.String("footer", readmeFooter, "the caption under the chart, naming where the numbers come from")
+	which := flag.String("chart", "readme", "which chart to draw: readme or direct")
+	input := flag.String("input", "", "`go test -bench` output to take the numbers from; the chart's own literals are used when empty")
+	out := flag.String("out", "", "directory to write <chart>-light.svg and <chart>-dark.svg into (default docs/assets)")
+	footer := flag.String("footer", "", "the caption under the chart, naming where the numbers come from; the chart's own is used when empty")
 	summary := flag.String("summary", "", "also write the same numbers to this file as a Markdown table")
 	flag.Parse()
+
+	def := pick(*which)
+	if def == nil {
+		fail(fmt.Errorf("unknown -chart %q", *which))
+	}
+	caption := *footer
+	if caption == "" {
+		caption = def.footer
+	}
 
 	if *input != "" {
 		f, err := os.Open(*input)
@@ -231,7 +361,7 @@ func main() {
 		if err != nil {
 			fail(err)
 		}
-		if err := apply(measured); err != nil {
+		if err := apply(def, measured); err != nil {
 			fail(err)
 		}
 	}
@@ -250,28 +380,38 @@ func main() {
 		fail(err)
 	}
 	for _, t := range themes {
-		name := filepath.Join(dir, "bench-"+t.name+".svg")
-		if err := os.WriteFile(name, render(t, *footer), 0o644); err != nil {
+		name := filepath.Join(dir, def.file+"-"+t.name+".svg")
+		if err := os.WriteFile(name, render(def, t, caption), 0o644); err != nil {
 			fail(err)
 		}
 		fmt.Println("wrote", name)
 	}
 
 	if *summary != "" {
-		if err := os.WriteFile(*summary, table(*footer), 0o644); err != nil {
+		if err := os.WriteFile(*summary, table(def, caption), 0o644); err != nil {
 			fail(err)
 		}
 		fmt.Println("wrote", *summary)
 	}
 }
 
+// pick resolves -chart to one of the definitions above.
+func pick(id string) *chartDef {
+	for _, c := range charts {
+		if c.id == id {
+			return c
+		}
+	}
+	return nil
+}
+
 // table restates the chart as Markdown. A PNG of the chart carries no alt
 // text, so wherever the image goes this goes with it. The columns are every
 // label any panel carries, in first-seen order, with an em dash where a panel
 // has no such row: jettison only encodes and simdjson-go only decodes.
-func table(footer string) []byte {
+func table(def *chartDef, footer string) []byte {
 	var labels []string
-	for _, p := range panels {
+	for _, p := range def.panels {
 		for _, r := range p.rows {
 			if !slices.Contains(labels, r.label) {
 				labels = append(labels, r.label)
@@ -290,7 +430,7 @@ func table(footer string) []byte {
 	}
 	b.WriteByte('\n')
 
-	for _, p := range panels {
+	for _, p := range def.panels {
 		fmt.Fprintf(&b, "| %s · %s |", p.title, p.sub)
 		for _, l := range labels {
 			i := slices.IndexFunc(p.rows, func(r row) bool { return r.label == l })
@@ -299,19 +439,22 @@ func table(footer string) []byte {
 				continue
 			}
 			r := p.rows[i]
-			if r.odjson {
+			switch {
+			case r.odjson && p.verdict != "":
+				fmt.Fprintf(&b, " **%s %s** (%s) |", fmtVal(r.value), p.unit, p.verdict)
+			case r.odjson:
 				fmt.Fprintf(&b, " **%s %s** (%s×) |", fmtVal(r.value), p.unit, p.ratio)
-				continue
+			default:
+				fmt.Fprintf(&b, " %s %s |", fmtVal(r.value), p.unit)
 			}
-			fmt.Fprintf(&b, " %s %s |", fmtVal(r.value), p.unit)
 		}
 		b.WriteByte('\n')
 	}
 
 	// The same sentence the panels carry, for the same reason: a bare ratio
 	// does not say what it is against.
-	if i := slices.IndexFunc(panels[0].rows, func(r row) bool { return r.odjson }); i > 0 {
-		fmt.Fprintf(&b, "\n× is odjson vs %s.\n", panels[0].rows[i-1].label)
+	if i := slices.IndexFunc(def.panels[0].rows, func(r row) bool { return r.odjson }); i > 0 {
+		fmt.Fprintf(&b, "\n× is %s %s.\n", def.vs, def.panels[0].rows[i-1].label)
 	}
 	fmt.Fprintf(&b, "\n%s\n", footer)
 	return b.Bytes()
@@ -332,17 +475,17 @@ func fail(err error) {
 
 // perColumn is how many panels each of the two columns holds: the Marshal
 // panels down the left, the Unmarshal panels down the right.
-func perColumn() int {
-	return (len(panels) + 1) / 2
+func perColumn(def *chartDef) int {
+	return (len(def.panels) + 1) / 2
 }
 
 // gridRows lays the panels out: the height of each grid row, which is the
 // taller of the two panels sharing it, and the y offset each starts at.
-func gridRows() (heights, tops []int) {
-	rows := perColumn()
+func gridRows(def *chartDef) (heights, tops []int) {
+	rows := perColumn(def)
 	heights = make([]int, rows)
 	tops = make([]int, rows)
-	for i, p := range panels {
+	for i, p := range def.panels {
 		r := i % rows
 		heights[r] = max(heights[r], titleH+rowH*len(p.rows))
 	}
@@ -354,14 +497,14 @@ func gridRows() (heights, tops []int) {
 	return heights, tops
 }
 
-func render(t theme, footer string) []byte {
-	heights, tops := gridRows()
-	rows := perColumn()
+func render(def *chartDef, t theme, footer string) []byte {
+	heights, tops := gridRows(def)
+	rows := perColumn(def)
 	svgH := tops[rows-1] + heights[rows-1] + footerH
 
 	var b bytes.Buffer
 	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-label="%s">`,
-		svgW, svgH, svgW, svgH, esc(altText()))
+		svgW, svgH, svgW, svgH, esc(altText(def)))
 	fmt.Fprintf(&b, `<style>
 text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
@@ -369,13 +512,14 @@ text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,san
 </style>`, t.primary, t.secondary)
 	fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="%s"/>`, svgW, svgH, t.surface)
 
-	fmt.Fprintf(&b, `<text class="t1" x="%d" y="26" font-size="16" font-weight="600">encoding/json/v2, with and without odjson</text>`, padX)
-	fmt.Fprintf(&b, `<text class="t2" x="%d" y="46" font-size="12">Time per operation — lower is better. Each panel has its own scale. The other libraries are baselines, as they ship.</text>`, padX)
+	fmt.Fprintf(&b, `<text class="t1" x="%d" y="26" font-size="16" font-weight="600">%s</text>`, padX, esc(def.heading))
+	fmt.Fprintf(&b, `<text class="t2" x="%d" y="46" font-size="12">%s</text>`, padX, esc(def.sub))
 
-	for i, p := range panels {
+	showVS := vsFits(def, t)
+	for i, p := range def.panels {
 		x := padX + (i/rows)*(panelW+panelGapX)
 		y := tops[i%rows]
-		drawPanel(&b, t, p, x, y)
+		drawPanel(&b, def, t, p, x, y, showVS)
 	}
 
 	fmt.Fprintf(&b, `<text class="t2" x="%d" y="%d" font-size="11">%s</text>`,
@@ -385,7 +529,54 @@ text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,san
 	return b.Bytes()
 }
 
-func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
+// vsFits reports whether every panel has room on its title line for the
+// clause naming what its ratio is against. The answer is one per chart, not
+// one per panel: in a grid of small multiples a clause that comes and goes
+// reads as an inconsistency, so either all of them carry it or none do.
+//
+// It only ever has to give way when the ratio is in the header, which is
+// where a ratio near 1 goes — the README's chart, whose ratios are all around
+// 4, draws them beside the bars and keeps the clause unconditionally.
+func vsFits(def *chartDef, t theme) bool {
+	for _, p := range def.panels {
+		max := 0.0
+		for _, r := range p.rows {
+			if r.value > max {
+				max = r.value
+			}
+		}
+		i := slices.IndexFunc(p.rows, func(r row) bool { return r.odjson })
+		if i < 1 {
+			continue
+		}
+		ratio, _ := ratioText(p, t)
+		// Relative to the panel's own left edge: the inline position and the
+		// right edge both move with x, so where the panel sits does not
+		// change the answer.
+		dx := labelW + gutter + barW(p.rows[i].value, max) + gutter + len(fmtVal(p.rows[i].value))*7 + 10
+		if dx+textW(ratio, 16) <= panelW {
+			continue // drawn beside the bar; the title line is free
+		}
+		sub := fmt.Sprintf("%s · %s · %s %s", p.sub, p.unit, def.vs, p.rows[i-1].label)
+		subX := int(float64(len(p.title))*8.7) + 8
+		if subX+textW(sub, 11)+gutter > panelW-textW(ratio, 16) {
+			return false
+		}
+	}
+	return true
+}
+
+// ratioText is a panel's headline and the ink it is drawn in: the measured
+// margin in the accent, or benchstat's own token in secondary ink when the
+// run resolved no difference, because "1.01× faster" would claim one.
+func ratioText(p panel, t theme) (string, string) {
+	if p.verdict != "" {
+		return p.verdict, t.secondary
+	}
+	return p.ratio + "× faster", t.accent
+}
+
+func drawPanel(b *bytes.Buffer, def *chartDef, t theme, p panel, x, y int, showVS bool) {
 	max := 0.0
 	for _, r := range p.rows {
 		if r.value > max {
@@ -400,7 +591,7 @@ func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
 	// free; every measured ratio leaves it so, since a bar 2x shorter than
 	// the longest ends before the panel's midpoint. A ratio near 1 would not,
 	// and then the panel header takes it instead of overprinting the time.
-	ratio := p.ratio + "× faster"
+	ratio, ratioInk := ratioText(p, t)
 	ratioX, ratioInHeader := 0, true
 	// The row the ratio is against: the one odjson is drawn indented under.
 	baseline, baseW := "", 0
@@ -422,14 +613,14 @@ func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
 	// naming what the ratio is against, because the ratio itself has no room
 	// to say it and the indented row only implies it.
 	sub := fmt.Sprintf("%s · %s", p.sub, p.unit)
-	if baseline != "" {
-		sub += " · odjson vs " + baseline
+	if showVS && baseline != "" {
+		sub += " · " + def.vs + " " + baseline
 	}
 	fmt.Fprintf(b, `<text class="t2" x="%d" y="%d" font-size="11">%s</text>`,
 		x+int(float64(len(p.title))*8.7)+8, y+13, esc(sub))
 	if ratioInHeader {
 		fmt.Fprintf(b, `<text x="%d" y="%d" font-size="16" font-weight="700" fill="%s" text-anchor="end">%s</text>`,
-			x+panelW, y+14, t.accent, ratio)
+			x+panelW, y+14, ratioInk, ratio)
 	}
 	fmt.Fprintf(b, `<rect x="%d" y="%d" width="%d" height="1" fill="%s"/>`, x, y+21, panelW, t.rule)
 
@@ -477,7 +668,7 @@ func drawPanel(b *bytes.Buffer, t theme, p panel, x, y int) {
 					x0, mid-3, x1, t.accent)
 			}
 			fmt.Fprintf(b, `<text x="%d" y="%d" font-size="16" font-weight="700" fill="%s">%s</text>`,
-				ratioX, top+barH/2+capH(16), t.accent, ratio)
+				ratioX, top+barH/2+capH(16), ratioInk, ratio)
 		}
 	}
 }
@@ -516,9 +707,9 @@ func fmtVal(v float64) string {
 	return fmt.Sprintf("%.0f", v)
 }
 
-func altText() string {
+func altText(def *chartDef) string {
 	var parts []string
-	for _, p := range panels {
+	for _, p := range def.panels {
 		var vals []string
 		for _, r := range p.rows {
 			vals = append(vals, fmt.Sprintf("%s %s %s", r.label, fmtVal(r.value), p.unit))
@@ -535,7 +726,10 @@ func esc(s string) string {
 // A key identifies one measurement in `go test -bench` output: the bench
 // sub-module it was run in, plus the three parts of the benchmark's name.
 type key struct {
-	module, op, codec, payload string
+	// module is the bench sub-module; name is the benchmark's own name with
+	// "Benchmark" and the -N parallelism suffix stripped, so a row that does
+	// not follow the three-part shape can name itself (see row.bench).
+	module, name string
 }
 
 // parse collects every ns/op in the input, keyed by measurement. A key can
@@ -557,11 +751,7 @@ func parse(r io.Reader) (map[key][]float64, error) {
 		if !ok {
 			continue
 		}
-		parts := strings.Split(name, "/")
-		if len(parts) != 3 {
-			continue
-		}
-		k := key{module, strings.TrimPrefix(parts[0], "Benchmark"), parts[1], parts[2]}
+		k := key{module, strings.TrimPrefix(name, "Benchmark")}
 		out[k] = append(out[k], ns)
 	}
 	if err := sc.Err(); err != nil {
@@ -601,16 +791,16 @@ func result(line string) (string, float64, bool) {
 // apply overwrites the panels' literals with the measured medians and
 // recomputes each panel's ratio. It fails rather than drawing a partial
 // chart: a missing bar reads as a measurement, not as an absence.
-func apply(m map[key][]float64) error {
-	for i := range panels {
-		p := &panels[i]
+func apply(def *chartDef, m map[key][]float64) error {
+	for i := range def.panels {
+		p := &def.panels[i]
 
 		ns := make([]float64, len(p.rows))
 		for j := range p.rows {
 			r := &p.rows[j]
-			v, ok := median(m[key{r.module, p.title, r.codec, p.payload}])
+			v, ok := median(m[key{r.module, benchName(*p, *r)}])
 			if !ok {
-				return fmt.Errorf("no Benchmark%s/%s/%s in bench/%s", p.title, r.codec, p.payload, r.module)
+				return fmt.Errorf("no Benchmark%s in bench/%s", benchName(*p, *r), r.module)
 			}
 			ns[j] = v
 			// The panels' scales are the README's: µs for twitter, ns for
@@ -628,8 +818,21 @@ func apply(m map[key][]float64) error {
 			return fmt.Errorf("panel %s/%s has no odjson row under a baseline", p.title, p.payload)
 		}
 		p.ratio = strconv.FormatFloat(ns[odjson-1]/ns[odjson], 'f', 2, 64)
+		// Whatever a literal panel recorded about significance belongs to the
+		// run it was measured in. Medians of someone else's run cannot say,
+		// so the ratio stands on its own.
+		p.verdict = ""
 	}
 	return nil
+}
+
+// benchName is the benchmark a row's number comes from: the three-part shape
+// the chart is built on, unless the row named one outright.
+func benchName(p panel, r row) string {
+	if r.bench != "" {
+		return r.bench
+	}
+	return p.title + "/" + r.codec + "/" + p.payload
 }
 
 // median is the middle sample, which is what the README quotes: a mean would

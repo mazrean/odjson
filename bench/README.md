@@ -263,11 +263,29 @@ benchstat a.txt b.txt
 ```
 
 Interleaving the two loops is better still. `docs/internals.md` quotes the
-numbers that come out of it.
+numbers that come out of it, and so does this package's chart:
 
-The package is deliberately out of the README chart and out of `bench.yml`: it
-answers a question about odjson's own API, not about where odjson sits among
-the host libraries.
+```sh
+cd bench && go run ./chart -chart direct
+```
+
+which writes `docs/assets/direct-{light,dark}.svg` from the literals in
+`chart/main.go`'s `directChart` — the same renderer, and the same format, as
+the README's. Re-measuring means editing those literals, exactly as it does
+for the README's. To render someone else's run instead, concatenate the
+per-row files and pass them in:
+
+```sh
+cat a.txt b.txt … > direct.txt
+cd bench && go run ./chart -chart direct -input direct.txt -out /tmp -footer '…'
+```
+
+`-input` renders raw ratios: medians alone cannot say whether a difference is
+significant, so the `~` a literal panel carries is dropped.
+
+The package is deliberately out of the **README's** chart and out of
+`bench.yml`: it answers a question about odjson's own API, not about where
+odjson sits among the host libraries, which is what that chart is for.
 
 ## `ab`
 

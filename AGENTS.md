@@ -391,6 +391,14 @@ Four workflows, all under `.github/workflows/`:
   comment carries the raw `go test` output. Never restate a CI figure as a
   measured claim — re-run locally first.
 
+  `bench/chart` draws two charts, picked with `-chart`: `readme` (the default,
+  written to `docs/assets/bench-{light,dark}.svg`, which is what CI renders)
+  and `direct` (`docs/assets/direct-{light,dark}.svg`, `bench/direct`'s
+  numbers). Adding a third means one more `chartDef`, not a second renderer.
+  A change to the renderer must leave the README's two SVGs **byte
+  identical** unless the README's numbers themselves changed; regenerate and
+  `cmp` before committing.
+
   The PNGs go on an orphan `bench-images` branch, one directory per PR head
   commit, and the comment links them as
   `github.com/<repo>/blob/bench-images/…?raw=true`. That branch is generated

@@ -13,9 +13,15 @@
 // gen cannot simply be regenerated that way: its encoding-json rows are
 // supposed to produce encoding/json's bytes, and they would stop.
 //
-// The package is deliberately out of the README chart and out of bench.yml.
+// The package is deliberately out of the README's chart and out of bench.yml.
 // It answers a question about odjson's own API, not about where odjson sits
-// among the host libraries, which is what the chart is for.
+// among the host libraries, which is what that chart is for. It has a chart of
+// its own instead, from the same renderer:
+//
+//	go run ./chart -chart direct
+//
+// which writes docs/assets/direct-{light,dark}.svg. Its literals are the
+// per-process numbers; see bench/README.md for how to re-measure them.
 package direct
 
 //go:generate go run github.com/mazrean/odjson -direct -escape-html=false
