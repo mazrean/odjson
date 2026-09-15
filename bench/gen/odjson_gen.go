@@ -2004,12 +2004,21 @@ func (v *Book) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalBook returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalBook(v *Book) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeBook.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeBook.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendBook appends the JSON encoding of v to dst and returns the
@@ -2020,7 +2029,6 @@ func AppendBook(dst []byte, v *Book) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeBook.Record(dst[n:])
 	return dst, nil
 }
 
@@ -2543,12 +2551,21 @@ func (v *Author) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalAuthor returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalAuthor(v *Author) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeAuthor.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeAuthor.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendAuthor appends the JSON encoding of v to dst and returns the
@@ -2559,7 +2576,6 @@ func AppendAuthor(dst []byte, v *Author) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeAuthor.Record(dst[n:])
 	return dst, nil
 }
 
@@ -3084,12 +3100,21 @@ func (v *TwitterStruct) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalTwitterStruct returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalTwitterStruct(v *TwitterStruct) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeTwitterStruct.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeTwitterStruct.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendTwitterStruct appends the JSON encoding of v to dst and returns the
@@ -3100,7 +3125,6 @@ func AppendTwitterStruct(dst []byte, v *TwitterStruct) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeTwitterStruct.Record(dst[n:])
 	return dst, nil
 }
 
@@ -4978,12 +5002,21 @@ func (v *Statuses) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalStatuses returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalStatuses(v *Statuses) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeStatuses.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeStatuses.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendStatuses appends the JSON encoding of v to dst and returns the
@@ -4994,7 +5027,6 @@ func AppendStatuses(dst []byte, v *Statuses) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeStatuses.Record(dst[n:])
 	return dst, nil
 }
 
@@ -5934,12 +5966,21 @@ func (v *Entities) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalEntities returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalEntities(v *Entities) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeEntities.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeEntities.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendEntities appends the JSON encoding of v to dst and returns the
@@ -5950,7 +5991,6 @@ func AppendEntities(dst []byte, v *Entities) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeEntities.Record(dst[n:])
 	return dst, nil
 }
 
@@ -6548,12 +6588,21 @@ func (v *Hashtags) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalHashtags returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalHashtags(v *Hashtags) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeHashtags.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeHashtags.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendHashtags appends the JSON encoding of v to dst and returns the
@@ -6564,7 +6613,6 @@ func AppendHashtags(dst []byte, v *Hashtags) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeHashtags.Record(dst[n:])
 	return dst, nil
 }
 
@@ -7003,12 +7051,21 @@ func (v *Metadata) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalMetadata returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalMetadata(v *Metadata) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeMetadata.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeMetadata.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendMetadata appends the JSON encoding of v to dst and returns the
@@ -7019,7 +7076,6 @@ func AppendMetadata(dst []byte, v *Metadata) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeMetadata.Record(dst[n:])
 	return dst, nil
 }
 
@@ -10226,12 +10282,21 @@ func (v *User) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalUser returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalUser(v *User) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeUser.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeUser.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendUser appends the JSON encoding of v to dst and returns the
@@ -10242,7 +10307,6 @@ func AppendUser(dst []byte, v *User) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeUser.Record(dst[n:])
 	return dst, nil
 }
 
@@ -10665,12 +10729,21 @@ func (v *UserEntities) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalUserEntities returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalUserEntities(v *UserEntities) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeUserEntities.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeUserEntities.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendUserEntities appends the JSON encoding of v to dst and returns the
@@ -10681,7 +10754,6 @@ func AppendUserEntities(dst []byte, v *UserEntities) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeUserEntities.Record(dst[n:])
 	return dst, nil
 }
 
@@ -11180,12 +11252,21 @@ func (v *URL) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalURL returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalURL(v *URL) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeURL.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeURL.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendURL appends the JSON encoding of v to dst and returns the
@@ -11196,7 +11277,6 @@ func AppendURL(dst []byte, v *URL) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeURL.Record(dst[n:])
 	return dst, nil
 }
 
@@ -11867,12 +11947,21 @@ func (v *Urls) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalUrls returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalUrls(v *Urls) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeUrls.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeUrls.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendUrls appends the JSON encoding of v to dst and returns the
@@ -11883,7 +11972,6 @@ func AppendUrls(dst []byte, v *Urls) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeUrls.Record(dst[n:])
 	return dst, nil
 }
 
@@ -12399,12 +12487,21 @@ func (v *Description) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalDescription returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalDescription(v *Description) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeDescription.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeDescription.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendDescription appends the JSON encoding of v to dst and returns the
@@ -12415,7 +12512,6 @@ func AppendDescription(dst []byte, v *Description) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeDescription.Record(dst[n:])
 	return dst, nil
 }
 
@@ -13363,12 +13459,21 @@ func (v *SearchMetadata) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalSearchMetadata returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalSearchMetadata(v *SearchMetadata) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeSearchMetadata.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeSearchMetadata.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendSearchMetadata appends the JSON encoding of v to dst and returns the
@@ -13379,7 +13484,6 @@ func AppendSearchMetadata(dst []byte, v *SearchMetadata) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeSearchMetadata.Record(dst[n:])
 	return dst, nil
 }
 

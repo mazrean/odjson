@@ -839,12 +839,21 @@ func (v *Root) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalRoot returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func MarshalRoot(v *Root) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizeRoot.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizeRoot.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // AppendRoot appends the JSON encoding of v to dst and returns the
@@ -855,7 +864,6 @@ func AppendRoot(dst []byte, v *Root) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizeRoot.Record(dst[n:])
 	return dst, nil
 }
 
@@ -1558,12 +1566,21 @@ func (v *nested) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // marshalNested returns the JSON encoding of v, reaching the generated
 // encoder without going through encoding/json.
 func marshalNested(v *nested) ([]byte, error) {
-	buf, err := v.odjsonAppend(odjsonSizenested.New(), odjsonrt.ModeV2HTML)
+	// The encoding is built in a pooled buffer and copied out once,
+	// rather than written into a buffer allocated at the right size:
+	// a fresh allocation is handed out zeroed, so writing into it
+	// walks cold memory twice, while the copy out of a warm pooled
+	// buffer allocates without zeroing and moves the bytes once.
+	buf := odjsonrt.GetBuffer()
+	var err error
+	buf.B, err = v.odjsonAppend(buf.B, odjsonrt.ModeV2HTML)
 	if err != nil {
+		odjsonrt.PutBuffer(buf)
 		return nil, err
 	}
-	odjsonSizenested.Record(buf)
-	return buf, nil
+	out := bytes.Clone(buf.B)
+	odjsonrt.PutBuffer(buf)
+	return out, nil
 }
 
 // appendNested appends the JSON encoding of v to dst and returns the
@@ -1574,7 +1591,6 @@ func appendNested(dst []byte, v *nested) ([]byte, error) {
 	if err != nil {
 		return dst[:n], err
 	}
-	odjsonSizenested.Record(dst[n:])
 	return dst, nil
 }
 

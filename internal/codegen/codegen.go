@@ -409,12 +409,12 @@ func directName(verb string, s *analyzer.StructInfo) string {
 // odjsonrt's direct path, so the speed survives -tags odjson_safe and a Go
 // minor that path has not been verified against.
 func (g *generator) directFuncs(s *analyzer.StructInfo) {
-	size := id("odjsonSize" + s.Name)
 	mode := rt("ModeV2")
 	if g.opts.EscapeHTML {
 		mode = rt("ModeV2HTML")
 	}
 
+	g.pkg.Imports.Add("bytes", "bytes")
 	marshal := directName("marshal", s)
 	g.funcDecl([]string{
 		"// " + marshal + " returns the JSON encoding of v, reaching the generated",
@@ -422,14 +422,24 @@ func (g *generator) directFuncs(s *analyzer.StructInfo) {
 	}, nil, marshal,
 		signature([]*ast.Field{receiver(s, false)}, sliceType(id("byte")), id("error")),
 		func(b *block) {
-			buf := id("buf")
-			g.emit(b, assignN(token.DEFINE, []ast.Expr{buf, errV},
-				call(sel(v, "odjsonAppend"), call(sel(size, "New")), mode)))
+			buf, out := id("buf"), id("out")
+			g.comment(b,
+				"// The encoding is built in a pooled buffer and copied out once,",
+				"// rather than written into a buffer allocated at the right size:",
+				"// a fresh allocation is handed out zeroed, so writing into it",
+				"// walks cold memory twice, while the copy out of a warm pooled",
+				"// buffer allocates without zeroing and moves the bytes once.")
+			g.emit(b, define(buf, callRT("GetBuffer")))
+			g.emit(b, varDecl("err", id("error")))
+			g.emit(b, assignN(token.ASSIGN, []ast.Expr{sel(buf, "B"), errV},
+				call(sel(v, "odjsonAppend"), sel(buf, "B"), mode)))
 			g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
+				g.emit(b, expr(callRT("PutBuffer", buf)))
 				g.emit(b, ret(nilV, errV))
 			})
-			g.emit(b, expr(call(sel(size, "Record"), buf)))
-			g.emit(b, ret(buf, nilV))
+			g.emit(b, define(out, call(sel(id("bytes"), "Clone"), sel(buf, "B"))))
+			g.emit(b, expr(callRT("PutBuffer", buf)))
+			g.emit(b, ret(out, nilV))
 		})
 
 	appendName := directName("append", s)
@@ -447,7 +457,6 @@ func (g *generator) directFuncs(s *analyzer.StructInfo) {
 			g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
 				g.emit(b, ret(slice(dst, nil, n), errV))
 			})
-			g.emit(b, expr(call(sel(size, "Record"), slice(dst, n, nil))))
 			g.emit(b, ret(dst, nilV))
 		})
 
