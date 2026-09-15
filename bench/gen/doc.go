@@ -4,5 +4,7 @@
 package gen
 
 // The benchmarks measure both modes, so the methods are generated here even
-// though they are not the default.
-//go:generate go run github.com/mazrean/odjson
+// though they are not the default. -direct adds the package level functions
+// the odjson-direct rows call, which is the same codec reached without
+// encoding/json in the way.
+//go:generate go run github.com/mazrean/odjson -direct

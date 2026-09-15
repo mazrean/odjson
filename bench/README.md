@@ -174,8 +174,33 @@ from one `go test -bench` output.
 
 `gen`'s rows measure unchanged call sites — the same `json.Marshal` /
 `json.Unmarshal` as `plain`, now routed through the generated methods, which is
-the only way odjson is used. There is no separate direct entry point to
-measure: the generator emits the four interface methods and nothing else.
+how odjson is used by default.
+
+The `odjson-direct` rows measure the other way in: `gen` is generated with
+`-direct`, so the same types also carry package level `MarshalTwitterStruct`
+and `UnmarshalBook` functions, and those rows call them. Everything below the
+call is identical — the same `odjsonAppend`, the same `odjsonParseV2` — so the
+gap between an `odjson-direct` row and the `encoding-json` row beside it is
+the cost of reaching the codec through `encoding/json`, and nothing else.
+They are not a `codec` table entry because their signatures are typed rather
+than `any` based; the benchmark name keeps the same `<codec>/<payload>` shape
+regardless.
+
+Two things to read carefully there:
+
+- `twitter` and `medium` are the **same Go type**, so they share one
+  `odjsonrt.SizeHint`. `twitter` runs first and leaves it at 256 KiB, and
+  every later `MarshalTwitterStruct` — `medium`'s included — then allocates a
+  288 KiB buffer. That is a real property of a function that must return its
+  result, but as a *row* it is an artefact of the two payloads sharing a
+  process: measure `medium` in its own `go test -bench` run to see the
+  number without it. The `json-v2` and `encoding-json` rows are not affected,
+  because those calls write into the encoder's own buffer through the direct
+  path and never size one of their own.
+- `BenchmarkAppendDirect` is the encoder with both the entry point and the
+  result allocation taken out: it writes into a buffer the caller keeps. It
+  is deliberately a benchmark of its own rather than a `Marshal` row, because
+  every row there allocates what it returns and this one does not.
 
 `TestGeneratedMatchesReflection` asserts that every host library really does
 route through the generated codec. sonic, go-json, json-iterator, segmentio
@@ -187,6 +212,14 @@ that the value survives a round trip through the generated pair. If that test
 fails, the `gen` rows are not measuring what they claim to. easyjson, gojay
 and simdjson-go have entry points of their own and never reach a
 `MarshalJSON`, so they have no `gen` row.
+
+The same test pins the `-direct` functions: their output must decode to the
+same document `encoding/json`'s `Marshal` produces, and `UnmarshalTwitterStruct`
+must decode to the same value `encoding/json/v2`'s `Unmarshal` does. The
+comparison is by value rather than by byte because `twitter.json` carries
+`[]interface{}` members, whose `map[string]any` the encoder writes in
+iteration order; byte equality against `encoding/json` is pinned on a map free
+type in `internal/testfixture/direct` instead.
 
 To regenerate after changing the generator:
 

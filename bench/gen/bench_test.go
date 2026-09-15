@@ -125,6 +125,20 @@ var sonicTrusting = sonic.Config{
 	NoValidateJSONSkip:      true,
 }.Froze()
 
+// unmarshalDirectTwitter and unmarshalDirectBook are the decode half of the
+// -direct API, wrapped so a payload can name one. They allocate a fresh value
+// per call, as the `any` based entries do: reusing one would let the decoder
+// skip allocating the slices it has already filled in.
+func unmarshalDirectTwitter(b []byte) (any, error) {
+	v := new(TwitterStruct)
+	return v, UnmarshalTwitterStruct(b, v)
+}
+
+func unmarshalDirectBook(b []byte) (any, error) {
+	v := new(Book)
+	return v, UnmarshalBook(b, v)
+}
+
 // payload is a single JSON document plus the Go type it decodes into.
 type payload struct {
 	name string
@@ -135,6 +149,19 @@ type payload struct {
 	// decoded is a pre-decoded value, used as the input to the Marshal
 	// benchmarks so that decoding cost is not folded into encoding cost.
 	decoded any
+	// marshalDirect and unmarshalDirect call the package level functions
+	// -direct generates for this payload's type. Those signatures are
+	// typed, so unlike the libraries above they cannot share one `any`
+	// based table entry; the closure is per payload instead.
+	// unmarshalDirect allocates the value it decodes into, the way the
+	// `any` based entries do through newValue, and hands it back so the
+	// parity test can look at what it decoded.
+	marshalDirect   func() ([]byte, error)
+	unmarshalDirect func([]byte) (any, error)
+	// appendDirect is the other half of the -direct encoder: it writes into
+	// a buffer the caller owns, which is the only row in this file that
+	// does not allocate its result. See BenchmarkAppendDirect.
+	appendDirect func([]byte) ([]byte, error)
 }
 
 // loadPayloads reads the fixtures once per test binary. twitter.json and
@@ -172,22 +199,31 @@ var loadPayloads = sync.OnceValues(func() ([]payload, error) {
 
 	return []payload{
 		{
-			name:     "twitter",
-			data:     twitterJSON,
-			newValue: func() any { return new(TwitterStruct) },
-			decoded:  twitter,
+			name:            "twitter",
+			data:            twitterJSON,
+			newValue:        func() any { return new(TwitterStruct) },
+			decoded:         twitter,
+			marshalDirect:   func() ([]byte, error) { return MarshalTwitterStruct(twitter) },
+			unmarshalDirect: unmarshalDirectTwitter,
+			appendDirect:    func(dst []byte) ([]byte, error) { return AppendTwitterStruct(dst, twitter) },
 		},
 		{
-			name:     "medium",
-			data:     mediumJSON,
-			newValue: func() any { return new(TwitterStruct) },
-			decoded:  medium,
+			name:            "medium",
+			data:            mediumJSON,
+			newValue:        func() any { return new(TwitterStruct) },
+			decoded:         medium,
+			marshalDirect:   func() ([]byte, error) { return MarshalTwitterStruct(medium) },
+			unmarshalDirect: unmarshalDirectTwitter,
+			appendDirect:    func(dst []byte) ([]byte, error) { return AppendTwitterStruct(dst, medium) },
 		},
 		{
-			name:     "small",
-			data:     data,
-			newValue: func() any { return new(Book) },
-			decoded:  small,
+			name:            "small",
+			data:            data,
+			newValue:        func() any { return new(Book) },
+			decoded:         small,
+			marshalDirect:   func() ([]byte, error) { return MarshalBook(small) },
+			unmarshalDirect: unmarshalDirectBook,
+			appendDirect:    func(dst []byte) ([]byte, error) { return AppendBook(dst, small) },
 		},
 	}, nil
 })
@@ -271,6 +307,54 @@ func TestGeneratedMatchesReflection(t *testing.T) {
 						t.Errorf("%s did not route through the generated codec (%d bytes vs %d)",
 							c.name, len(viaHost), len(direct))
 					}
+				}
+			}
+
+			// The -direct functions follow json/v2's semantics with
+			// encoding/json's escaping, which is what an encoding/json
+			// Marshal makes of MarshalJSONTo. If that ever stops holding,
+			// the odjson-direct rows below are measuring a different
+			// encoder from the rest of the table.
+			//
+			// The comparison is by value rather than by byte: twitter.json
+			// carries []interface{} members, so both outputs write the
+			// map[string]any they decoded into in iteration order and
+			// neither is byte stable. Byte equality against encoding/json
+			// is pinned on a map free type in
+			// internal/testfixture/direct instead.
+			if p.marshalDirect != nil {
+				viaDirect, err := p.marshalDirect()
+				if err != nil {
+					t.Fatalf("odjson -direct marshal: %v", err)
+				}
+				viaLibrary, err := jsonv1.Marshal(p.decoded)
+				if err != nil {
+					t.Fatalf("encoding/json marshal: %v", err)
+				}
+				var asDirect, asLibrary any
+				if err := jsonv1.Unmarshal(viaDirect, &asDirect); err != nil {
+					t.Fatalf("-direct output is not valid JSON: %v", err)
+				}
+				if err := jsonv1.Unmarshal(viaLibrary, &asLibrary); err != nil {
+					t.Fatalf("encoding/json output: %v", err)
+				}
+				if !reflect.DeepEqual(asDirect, asLibrary) {
+					t.Error("-direct encoded a different document from encoding/json's Marshal")
+				}
+
+				// The decode half is pinned the same way: json/v2's
+				// Unmarshal reaches UnmarshalJSONFrom and, through it, the
+				// very parser UnmarshalT calls.
+				decodedDirect, err := p.unmarshalDirect(p.data)
+				if err != nil {
+					t.Fatalf("odjson -direct unmarshal: %v", err)
+				}
+				viaV2 := p.newValue()
+				if err := jsonv2.Unmarshal(p.data, viaV2); err != nil {
+					t.Fatalf("json/v2 unmarshal: %v", err)
+				}
+				if !reflect.DeepEqual(decodedDirect, viaV2) {
+					t.Error("-direct decoded a different value from json/v2's Unmarshal")
 				}
 			}
 
@@ -364,6 +448,66 @@ func BenchmarkMarshal(b *testing.B) {
 			}
 		})
 	}
+
+	// odjson-direct is the -direct API: the same generated encoder with
+	// encoding/json taken out of the call. It is not a codecs entry because
+	// its signature is typed, but the benchmark name keeps the
+	// <codec>/<payload> shape the rest of the table has.
+	b.Run("odjson-direct", func(b *testing.B) {
+		for _, p := range ps {
+			if p.marshalDirect == nil {
+				continue
+			}
+			b.Run(p.name, func(b *testing.B) {
+				if _, err := p.marshalDirect(); err != nil {
+					b.Fatal(err)
+				}
+
+				b.ReportAllocs()
+				b.SetBytes(int64(len(p.data)))
+
+				for b.Loop() {
+					if _, err := p.marshalDirect(); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
+	})
+}
+
+// BenchmarkAppendDirect measures AppendT into a buffer the caller keeps.
+//
+// It is deliberately not a row in BenchmarkMarshal: every row there allocates
+// the []byte it returns, and this one does not, so putting them in one table
+// would invite a comparison of two different jobs. What it isolates is the
+// encoder itself, with both the entry point and the result allocation out of
+// the way -- which on a large document is where MarshalT's time actually
+// goes, since a returned buffer has to be sized by odjsonrt.SizeHint and that
+// hint carries an eighth of headroom.
+func BenchmarkAppendDirect(b *testing.B) {
+	for _, p := range payloads(b) {
+		if p.appendDirect == nil {
+			continue
+		}
+		b.Run(p.name, func(b *testing.B) {
+			buf, err := p.appendDirect(nil)
+			if err != nil {
+				b.Fatal(err)
+			}
+			buf = buf[:0]
+
+			b.ReportAllocs()
+			b.SetBytes(int64(len(p.data)))
+
+			for b.Loop() {
+				buf, err = p.appendDirect(buf[:0])
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
 }
 
 func BenchmarkUnmarshal(b *testing.B) {
@@ -395,4 +539,26 @@ func BenchmarkUnmarshal(b *testing.B) {
 			}
 		})
 	}
+
+	b.Run("odjson-direct", func(b *testing.B) {
+		for _, p := range ps {
+			if p.unmarshalDirect == nil {
+				continue
+			}
+			b.Run(p.name, func(b *testing.B) {
+				if _, err := p.unmarshalDirect(p.data); err != nil {
+					b.Fatal(err)
+				}
+
+				b.ReportAllocs()
+				b.SetBytes(int64(len(p.data)))
+
+				for b.Loop() {
+					if _, err := p.unmarshalDirect(p.data); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
+	})
 }
