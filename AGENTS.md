@@ -37,6 +37,19 @@ verified against. What it costs is the thing the default stance protects:
 call sites that no longer compile once the generated file is deleted. Say so
 when documenting it.
 
+**Measured** (`bench/direct`, identical bytes, one row per process): against
+`encoding/json`, `UnmarshalT` is −66% on all three payloads, because v1's
+flags keep `UnmarshalJSONFrom` off the direct path and `UnmarshalT` has no
+flags to honour. Against `encoding/json/v2`, which already takes that route,
+only the entry point is left — a flat 50–140 ns, so `twitter` is level
+(p=0.394) and `small` is −24%. `AppendT` into a caller's buffer is
+1.8×–2.7× with no allocation at all, and is the encode story; `MarshalT` and
+`json/v2`'s `Marshal` both pay the same result copy. **A `-direct` encode row
+must be quoted from a per-process run**: in one `go test -bench .` the
+`odjson-direct` rows come last, on a churned heap, which moves them about 5%.
+`-escape-html` is worth another 18 µs on `twitter`, so `gen`'s `json-v2` row
+is not a like-for-like baseline and `bench/direct` exists to be one.
+
 The functions follow **`encoding/json/v2`'s semantics** — they call the very
 `odjsonAppend` and `odjsonParseV2` the v2 methods call — so `-case-insensitive`
 does not reach them. Under the default `-escape-html` the encoder writes
@@ -269,7 +282,8 @@ Within the root module:
 Every fixture's generated file is committed, and `internal/generate`'s tests
 regenerate each one and fail on any difference. Regenerate with
 `go generate ./...` from the repo root (and again from `bench/` — a separate
-module, whose `gen` and `shapes/gen` packages both carry a directive, and
+module, whose `gen`, `shapes/gen` and `direct` packages each carry a
+directive — `direct`'s is `-direct -escape-html=false`, deliberately — and
 whose `easyjson` and `shapes/easyjson` packages carry one that runs
 easyjson's generator instead) whenever the generator changes.
 - `docs/internals.md` — the measurement record and the implementation detail
