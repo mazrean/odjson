@@ -1274,9 +1274,21 @@ they never touch `odjsonrt/direct.go` — they keep their speed under
 `-tags odjson_safe` and on a Go minor the direct path has not been verified
 against.
 
-Measured on the AMD Ryzen 9 7950X, go1.27.1, `bench/gen`, `-count 6` through
-`benchstat`. Every row below runs the identical generated codec; the only
-variable is how the call reaches it.
+The chart is `bench/direct`'s numbers — the like-for-like ones, from the
+per-process runs the next section explains. Regenerate it with
+`cd bench && go run ./chart -chart direct`.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/direct-dark.svg">
+  <img alt="Time per operation, lower is better. Both sides run the same generated codec on the same bytes. Marshal large 616 KiB: json/v2 + odjson 106 µs, MarshalT 105 µs (no significant difference, p=0.394), AppendT 59 µs with no allocation. Marshal medium 13 KiB: 2924 ns, MarshalT 2749 ns (1.06× faster), AppendT 1096 ns. Marshal small 365 B: 275 ns, MarshalT 209 ns (1.32× faster), AppendT 107 ns. Unmarshal large 616 KiB: 401 µs, UnmarshalT 397 µs (no significant difference, p=0.240). Unmarshal medium 13 KiB: 8914 ns, UnmarshalT 8722 ns (1.02× faster). Unmarshal small 365 B: 596 ns, UnmarshalT 471 ns (1.27× faster)." src="assets/direct-light.svg" width="912">
+</picture>
+
+The two tables below are a different measurement from the chart: they are
+`bench/gen`, where the generated file carries the default `-escape-html` and
+the comparison against `encoding/json` is the one that can be made. Measured
+on the AMD Ryzen 9 7950X, go1.27.1, `-count 6` through `benchstat`. Every row
+runs the identical generated codec; the only variable is how the call reaches
+it.
 
 **Against `encoding/json`** — the like-for-like comparison, since both write
 `ModeV2HTML` bytes:

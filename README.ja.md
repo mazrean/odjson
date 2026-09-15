@@ -196,6 +196,11 @@ func UnmarshalT(data []byte, v *T) error
 
 `T` が非公開型なら `marshalT` / `appendT` / `unmarshalT` になり、関数の可視性は型の可視性と一致します。
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/direct-dark.svg">
+  <img alt="1 回あたりの所要時間。短いほど速い。両者は同じ生成コーデックで同じバイトを書く。Marshal large 616 KiB: json/v2 + odjson 106 µs, MarshalT 105 µs（有意差なし、p=0.394）、AppendT 59 µs（確保なし）。Marshal medium 13 KiB: 2924 ns, MarshalT 2749 ns（1.06 倍）、AppendT 1096 ns。Marshal small 365 B: 275 ns, MarshalT 209 ns（1.32 倍）、AppendT 107 ns。Unmarshal large 616 KiB: 401 µs, UnmarshalT 397 µs（有意差なし、p=0.240）。Unmarshal medium 13 KiB: 8914 ns, UnmarshalT 8722 ns（1.02 倍）。Unmarshal small 365 B: 596 ns, UnmarshalT 471 ns（1.27 倍）。" src="./docs/assets/direct-light.svg" width="912">
+</picture>
+
 呼び出す先はメソッドと同じ生成済みエンコーダ・パーサで、`encoding/json` のインタフェース経由の呼び出し、オプション解釈、バッファの受け渡しが消えるぶんだけ速くなります。セマンティクスは `encoding/json/v2` に従うため `-case-insensitive` は届かず、デフォルトの `-escape-html` のもとでは `MarshalT(&v)` は `json.Marshal(&v)` とバイト単位で一致します。
 
 判断材料は 3 つです。

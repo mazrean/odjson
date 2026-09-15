@@ -196,6 +196,11 @@ func UnmarshalT(data []byte, v *T) error
 
 An unexported `T` gets `marshalT` / `appendT` / `unmarshalT`, so the functions are exactly as reachable as the type they serve.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/direct-dark.svg">
+  <img alt="Time per operation, lower is better. Both sides run the same generated codec on the same bytes. Marshal large 616 KiB: json/v2 + odjson 106 µs, MarshalT 105 µs (no significant difference, p=0.394), AppendT 59 µs with no allocation. Marshal medium 13 KiB: 2924 ns, MarshalT 2749 ns (1.06× faster), AppendT 1096 ns. Marshal small 365 B: 275 ns, MarshalT 209 ns (1.32× faster), AppendT 107 ns. Unmarshal large 616 KiB: 401 µs, UnmarshalT 397 µs (no significant difference, p=0.240). Unmarshal medium 13 KiB: 8914 ns, UnmarshalT 8722 ns (1.02× faster). Unmarshal small 365 B: 596 ns, UnmarshalT 471 ns (1.27× faster)." src="./docs/assets/direct-light.svg" width="912">
+</picture>
+
 They call the same generated encoder and parser the methods call, with `encoding/json`'s interface dispatch, option decoding and buffer handover taken out of the way, and they follow `encoding/json/v2`'s semantics — so `-case-insensitive` does not reach them, and under the default `-escape-html` `MarshalT(&v)` is byte for byte what `json.Marshal(&v)` produces.
 
 Three things to weigh:
