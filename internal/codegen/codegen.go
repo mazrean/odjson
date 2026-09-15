@@ -6,6 +6,9 @@ import (
 	"go/ast"
 	"go/token"
 	"strconv"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/mazrean/odjson/internal/analyzer"
 )
@@ -18,6 +21,11 @@ type Options struct {
 	// CaseInsensitive enables encoding/json's fallback that matches an
 	// object member to a field name ignoring case.
 	CaseInsensitive bool
+	// Direct adds the package level MarshalT / AppendT / UnmarshalT
+	// functions that reach the generated codec without going through
+	// encoding/json. Off by default: the four standard methods are the
+	// whole API surface unless the user asks for more.
+	Direct bool
 	// Command is recorded in the file header.
 	Command string
 }
@@ -370,6 +378,109 @@ func (g *generator) structCodec(s *analyzer.StructInfo) {
 			})
 			g.emit(b, expr(callRT("PutStringCache", sc)))
 			g.emit(b, ret(errV))
+		})
+
+	if g.opts.Direct {
+		g.directFuncs(s)
+	}
+}
+
+// directName renders the package level name of one -direct function: MarshalT
+// for an exported type, marshalT for an unexported one, so the function is
+// exactly as reachable as the type it serves.
+func directName(verb string, s *analyzer.StructInfo) string {
+	if token.IsExported(s.Name) {
+		return strings.ToUpper(verb[:1]) + verb[1:] + s.Name
+	}
+	r, n := utf8.DecodeRuneInString(s.Name)
+	return verb + string(unicode.ToUpper(r)) + s.Name[n:]
+}
+
+// directFuncs writes the package level functions -direct adds for one local
+// struct. They call the same odjsonAppend and odjsonParseV2 the four standard
+// methods call, with the interface dispatch, the option decoding and the
+// buffer handover of encoding/json taken out.
+//
+// They follow encoding/json/v2's semantics, which is what MarshalJSONTo and
+// UnmarshalJSONFrom follow, so -case-insensitive does not reach them. Under
+// -escape-html the encoder writes odjsonrt.ModeV2HTML, which is byte for byte
+// what an encoding/json Marshal makes of MarshalJSONTo, so the functions and
+// the standard entry points stay interchangeable. Nothing here goes through
+// odjsonrt's direct path, so the speed survives -tags odjson_safe and a Go
+// minor that path has not been verified against.
+func (g *generator) directFuncs(s *analyzer.StructInfo) {
+	mode := rt("ModeV2")
+	if g.opts.EscapeHTML {
+		mode = rt("ModeV2HTML")
+	}
+
+	g.pkg.Imports.Add("bytes", "bytes")
+	marshal := directName("marshal", s)
+	g.funcDecl([]string{
+		"// " + marshal + " returns the JSON encoding of v, reaching the generated",
+		"// encoder without going through encoding/json.",
+	}, nil, marshal,
+		signature([]*ast.Field{receiver(s, false)}, sliceType(id("byte")), id("error")),
+		func(b *block) {
+			buf, out := id("buf"), id("out")
+			g.comment(b,
+				"// The encoding is built in a pooled buffer and copied out once,",
+				"// rather than written into a buffer allocated at the right size:",
+				"// a fresh allocation is handed out zeroed, so writing into it",
+				"// walks cold memory twice, while the copy out of a warm pooled",
+				"// buffer allocates without zeroing and moves the bytes once.")
+			g.emit(b, define(buf, callRT("GetBuffer")))
+			g.emit(b, varDecl("err", id("error")))
+			g.emit(b, assignN(token.ASSIGN, []ast.Expr{sel(buf, "B"), errV},
+				call(sel(v, "odjsonAppend"), sel(buf, "B"), mode)))
+			g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
+				g.emit(b, expr(callRT("PutBuffer", buf)))
+				g.emit(b, ret(nilV, errV))
+			})
+			g.emit(b, define(out, call(sel(id("bytes"), "Clone"), sel(buf, "B"))))
+			g.emit(b, expr(callRT("PutBuffer", buf)))
+			g.emit(b, ret(out, nilV))
+		})
+
+	appendName := directName("append", s)
+	g.funcDecl([]string{
+		"// " + appendName + " appends the JSON encoding of v to dst and returns the",
+		"// extended buffer. On failure dst is returned with nothing appended.",
+	}, nil, appendName,
+		signature([]*ast.Field{field("dst", sliceType(id("byte"))), receiver(s, false)},
+			sliceType(id("byte")), id("error")),
+		func(b *block) {
+			n := id("n")
+			g.emit(b, define(n, call(id("len"), dst)))
+			g.emit(b, assignN(token.DEFINE, []ast.Expr{dst, errV},
+				call(sel(v, "odjsonAppend"), dst, mode)))
+			g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
+				g.emit(b, ret(slice(dst, nil, n), errV))
+			})
+			g.emit(b, ret(dst, nilV))
+		})
+
+	unmarshal := directName("unmarshal", s)
+	g.funcDecl([]string{
+		"// " + unmarshal + " decodes a complete JSON document into v under",
+		"// encoding/json/v2's semantics. Nobody has validated data, so the parser",
+		"// rejects what jsontext would have.",
+	}, nil, unmarshal,
+		signature([]*ast.Field{field("data", sliceType(id("byte"))), receiver(s, false)},
+			id("error")),
+		func(b *block) {
+			sc := id(cache)
+			g.comment(b,
+				"// The cache plays the part of encoding/json/v2's string cache: a",
+				"// value that recurs in the document is allocated once.")
+			g.emit(b, define(sc, callRT("GetStringCache")))
+			g.emit(b, assignN(token.DEFINE, []ast.Expr{p, errV},
+				call(sel(v, "odjsonParseV2"), data, callRT("SkipSpace", data, num(0)), sc, id("true"))))
+			g.emit(b, expr(callRT("PutStringCache", sc)))
+			g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
+				g.emit(b, ret(errV))
+			})
+			g.emit(b, ret(callRT("EndOfDocument", data, p)))
 		})
 }
 

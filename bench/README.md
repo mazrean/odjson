@@ -174,8 +174,42 @@ from one `go test -bench` output.
 
 `gen`'s rows measure unchanged call sites — the same `json.Marshal` /
 `json.Unmarshal` as `plain`, now routed through the generated methods, which is
-the only way odjson is used. There is no separate direct entry point to
-measure: the generator emits the four interface methods and nothing else.
+how odjson is used by default.
+
+The `odjson-direct` rows measure the other way in: `gen` is generated with
+`-direct`, so the same types also carry package level `MarshalTwitterStruct`
+and `UnmarshalBook` functions, and those rows call them. Everything below the
+call is identical — the same `odjsonAppend`, the same `odjsonParseV2` — so the
+gap between an `odjson-direct` row and the `encoding-json` row beside it is
+the cost of reaching the codec through `encoding/json`, and nothing else.
+They are not a `codec` table entry because their signatures are typed rather
+than `any` based; the benchmark name keeps the same `<codec>/<payload>` shape
+regardless.
+
+Two things to read carefully there:
+
+- **The `json-v2` Marshal row is not like for like.** `json/v2` does not
+  escape `<`, `>` and `&`, and `gen` is generated with the default
+  `-escape-html`, so `MarshalTwitterStruct` writes bytes that row does not —
+  worth 18 µs on `twitter`. Read the encode side against `encoding-json`,
+  which escapes the same things, and see `direct` below for the comparison
+  against `json/v2` at identical bytes. The decode rows have no escaping to
+  differ over and are comparable against either.
+- **`odjson-direct` runs last**, on a heap the rows above it have churned, and
+  that is worth about 5% on the encode. It makes `gen`'s encode figures
+  conservative rather than flattering, but do not quote one as a measured
+  margin: run the row in its own process first.
+- `BenchmarkAppendDirect` is the encoder with both the entry point and the
+  result allocation taken out: it writes into a buffer the caller keeps. It
+  is deliberately a benchmark of its own rather than a `Marshal` row, because
+  every row there allocates what it returns and this one does not.
+
+`MarshalT` builds its result in a pooled buffer and copies out, rather than
+allocating one at `odjsonrt.SizeHint`'s size. That is worth knowing here
+because the rejected shape read *seven times* its real cost in this very
+table: `twitter` and `medium` are the same Go type and would have shared one
+hint, so `twitter` running first left every later `MarshalTwitterStruct`
+allocating a 288 KiB buffer. See `docs/internals.md`.
 
 `TestGeneratedMatchesReflection` asserts that every host library really does
 route through the generated codec. sonic, go-json, json-iterator, segmentio
@@ -188,6 +222,14 @@ fails, the `gen` rows are not measuring what they claim to. easyjson, gojay
 and simdjson-go have entry points of their own and never reach a
 `MarshalJSON`, so they have no `gen` row.
 
+The same test pins the `-direct` functions: their output must decode to the
+same document `encoding/json`'s `Marshal` produces, and `UnmarshalTwitterStruct`
+must decode to the same value `encoding/json/v2`'s `Unmarshal` does. The
+comparison is by value rather than by byte because `twitter.json` carries
+`[]interface{}` members, whose `map[string]any` the encoder writes in
+iteration order; byte equality against `encoding/json` is pinned on a map free
+type in `internal/testfixture/direct` instead.
+
 To regenerate after changing the generator:
 
 ```sh
@@ -196,6 +238,55 @@ cd bench && go generate ./...
 
 That covers `gen` and `shapes/gen`, which carry the same directive, and
 `easyjson`, whose directive runs easyjson's generator.
+
+## `direct`
+
+`gen`'s types again, generated with `-direct -escape-html=false`. That one
+flag is the whole reason the package exists: it puts `MarshalT` on
+`odjsonrt.ModeV2`, the exact bytes `encoding/json/v2` writes, so the
+`odjson-direct` and `json-v2` rows are finally the same job.
+`TestDirectMatchesJSONV2` is what holds that — byte for byte on `small`, and
+by length and value on `twitter` and `medium`, whose `interface{}` members put
+a `map[string]any` in iteration order. `gen` cannot be regenerated this way,
+because its `encoding-json` rows are supposed to produce `encoding/json`'s
+bytes.
+
+**Run one row per process.** Both packages' `odjson-direct` rows come last in
+a single `go test -bench .`, after rows that have churned the heap, and that
+is worth about 5% on the encode:
+
+```sh
+cd bench/direct
+go test -run '^$' -bench '^BenchmarkMarshal$/^json-v2$/^twitter$' -count 6 > a.txt
+go test -run '^$' -bench '^BenchmarkMarshal$/^odjson-direct$/^twitter$' -count 6 > b.txt
+benchstat a.txt b.txt
+```
+
+Interleaving the two loops is better still. `docs/internals.md` quotes the
+numbers that come out of it, and so does this package's chart:
+
+```sh
+cd bench && go run ./chart -chart direct
+```
+
+which writes `docs/assets/direct-{light,dark}.svg` from the literals in
+`chart/main.go`'s `directChart` — the same renderer, and the same format, as
+the README's. Re-measuring means editing those literals, exactly as it does
+for the README's.
+
+Two differences from the README's chart, both deliberate. The `-direct` row is
+**not indented** under the baseline: an indent means "the row above, plus
+this", and `MarshalT` is not `json/v2` plus anything — the two rows are
+alternative ways in, and are drawn as alternatives. And `AppendT` is measured
+but **not drawn**: it writes into a buffer the caller keeps, so a bar of its
+own beside one that allocates would invite a comparison that is not there.
+
+`-input` renders raw ratios: medians alone cannot say whether a difference is
+significant, so the `~` a literal panel carries is dropped.
+
+The package is deliberately out of the **README's** chart and out of
+`bench.yml`: it answers a question about odjson's own API, not about where
+odjson sits among the host libraries, which is what that chart is for.
 
 ## `ab`
 

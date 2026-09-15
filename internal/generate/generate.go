@@ -26,6 +26,9 @@ type Config struct {
 	// generator.
 	EscapeHTML      bool
 	CaseInsensitive bool
+	// Direct adds the package level MarshalT / AppendT / UnmarshalT
+	// functions alongside the four standard methods.
+	Direct bool
 	// Command is recorded in the generated file's header.
 	Command string
 }
@@ -57,6 +60,7 @@ func Source(dir string, cfg Config) ([]byte, error) {
 	return codegen.Generate(pkg, codegen.Options{
 		EscapeHTML:      cfg.EscapeHTML,
 		CaseInsensitive: cfg.CaseInsensitive,
+		Direct:          cfg.Direct,
 		Command:         cfg.Command,
 	})
 }

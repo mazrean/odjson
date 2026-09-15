@@ -1256,6 +1256,217 @@ requires `json/v2` to produce the same bytes for both, and the JSON Test Suite
 runs through the generated `UnmarshalJSONFrom` against `json/v2`'s own decoder
 for all 318 cases.
 
+## The `-direct` functions
+
+Not to be confused with **the direct path** above, which is how the four
+standard methods reach into `jsontext`'s buffers. `-direct` is a generator
+flag, off by default, that emits a second entry point per struct type `T`:
+
+```go
+func MarshalT(v *T) ([]byte, error)
+func AppendT(dst []byte, v *T) ([]byte, error)
+func UnmarshalT(data []byte, v *T) error
+```
+
+They call the same `odjsonAppend` and `odjsonParseV2` the methods call. What
+they remove is everything `encoding/json` does around that call, and — because
+they never touch `odjsonrt/direct.go` — they keep their speed under
+`-tags odjson_safe` and on a Go minor the direct path has not been verified
+against.
+
+What they cost is the property everything else here protects: a call site
+written against `MarshalT` stops compiling once the generated file is deleted,
+where one written against `json.Marshal` just goes back to the library's own
+speed. That is why the flag is off by default and why `README.md` gives it one
+row of the flag table rather than a section — an unchanged `json.Marshal` over
+`encoding/json/v2` is how odjson is meant to be used, and this page is where
+the alternative is spelled out.
+
+The chart is `bench/direct`'s numbers — the like-for-like ones, from the
+per-process runs the next section explains. Regenerate it with
+`cd bench && go run ./chart -chart direct`. It draws `MarshalT` and
+`UnmarshalT` only: `AppendT` writes into a buffer the caller keeps, so a bar
+of its own beside one that allocates would invite a comparison that is not
+there. Its numbers are two sections down.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/direct-dark.svg">
+  <img alt="Time per operation, lower is better. Both rows run the same generated codec on the same bytes. Marshal large 616 KiB: json/v2 + odjson 106 µs, MarshalT 105 µs (no significant difference, p=0.394). Marshal medium 13 KiB: 2924 ns, MarshalT 2749 ns (1.06× faster). Marshal small 365 B: 275 ns, MarshalT 209 ns (1.32× faster). Unmarshal large 616 KiB: 401 µs, UnmarshalT 397 µs (no significant difference, p=0.240). Unmarshal medium 13 KiB: 8914 ns, UnmarshalT 8722 ns (1.02× faster). Unmarshal small 365 B: 596 ns, UnmarshalT 471 ns (1.27× faster)." src="assets/direct-light.svg" width="912">
+</picture>
+
+The two tables below are a different measurement from the chart: they are
+`bench/gen`, where the generated file carries the default `-escape-html` and
+the comparison against `encoding/json` is the one that can be made. Measured
+on the AMD Ryzen 9 7950X, go1.27.1, `-count 6` through `benchstat`. Every row
+runs the identical generated codec; the only variable is how the call reaches
+it.
+
+**Against `encoding/json`** — the like-for-like comparison, since both write
+`ModeV2HTML` bytes:
+
+| | Marshal | Unmarshal |
+| --- | --- | --- |
+| `twitter` | 116.6 µs → 115.3 µs (~, p=0.24) | 1149.0 µs → 394.8 µs (**−65.6%**) |
+| `medium` | 3.239 µs → 3.049 µs (−5.9%) | 24.85 µs → 8.41 µs (**−66.2%**) |
+| `small` | 272.4 ns → 210.3 ns (−22.8%) | 1459.5 ns → 491.1 ns (**−66.4%**) |
+
+Allocations are identical on every row, to the byte.
+
+**Against `encoding/json/v2`:**
+
+| | Marshal | Unmarshal |
+| --- | --- | --- |
+| `twitter` | 97.8 µs → 115.3 µs (+17.8%) | 392.6 µs → 394.8 µs (~, p=0.31) |
+| `medium` | 2.580 µs → 3.049 µs (+18.2%) | 8.628 µs → 8.410 µs (−2.5%) |
+| `small` | 254.9 ns → 210.3 ns (−17.5%) | 613.4 ns → 491.1 ns (−19.9%) |
+
+Three things to read out of that.
+
+**The entry point costs a flat 50–140 ns**, not a percentage. `small` is where
+it shows (−17.5% encode, −19.9% decode); `twitter` is where it disappears
+(2 µs in 395). A `-direct` function is worth reaching for on small values in a
+hot loop, and worth nothing on a large document.
+
+**The decode side is the exception, and the reason is v1's flags.** Under
+`encoding/json` the generated `UnmarshalJSONFrom` cannot take the direct path
+— those flags allow what the strict parsers refuse — so it stays on the public
+API path and pays for it. `UnmarshalT` has no flags to honour, so it goes
+straight to `odjsonParseV2` with `strict` set. That is the same route
+`encoding/json/v2` already takes, which is why the gain against `json/v2` is
+only the entry point while the gain against `encoding/json` is **a factor of
+three on every payload**.
+
+That factor of three is the largest number `-direct` produces, and it is the
+one to be most careful quoting: it is **not** a free speed-up of an existing
+`encoding/json` call site, because `UnmarshalT` decodes under json/v2's rules.
+A v1 call site that relied on a case-insensitive member match, on a duplicate
+name being accepted, on an array being padded or truncated to fit, or on
+`null` leaving a field untouched will *behave differently*, not merely faster.
+Those are exactly the allowances that keep `UnmarshalJSONFrom` off the direct
+path in the first place — which is to say the 3× and the semantics change are
+the same fact seen from two sides, and `-case-insensitive` does not bridge it.
+See "Which semantics a generated method follows" above.
+
+**The `json/v2` Marshal row above is not like for like, and neither is its
+ordering.** Taken at face value it says `MarshalT` is 17.8% *slower* than
+`json/v2`'s Marshal on `twitter` — which cannot be right, since `MarshalT`
+does strictly less than the call that reaches it. Two separate artefacts, both
+measured out in `bench/direct`; see the next section.
+
+### Why `MarshalT` builds in a pooled buffer
+
+The obvious shape — allocate at `odjsonrt.SizeHint`'s size and append into it —
+was measured and rejected:
+
+| | `SizeHint` buffer | pooled + `bytes.Clone` |
+| --- | --- | --- |
+| `twitter` | 115.1 µs, 288 KiB | 115.3 µs, 256.8 KiB |
+| `medium` | 3.10 µs, 10.0 KiB (measured alone) | 3.05 µs, 9.27 KiB |
+| `small` | 203.1 ns, 416 B | 210.3 ns, 384 B |
+
+Level on time, 7 ns worse on `small`, and taken for two reasons that are not
+about time. A fresh allocation is handed out zeroed, so the encoder walks cold
+memory; the pooled buffer is warm and the copy out of it allocates without
+zeroing. And `SizeHint` carries an eighth of headroom and only ever grows,
+which makes the allocation both larger than the library's and *shared between
+every document of that type*: `twitter` and `medium` are the same Go type, so
+in one process `twitter` left the hint at 256 KiB and `medium`'s `MarshalT`
+then allocated 288 KiB per call and read **21.7 µs instead of 3.05 µs** —
+seven times its real cost, in the benchmark `bench.yml` posts on every pull
+request. The pooled form has no hint to share.
+
+`MarshalJSON` still has the `SizeHint` shape, and the same question. It is the
+default path, so answering it needs the pooled-layout procedure in
+"Measurement notes" rather than one run; it is left open deliberately.
+
+### `bench/direct`: the same bytes, and one row per process
+
+`MarshalT` cannot be slower than a `json/v2` `Marshal` that reaches it: it is
+the same `odjsonAppend`, the same pooled buffer, the same `bytes.Clone`
+(`encoding/json/v2`'s `Marshal` is literally `GetBufferedEncoder` →
+`marshalEncode` → `bytes.Clone(xe.Buf)`), minus the interface dispatch, the
+option decoding and the encoder's own bookkeeping. When a measurement says
+otherwise, the measurement is what to look at.
+
+It was two things, and `bench/direct` — `gen`'s types generated with
+`-direct -escape-html=false`, so `MarshalT` writes `ModeV2`, the exact bytes
+`json/v2` writes, with `TestDirectMatchesJSONV2` requiring it — takes them
+apart.
+
+**The escaping, worth 18 µs on `twitter`.** The identical `AppendT`, same
+payload, same generated code, differing only in the mode:
+
+| | `ModeV2HTML` (`bench/gen`) | `ModeV2` (`bench/direct`) |
+| --- | --- | --- |
+| `twitter` | 76.13 µs | **58.56 µs** |
+| `medium` | 1.694 µs | **1.096 µs** |
+| `small` | 123.5 ns | **107.3 ns** |
+
+So under the default `-escape-html`, `MarshalT` is doing work the `json/v2`
+row beside it is not, and their ratio is not the entry point.
+
+**Benchmark ordering, worth about 5%.** In one process `json/v2`'s rows run
+first and `odjson-direct`'s last, on a heap the earlier rows have churned at
+257 KiB per iteration. Running each row in its own process, interleaved, moves
+`twitter` by 4.7% and `medium` by 5.7% — larger than the 3–4% layout noise in
+"Measurement notes", and in a fixed direction. **Quote a `-direct` encode row
+only from a per-process run.**
+
+With both removed — identical bytes, one row per process, interleaved,
+`-count 6` through `benchstat`:
+
+| | `json/v2` + odjson | `MarshalT` | |
+| --- | --- | --- | --- |
+| `twitter` | 106.3 µs ± 5% | 104.9 µs ± 4% | ~ (p=0.394) |
+| `medium` | 2.924 µs ± 2% | **2.749 µs** ± 2% | −6.0% (p=0.002) |
+| `small` | 275.2 ns ± 2% | **208.7 ns** ± 1% | −24.2% (p=0.002) |
+
+Never slower, and faster by exactly as much as the entry point is worth
+relative to the document: invisible at 257 KiB, a quarter of the call at 344
+bytes. The decode side, given the same treatment:
+
+| | `json/v2` + odjson | `UnmarshalT` | |
+| --- | --- | --- | --- |
+| `twitter` | 400.9 µs ± 1% | 396.9 µs ± 2% | ~ (p=0.240) |
+| `medium` | 8.914 µs ± 1% | **8.722 µs** ± 2% | −2.15% (p=0.002) |
+| `small` | 596.4 ns ± 2% | **471.0 ns** ± 2% | −21.0% (p=0.002) |
+
+Allocation counts are identical on all three (475 / 18 / 6) and the bytes
+differ by 0.2%, which is the decoder's own scratch and not the entry point.
+Reading the saving in nanoseconds rather than per cent is what makes the three
+rows one number: 125 ns on `small`, 192 ns on `medium`, and on `twitter` a
+4 µs difference that a 1–2% spread cannot resolve. **The entry point is a
+constant, so the percentage is really a statement about the document.**
+
+Unlike the encode rows, the decode ones barely move under isolation — in a
+single process they read ~ / −2.3% / −20.6%. Two effects cancel: the heap the
+earlier rows churned costs the later one, and the `json/v2` rows running first
+warm the slab and the string cache that both sides share.
+
+The `bench/gen` tables further up have `odjson-direct` running last too, which
+makes their encode figures against `encoding/json` conservative in the same
+direction. The −66% decode rows are far too large for it to matter.
+
+### `AppendT` is the encode win
+
+At identical bytes, against the `json/v2` `Marshal` that reaches the same
+encoder:
+
+| | `AppendT` into a kept buffer | `json/v2`'s Marshal | |
+| --- | --- | --- | --- |
+| `twitter` | **58.56 µs**, 0 allocs | 106.3 µs, 1 alloc, 256.7 KiB | 1.82× |
+| `medium` | **1.096 µs**, 0 allocs | 2.924 µs, 1 alloc, 9.27 KiB | 2.67× |
+| `small` | **107.3 ns**, 0 allocs | 275.2 ns, 1 alloc, 384 B | 2.57× |
+
+Everything `MarshalT` spends above `AppendT` is the result buffer — a 257 KiB
+allocation and the copy into it, about 46 µs on `twitter`, which `json/v2`
+pays too and neither can avoid while returning a `[]byte`. A caller that keeps
+a buffer pays for the encoder and nothing else, and that is where `-direct`
+stops being a few per cent and becomes a factor.
+
+`BenchmarkAppendDirect` is deliberately not a `Marshal` row, in either
+package, because every row there allocates what it returns.
+
 ## The two third-party libraries
 
 sonic and go-json honour `json.Marshaler` and `json.Unmarshaler` too, so the

@@ -16,13 +16,56 @@ struct:
 - `MarshalJSONTo` / `UnmarshalJSONFrom` (`encoding/json/v2` interfaces)
 - `MarshalJSON` / `UnmarshalJSON` (`encoding/json` v1 interfaces)
 
-Those four methods are the **entire** generated API surface. There are no
-exported direct functions: everything a caller reaches goes through the
-standard interfaces, so an unchanged `json.Marshal` / `json.Unmarshal` picks
-the generated codec up, and deleting the generated file undoes all of it. Do
-not re-introduce package level `MarshalT` / `AppendT` / `UnmarshalT`; "keep
-using the standard library, and take it off whenever you like" is the product,
-and a second entry point contradicts it.
+Those four methods are the **entire** generated API surface **by default**.
+Everything a caller reaches goes through the standard interfaces, so an
+unchanged `json.Marshal` / `json.Unmarshal` picks the generated codec up, and
+deleting the generated file undoes all of it. "Keep using the standard
+library, and take it off whenever you like" is the product, and that is what
+an invocation without flags must keep producing: never emit a second entry
+point unasked.
+
+`-direct` is the opt-in that adds one, per struct type `T`: package level
+`MarshalT(v *T) ([]byte, error)`, `AppendT(dst []byte, v *T) ([]byte, error)`
+and `UnmarshalT(data []byte, v *T) error`, spelled `marshalT` / `appendT` /
+`unmarshalT` for an unexported `T` so the functions are exactly as reachable
+as the type they serve. It **adds** to the four methods rather than replacing
+them, and it defaults to **false**. What it buys is the call overhead of
+`encoding/json` — the interface dispatch, the option decoding, the buffer
+handover — and, because it never touches `odjsonrt/direct.go`, that speed also
+survives `-tags odjson_safe` and a Go minor the direct path has not been
+verified against. What it costs is the thing the default stance protects:
+call sites that no longer compile once the generated file is deleted. Say so
+when documenting it.
+
+**In `README.md` and `README.ja.md` it gets one row of the flag table and
+nothing else** — no section, no chart, no example. An unchanged `json.Marshal`
+over `encoding/json/v2` is how odjson is meant to be used, and the README is
+where that is established; a second entry point given a section of its own
+there reads as a second recommended way in. The full treatment — the
+signatures, the semantics, the measurements, the chart — lives in
+`docs/internals.md`. Do not re-expand it into the READMEs.
+
+**Measured** (`bench/direct`, identical bytes, one row per process): against
+`encoding/json`, `UnmarshalT` is −66% on all three payloads, because v1's
+flags keep `UnmarshalJSONFrom` off the direct path and `UnmarshalT` has no
+flags to honour. Against `encoding/json/v2`, which already takes that route,
+only the entry point is left — a flat 50–140 ns, so `twitter` is level
+(p=0.394) and `small` is −24%. `AppendT` into a caller's buffer is
+1.8×–2.7× with no allocation at all, and is the encode story; `MarshalT` and
+`json/v2`'s `Marshal` both pay the same result copy. **A `-direct` encode row
+must be quoted from a per-process run**: in one `go test -bench .` the
+`odjson-direct` rows come last, on a churned heap, which moves them about 5%.
+`-escape-html` is worth another 18 µs on `twitter`, so `gen`'s `json-v2` row
+is not a like-for-like baseline and `bench/direct` exists to be one.
+
+The functions follow **`encoding/json/v2`'s semantics** — they call the very
+`odjsonAppend` and `odjsonParseV2` the v2 methods call — so `-case-insensitive`
+does not reach them. Under the default `-escape-html` the encoder writes
+`odjsonrt.ModeV2HTML`, which makes `MarshalT` byte for byte what an
+`encoding/json` `Marshal` of the same value produces; `internal/testfixture/direct`
+pins exactly that, and pins `UnmarshalT` against `encoding/json/v2`'s
+`Unmarshal` on twenty documents, rejections included. Changing the mode or the
+`strict` argument breaks those oracles, which is the point of them.
 
 **Positioning** (measured, see `bench/`): the target is `encoding/json/v2`
 (2.7-4.4x faster on all six measurements: encode and decode of sonic's own
@@ -224,9 +267,12 @@ Within the root module:
   promotion and conflict resolution, `fallback` covers what the generator hands
   back to reflection, `crosspkg` covers types imported from another package,
   `suite` runs the JSON Test Suite through generated decoders,
-  `withmethods` covers a minimal type reached through every library, and
+  `withmethods` covers a minimal type reached through every library,
   `unexported` covers the default type selection, which takes unexported
-  struct types too.
+  struct types too, and `direct` covers `-direct`, pinning the generated
+  functions against `encoding/json`'s `Marshal` and `encoding/json/v2`'s
+  `Unmarshal` on the very same types — which is the only claim `-direct`
+  makes, so it needs no `plain` twin.
 
   Because the generated methods are what `encoding/json` now calls, the parity
   oracle cannot be `json.Marshal` on the fixture type itself. Each affected
@@ -244,7 +290,8 @@ Within the root module:
 Every fixture's generated file is committed, and `internal/generate`'s tests
 regenerate each one and fail on any difference. Regenerate with
 `go generate ./...` from the repo root (and again from `bench/` — a separate
-module, whose `gen` and `shapes/gen` packages both carry a directive, and
+module, whose `gen`, `shapes/gen` and `direct` packages each carry a
+directive — `direct`'s is `-direct -escape-html=false`, deliberately — and
 whose `easyjson` and `shapes/easyjson` packages carry one that runs
 easyjson's generator instead) whenever the generator changes.
 - `docs/internals.md` — the measurement record and the implementation detail
@@ -351,6 +398,14 @@ Four workflows, all under `.github/workflows/`:
   `docs/internals.md` quote, so the chart's footer names the runner and the
   comment carries the raw `go test` output. Never restate a CI figure as a
   measured claim — re-run locally first.
+
+  `bench/chart` draws two charts, picked with `-chart`: `readme` (the default,
+  written to `docs/assets/bench-{light,dark}.svg`, which is what CI renders)
+  and `direct` (`docs/assets/direct-{light,dark}.svg`, `bench/direct`'s
+  numbers). Adding a third means one more `chartDef`, not a second renderer.
+  A change to the renderer must leave the README's two SVGs **byte
+  identical** unless the README's numbers themselves changed; regenerate and
+  `cmp` before committing.
 
   The PNGs go on an orphan `bench-images` branch, one directory per PR head
   commit, and the comment links them as

@@ -179,6 +179,7 @@ With no package argument odjson generates for the package in the current directo
 | `-recursive`        | `true`           | Also generate codecs for struct types reachable from the selected ones, so nested values skip reflection too.  |
 | `-escape-html`      | `true`           | Escape `<`, `>` and `&` in strings, matching `encoding/json`'s default.                                        |
 | `-case-insensitive` | `false`          | In `UnmarshalJSON`, fall back to a case-insensitive member match the way `encoding/json` v1 does. Off by default, matching `encoding/json/v2`. |
+| `-direct`           | `false`          | Also generate package level `MarshalT` / `UnmarshalT` per struct type `T`, reaching the generated codec without going through `encoding/json`. Off by default: an unchanged `json.Marshal` is the way odjson is meant to be used, and a call site written against `MarshalT` stops compiling once the generated file is deleted. Measured in [docs/internals.md](./docs/internals.md). |
 | `-version`          |                  | Print the version and exit.                                                                                    |
 
 ## How it works

@@ -44,6 +44,7 @@ type config struct {
 	escapeHTML      bool
 	caseInsensitive bool
 	recursive       bool
+	direct          bool
 	showVersion     bool
 }
 
@@ -59,6 +60,7 @@ func run(args []string) error {
 	fs.BoolVar(&cfg.escapeHTML, "escape-html", true, "escape <, > and & like encoding/json does by default")
 	fs.BoolVar(&cfg.caseInsensitive, "case-insensitive", false, "in UnmarshalJSON, fall back to a case-insensitive field match the way encoding/json v1\n\tdoes. Off by default, matching encoding/json/v2")
 	fs.BoolVar(&cfg.recursive, "recursive", true, "also generate codecs for struct types reachable from the selected types")
+	fs.BoolVar(&cfg.direct, "direct", false, "also generate package level MarshalT, AppendT and UnmarshalT functions per struct type T,\n\tskipping encoding/json entirely. They follow encoding/json/v2's semantics, so\n\t-case-insensitive does not reach them")
 	fs.BoolVar(&cfg.showVersion, "version", false, "print the version and exit")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -110,6 +112,7 @@ func run(args []string) error {
 			Recursive:       cfg.recursive,
 			EscapeHTML:      cfg.escapeHTML,
 			CaseInsensitive: cfg.caseInsensitive,
+			Direct:          cfg.direct,
 			Command:         command(),
 		}
 		if err := generate.Run(dir, gcfg); err != nil {

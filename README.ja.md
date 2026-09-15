@@ -179,6 +179,7 @@ odjson [flags] [packages]
 | `-recursive`        | `true`           | 選択した型から到達できる struct 型のコーデックも生成し、ネストした値でもリフレクションを避けます。                  |
 | `-escape-html`      | `true`           | 文字列中の `<`、`>`、`&` をエスケープします。`encoding/json` のデフォルトに合わせた動作です。                      |
 | `-case-insensitive` | `false`          | `UnmarshalJSON` で、`encoding/json` v1 と同じく大文字小文字を無視したメンバ一致にフォールバックします。デフォルトは無効で、`encoding/json/v2` に合わせてあります。 |
+| `-direct`           | `false`          | struct 型 `T` ごとにパッケージレベルの `MarshalT` / `UnmarshalT` も生成し、`encoding/json` を経由せずに生成コードへ届くようにします。デフォルトは無効です。`json.Marshal` をそのまま使うのが odjson の本来の使い方で、`MarshalT` を直接書いた呼び出し側は生成ファイルを消すとコンパイルが通らなくなるためです。測定結果は [docs/internals.md](./docs/internals.md) にあります。 |
 | `-version`          |                  | バージョンを表示して終了します。                                                                                 |
 
 ## 仕組み
