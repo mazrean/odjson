@@ -188,19 +188,22 @@ regardless.
 
 Two things to read carefully there:
 
-- `twitter` and `medium` are the **same Go type**, so they share one
-  `odjsonrt.SizeHint`. `twitter` runs first and leaves it at 256 KiB, and
-  every later `MarshalTwitterStruct` — `medium`'s included — then allocates a
-  288 KiB buffer. That is a real property of a function that must return its
-  result, but as a *row* it is an artefact of the two payloads sharing a
-  process: measure `medium` in its own `go test -bench` run to see the
-  number without it. The `json-v2` and `encoding-json` rows are not affected,
-  because those calls write into the encoder's own buffer through the direct
-  path and never size one of their own.
+- **The `json-v2` Marshal row is not like for like.** `json/v2` does not
+  escape `<`, `>` and `&`, and `gen` is generated with the default
+  `-escape-html`, so `MarshalTwitterStruct` writes bytes that row does not.
+  Read the encode side against `encoding-json`, which escapes the same things.
+  The decode rows are comparable against either.
 - `BenchmarkAppendDirect` is the encoder with both the entry point and the
   result allocation taken out: it writes into a buffer the caller keeps. It
   is deliberately a benchmark of its own rather than a `Marshal` row, because
   every row there allocates what it returns and this one does not.
+
+`MarshalT` builds its result in a pooled buffer and copies out, rather than
+allocating one at `odjsonrt.SizeHint`'s size. That is worth knowing here
+because the rejected shape read *seven times* its real cost in this very
+table: `twitter` and `medium` are the same Go type and would have shared one
+hint, so `twitter` running first left every later `MarshalTwitterStruct`
+allocating a 288 KiB buffer. See `docs/internals.md`.
 
 `TestGeneratedMatchesReflection` asserts that every host library really does
 route through the generated codec. sonic, go-json, json-iterator, segmentio
