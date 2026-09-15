@@ -179,35 +179,8 @@ With no package argument odjson generates for the package in the current directo
 | `-recursive`        | `true`           | Also generate codecs for struct types reachable from the selected ones, so nested values skip reflection too.  |
 | `-escape-html`      | `true`           | Escape `<`, `>` and `&` in strings, matching `encoding/json`'s default.                                        |
 | `-case-insensitive` | `false`          | In `UnmarshalJSON`, fall back to a case-insensitive member match the way `encoding/json` v1 does. Off by default, matching `encoding/json/v2`. |
-| `-direct`           | `false`          | Also generate `MarshalT` / `AppendT` / `UnmarshalT` per struct type `T`, skipping `encoding/json` entirely. See [Calling the generated codec directly](#calling-the-generated-codec-directly). |
+| `-direct`           | `false`          | Also generate package level `MarshalT` / `UnmarshalT` per struct type `T`, reaching the generated codec without going through `encoding/json`. Off by default: an unchanged `json.Marshal` is the way odjson is meant to be used, and a call site written against `MarshalT` stops compiling once the generated file is deleted. Measured in [docs/internals.md](./docs/internals.md). |
 | `-version`          |                  | Print the version and exit.                                                                                    |
-
-### Calling the generated codec directly
-
-By default the four standard methods are the whole API: `json.Marshal` and `json.Unmarshal` find them, and deleting the generated file leaves every call site compiling, at the library's own speed.
-
-`-direct` adds a second entry point per struct type `T`, alongside those methods rather than instead of them:
-
-```go
-func MarshalT(v *T) ([]byte, error)
-func AppendT(dst []byte, v *T) ([]byte, error)
-func UnmarshalT(data []byte, v *T) error
-```
-
-An unexported `T` gets `marshalT` / `appendT` / `unmarshalT`, so the functions are exactly as reachable as the type they serve.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/direct-dark.svg">
-  <img alt="Time per operation, lower is better. Both sides run the same generated codec on the same bytes. Marshal large 616 KiB: json/v2 + odjson 106 µs, MarshalT 105 µs (no significant difference, p=0.394), AppendT 59 µs with no allocation. Marshal medium 13 KiB: 2924 ns, MarshalT 2749 ns (1.06× faster), AppendT 1096 ns. Marshal small 365 B: 275 ns, MarshalT 209 ns (1.32× faster), AppendT 107 ns. Unmarshal large 616 KiB: 401 µs, UnmarshalT 397 µs (no significant difference, p=0.240). Unmarshal medium 13 KiB: 8914 ns, UnmarshalT 8722 ns (1.02× faster). Unmarshal small 365 B: 596 ns, UnmarshalT 471 ns (1.27× faster)." src="./docs/assets/direct-light.svg" width="912">
-</picture>
-
-They call the same generated encoder and parser the methods call, with `encoding/json`'s interface dispatch, option decoding and buffer handover taken out of the way, and they follow `encoding/json/v2`'s semantics — so `-case-insensitive` does not reach them, and under the default `-escape-html` `MarshalT(&v)` is byte for byte what `json.Marshal(&v)` produces.
-
-Three things to weigh:
-
-- Nothing here goes through [the direct path](docs/internals.md), so the speed also survives `-tags odjson_safe` and a Go release that path has not been verified against yet.
-- A call site written against `MarshalT` no longer compiles once the generated file is deleted. That is the property the default stance protects, and the reason `-direct` is off by default.
-- `UnmarshalT` is ~3× faster than `encoding/json`'s `Unmarshal` ([why](docs/internals.md)), but that is **not** a free speed-up: it decodes under json/v2's rules. A call site that relied on v1 accepting a duplicate name, matching a member name case-insensitively, padding a short array, or leaving a field untouched on `null` will behave differently, not merely faster. Against `encoding/json/v2` there is no such difference — only the call overhead, which is a flat ~120–200 ns and so matters on small values and disappears on large ones.
 
 ## How it works
 

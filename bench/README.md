@@ -272,13 +272,14 @@ cd bench && go run ./chart -chart direct
 which writes `docs/assets/direct-{light,dark}.svg` from the literals in
 `chart/main.go`'s `directChart` — the same renderer, and the same format, as
 the README's. Re-measuring means editing those literals, exactly as it does
-for the README's. To render someone else's run instead, concatenate the
-per-row files and pass them in:
+for the README's.
 
-```sh
-cat a.txt b.txt … > direct.txt
-cd bench && go run ./chart -chart direct -input direct.txt -out /tmp -footer '…'
-```
+Two differences from the README's chart, both deliberate. The `-direct` row is
+**not indented** under the baseline: an indent means "the row above, plus
+this", and `MarshalT` is not `json/v2` plus anything — the two rows are
+alternative ways in, and are drawn as alternatives. And `AppendT` is measured
+but **not drawn**: it writes into a buffer the caller keeps, so a bar of its
+own beside one that allocates would invite a comparison that is not there.
 
 `-input` renders raw ratios: medians alone cannot say whether a difference is
 significant, so the `~` a literal panel carries is dropped.

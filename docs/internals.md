@@ -1274,13 +1274,24 @@ they never touch `odjsonrt/direct.go` — they keep their speed under
 `-tags odjson_safe` and on a Go minor the direct path has not been verified
 against.
 
+What they cost is the property everything else here protects: a call site
+written against `MarshalT` stops compiling once the generated file is deleted,
+where one written against `json.Marshal` just goes back to the library's own
+speed. That is why the flag is off by default and why `README.md` gives it one
+row of the flag table rather than a section — an unchanged `json.Marshal` over
+`encoding/json/v2` is how odjson is meant to be used, and this page is where
+the alternative is spelled out.
+
 The chart is `bench/direct`'s numbers — the like-for-like ones, from the
 per-process runs the next section explains. Regenerate it with
-`cd bench && go run ./chart -chart direct`.
+`cd bench && go run ./chart -chart direct`. It draws `MarshalT` and
+`UnmarshalT` only: `AppendT` writes into a buffer the caller keeps, so a bar
+of its own beside one that allocates would invite a comparison that is not
+there. Its numbers are two sections down.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/direct-dark.svg">
-  <img alt="Time per operation, lower is better. Both sides run the same generated codec on the same bytes. Marshal large 616 KiB: json/v2 + odjson 106 µs, MarshalT 105 µs (no significant difference, p=0.394), AppendT 59 µs with no allocation. Marshal medium 13 KiB: 2924 ns, MarshalT 2749 ns (1.06× faster), AppendT 1096 ns. Marshal small 365 B: 275 ns, MarshalT 209 ns (1.32× faster), AppendT 107 ns. Unmarshal large 616 KiB: 401 µs, UnmarshalT 397 µs (no significant difference, p=0.240). Unmarshal medium 13 KiB: 8914 ns, UnmarshalT 8722 ns (1.02× faster). Unmarshal small 365 B: 596 ns, UnmarshalT 471 ns (1.27× faster)." src="assets/direct-light.svg" width="912">
+  <img alt="Time per operation, lower is better. Both rows run the same generated codec on the same bytes. Marshal large 616 KiB: json/v2 + odjson 106 µs, MarshalT 105 µs (no significant difference, p=0.394). Marshal medium 13 KiB: 2924 ns, MarshalT 2749 ns (1.06× faster). Marshal small 365 B: 275 ns, MarshalT 209 ns (1.32× faster). Unmarshal large 616 KiB: 401 µs, UnmarshalT 397 µs (no significant difference, p=0.240). Unmarshal medium 13 KiB: 8914 ns, UnmarshalT 8722 ns (1.02× faster). Unmarshal small 365 B: 596 ns, UnmarshalT 471 ns (1.27× faster)." src="assets/direct-light.svg" width="912">
 </picture>
 
 The two tables below are a different measurement from the chart: they are

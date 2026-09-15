@@ -37,6 +37,14 @@ verified against. What it costs is the thing the default stance protects:
 call sites that no longer compile once the generated file is deleted. Say so
 when documenting it.
 
+**In `README.md` and `README.ja.md` it gets one row of the flag table and
+nothing else** — no section, no chart, no example. An unchanged `json.Marshal`
+over `encoding/json/v2` is how odjson is meant to be used, and the README is
+where that is established; a second entry point given a section of its own
+there reads as a second recommended way in. The full treatment — the
+signatures, the semantics, the measurements, the chart — lives in
+`docs/internals.md`. Do not re-expand it into the READMEs.
+
 **Measured** (`bench/direct`, identical bytes, one row per process): against
 `encoding/json`, `UnmarshalT` is −66% on all three payloads, because v1's
 flags keep `UnmarshalJSONFrom` off the direct path and `UnmarshalT` has no

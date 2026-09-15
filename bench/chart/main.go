@@ -50,9 +50,13 @@ import (
 
 // A row is one library's measurement within a panel, in the panel's unit.
 type row struct {
-	label    string
-	value    float64
-	indent   bool // drawn as a variant of the row above it
+	label string
+	value float64
+	// indent draws the row as a variant of the one above — "encoding/json/v2"
+	// and "+ odjson" under it are one library with and without odjson. A row
+	// that is an alternative to the one above rather than an addition to it
+	// (the -direct chart's) is not indented.
+	indent   bool
 	odjson   bool // the highlighted bar
 	emphasis bool // label in primary ink rather than secondary
 
@@ -60,11 +64,6 @@ type row struct {
 	// (`plain` measures the libraries as they ship, `gen` measures them on
 	// odjson-generated types) and the codec label the benchmark uses.
 	module, codec string
-	// bench names the benchmark outright, for a row whose measurement does
-	// not follow the Benchmark<panel title>/<codec>/<payload> shape the rest
-	// of the chart is built on — BenchmarkAppendDirect/<payload> has no
-	// codec segment, because it is not one of a table of libraries.
-	bench string
 }
 
 // A panel is one benchmark: the libraries on a scale of their own. The
@@ -224,9 +223,15 @@ var readmeChart = chartDef{
 // -escape-html=false so that the bytes do not, which TestDirectMatchesJSONV2
 // holds it to.
 //
-// AppendT sits in the Marshal panels as a third row rather than the accented
-// one: it writes into a buffer the caller keeps, so it is not the like-for-
-// like comparison the ratio is about. Its label says so.
+// The -direct row is not indented under the baseline, the way "+ odjson" is
+// in the chart above. That indent means "the row above, plus this"; MarshalT
+// is not json/v2 plus anything, it is the other way in. The two rows are
+// alternatives, and the chart draws them as alternatives.
+//
+// AppendT is measured (see BenchmarkAppendDirect and docs/internals.md) but
+// not drawn: it writes into a buffer the caller keeps, so it does not do the
+// job the other two rows do, and a bar half the length of one that allocates
+// invites the comparison anyway.
 var directChart = chartDef{
 	id:      "direct",
 	file:    "direct",
@@ -239,45 +244,42 @@ var directChart = chartDef{
 			title: "Marshal", sub: "large · 616 KiB", unit: "µs", ratio: "1.01", verdict: "~ p=0.394", payload: "twitter",
 			rows: []row{
 				{label: "json/v2 + odjson", value: 106.3, module: "direct", codec: "json-v2"},
-				{label: "+ MarshalT", value: 104.9, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
-				{label: "AppendT · 0 allocs", value: 58.56, emphasis: true, module: "direct", bench: "AppendDirect/twitter"},
+				{label: "MarshalT", value: 104.9, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
 			},
 		},
 		{
 			title: "Marshal", sub: "medium · 13 KiB", unit: "ns", ratio: "1.06", payload: "medium",
 			rows: []row{
 				{label: "json/v2 + odjson", value: 2924, module: "direct", codec: "json-v2"},
-				{label: "+ MarshalT", value: 2749, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
-				{label: "AppendT · 0 allocs", value: 1096, emphasis: true, module: "direct", bench: "AppendDirect/medium"},
+				{label: "MarshalT", value: 2749, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
 			},
 		},
 		{
 			title: "Marshal", sub: "small · 365 B", unit: "ns", ratio: "1.32", payload: "small",
 			rows: []row{
 				{label: "json/v2 + odjson", value: 275.2, module: "direct", codec: "json-v2"},
-				{label: "+ MarshalT", value: 208.7, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
-				{label: "AppendT · 0 allocs", value: 107.3, emphasis: true, module: "direct", bench: "AppendDirect/small"},
+				{label: "MarshalT", value: 208.7, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
 			},
 		},
 		{
 			title: "Unmarshal", sub: "large · 616 KiB", unit: "µs", ratio: "1.01", verdict: "~ p=0.240", payload: "twitter",
 			rows: []row{
 				{label: "json/v2 + odjson", value: 400.9, module: "direct", codec: "json-v2"},
-				{label: "+ UnmarshalT", value: 396.9, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
+				{label: "UnmarshalT", value: 396.9, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
 			},
 		},
 		{
 			title: "Unmarshal", sub: "medium · 13 KiB", unit: "ns", ratio: "1.02", payload: "medium",
 			rows: []row{
 				{label: "json/v2 + odjson", value: 8914, module: "direct", codec: "json-v2"},
-				{label: "+ UnmarshalT", value: 8722, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
+				{label: "UnmarshalT", value: 8722, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
 			},
 		},
 		{
 			title: "Unmarshal", sub: "small · 365 B", unit: "ns", ratio: "1.27", payload: "small",
 			rows: []row{
 				{label: "json/v2 + odjson", value: 596.4, module: "direct", codec: "json-v2"},
-				{label: "+ UnmarshalT", value: 471.0, indent: true, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
+				{label: "UnmarshalT", value: 471.0, odjson: true, emphasis: true, module: "direct", codec: "odjson-direct"},
 			},
 		},
 	},
@@ -798,9 +800,10 @@ func apply(def *chartDef, m map[key][]float64) error {
 		ns := make([]float64, len(p.rows))
 		for j := range p.rows {
 			r := &p.rows[j]
-			v, ok := median(m[key{r.module, benchName(*p, *r)}])
+			name := p.title + "/" + r.codec + "/" + p.payload
+			v, ok := median(m[key{r.module, name}])
 			if !ok {
-				return fmt.Errorf("no Benchmark%s in bench/%s", benchName(*p, *r), r.module)
+				return fmt.Errorf("no Benchmark%s in bench/%s", name, r.module)
 			}
 			ns[j] = v
 			// The panels' scales are the README's: µs for twitter, ns for
@@ -811,10 +814,11 @@ func apply(def *chartDef, m map[key][]float64) error {
 			r.value = v
 		}
 
-		// The odjson row is drawn indented under the baseline it improves on,
-		// so the row above it is what the ratio is against.
+		// The highlighted row is drawn directly under the baseline it is
+		// measured against, indented or not, so the row above it is what the
+		// ratio is against.
 		odjson := slices.IndexFunc(p.rows, func(r row) bool { return r.odjson })
-		if odjson < 1 || !p.rows[odjson].indent {
+		if odjson < 1 {
 			return fmt.Errorf("panel %s/%s has no odjson row under a baseline", p.title, p.payload)
 		}
 		p.ratio = strconv.FormatFloat(ns[odjson-1]/ns[odjson], 'f', 2, 64)
@@ -824,15 +828,6 @@ func apply(def *chartDef, m map[key][]float64) error {
 		p.verdict = ""
 	}
 	return nil
-}
-
-// benchName is the benchmark a row's number comes from: the three-part shape
-// the chart is built on, unless the row named one outright.
-func benchName(p panel, r row) string {
-	if r.bench != "" {
-		return r.bench
-	}
-	return p.title + "/" + r.codec + "/" + p.payload
 }
 
 // median is the middle sample, which is what the README quotes: a mean would

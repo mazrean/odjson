@@ -179,35 +179,8 @@ odjson [flags] [packages]
 | `-recursive`        | `true`           | 選択した型から到達できる struct 型のコーデックも生成し、ネストした値でもリフレクションを避けます。                  |
 | `-escape-html`      | `true`           | 文字列中の `<`、`>`、`&` をエスケープします。`encoding/json` のデフォルトに合わせた動作です。                      |
 | `-case-insensitive` | `false`          | `UnmarshalJSON` で、`encoding/json` v1 と同じく大文字小文字を無視したメンバ一致にフォールバックします。デフォルトは無効で、`encoding/json/v2` に合わせてあります。 |
-| `-direct`           | `false`          | struct 型 `T` ごとに `MarshalT` / `AppendT` / `UnmarshalT` も生成し、`encoding/json` を経由せずに呼べるようにします。[生成コードを直接呼ぶ](#生成コードを直接呼ぶ)を参照してください。 |
+| `-direct`           | `false`          | struct 型 `T` ごとにパッケージレベルの `MarshalT` / `UnmarshalT` も生成し、`encoding/json` を経由せずに生成コードへ届くようにします。デフォルトは無効です。`json.Marshal` をそのまま使うのが odjson の本来の使い方で、`MarshalT` を直接書いた呼び出し側は生成ファイルを消すとコンパイルが通らなくなるためです。測定結果は [docs/internals.md](./docs/internals.md) にあります。 |
 | `-version`          |                  | バージョンを表示して終了します。                                                                                 |
-
-### 生成コードを直接呼ぶ
-
-デフォルトでは 4 つの標準メソッドが API のすべてです。`json.Marshal` と `json.Unmarshal` がそれを見つけ、生成ファイルを消しても呼び出し側はそのままコンパイルが通り、ライブラリ本来の速度に戻るだけです。
-
-`-direct` は、そのメソッドを置き換えるのではなく **並べて**、struct 型 `T` ごとにもう 1 つの入口を追加します。
-
-```go
-func MarshalT(v *T) ([]byte, error)
-func AppendT(dst []byte, v *T) ([]byte, error)
-func UnmarshalT(data []byte, v *T) error
-```
-
-`T` が非公開型なら `marshalT` / `appendT` / `unmarshalT` になり、関数の可視性は型の可視性と一致します。
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/direct-dark.svg">
-  <img alt="1 回あたりの所要時間。短いほど速い。両者は同じ生成コーデックで同じバイトを書く。Marshal large 616 KiB: json/v2 + odjson 106 µs, MarshalT 105 µs（有意差なし、p=0.394）、AppendT 59 µs（確保なし）。Marshal medium 13 KiB: 2924 ns, MarshalT 2749 ns（1.06 倍）、AppendT 1096 ns。Marshal small 365 B: 275 ns, MarshalT 209 ns（1.32 倍）、AppendT 107 ns。Unmarshal large 616 KiB: 401 µs, UnmarshalT 397 µs（有意差なし、p=0.240）。Unmarshal medium 13 KiB: 8914 ns, UnmarshalT 8722 ns（1.02 倍）。Unmarshal small 365 B: 596 ns, UnmarshalT 471 ns（1.27 倍）。" src="./docs/assets/direct-light.svg" width="912">
-</picture>
-
-呼び出す先はメソッドと同じ生成済みエンコーダ・パーサで、`encoding/json` のインタフェース経由の呼び出し、オプション解釈、バッファの受け渡しが消えるぶんだけ速くなります。セマンティクスは `encoding/json/v2` に従うため `-case-insensitive` は届かず、デフォルトの `-escape-html` のもとでは `MarshalT(&v)` は `json.Marshal(&v)` とバイト単位で一致します。
-
-判断材料は 3 つです。
-
-- ここは [direct path](docs/internals.md) を通らないので、`-tags odjson_safe` でも、direct path が未検証の Go マイナーバージョンでも速度がそのまま残ります。
-- `MarshalT` を直接書いた呼び出し側は、生成ファイルを消すとコンパイルが通らなくなります。デフォルトが `false` なのはそのためです。
-- `UnmarshalT` は `encoding/json` の `Unmarshal` より約 3 倍速い（[理由](docs/internals.md)）のですが、これは**ただの高速化ではありません**。json/v2 のルールでデコードするため、v1 が許していたもの——重複したメンバ名、大文字小文字を無視した一致、短い配列のパディング、`null` でフィールドを変更しないこと——に依存した呼び出し側は、速くなるのではなく**挙動が変わります**。`encoding/json/v2` に対してはその差はなく、残るのは呼び出しのオーバーヘッドだけです。これは約 120〜200 ns の固定費なので、小さい値では効き、大きな文書では消えます。
 
 ## 仕組み
 
