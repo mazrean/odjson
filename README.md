@@ -179,7 +179,29 @@ With no package argument odjson generates for the package in the current directo
 | `-recursive`        | `true`           | Also generate codecs for struct types reachable from the selected ones, so nested values skip reflection too.  |
 | `-escape-html`      | `true`           | Escape `<`, `>` and `&` in strings, matching `encoding/json`'s default.                                        |
 | `-case-insensitive` | `false`          | In `UnmarshalJSON`, fall back to a case-insensitive member match the way `encoding/json` v1 does. Off by default, matching `encoding/json/v2`. |
+| `-direct`           | `false`          | Also generate `MarshalT` / `AppendT` / `UnmarshalT` per struct type `T`, skipping `encoding/json` entirely. See [Calling the generated codec directly](#calling-the-generated-codec-directly). |
 | `-version`          |                  | Print the version and exit.                                                                                    |
+
+### Calling the generated codec directly
+
+By default the four standard methods are the whole API: `json.Marshal` and `json.Unmarshal` find them, and deleting the generated file leaves every call site compiling, at the library's own speed.
+
+`-direct` adds a second entry point per struct type `T`, alongside those methods rather than instead of them:
+
+```go
+func MarshalT(v *T) ([]byte, error)
+func AppendT(dst []byte, v *T) ([]byte, error)
+func UnmarshalT(data []byte, v *T) error
+```
+
+An unexported `T` gets `marshalT` / `appendT` / `unmarshalT`, so the functions are exactly as reachable as the type they serve.
+
+They call the same generated encoder and parser the methods call, with `encoding/json`'s interface dispatch, option decoding and buffer handover taken out of the way, and they follow `encoding/json/v2`'s semantics — so `-case-insensitive` does not reach them, and under the default `-escape-html` `MarshalT(&v)` is byte for byte what `json.Marshal(&v)` produces.
+
+Two things to weigh:
+
+- Nothing here goes through [the direct path](docs/internals.md), so the speed also survives `-tags odjson_safe` and a Go release that path has not been verified against yet.
+- A call site written against `MarshalT` no longer compiles once the generated file is deleted. That is the property the default stance protects, and the reason `-direct` is off by default.
 
 ## How it works
 

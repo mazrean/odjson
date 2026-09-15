@@ -16,13 +16,35 @@ struct:
 - `MarshalJSONTo` / `UnmarshalJSONFrom` (`encoding/json/v2` interfaces)
 - `MarshalJSON` / `UnmarshalJSON` (`encoding/json` v1 interfaces)
 
-Those four methods are the **entire** generated API surface. There are no
-exported direct functions: everything a caller reaches goes through the
-standard interfaces, so an unchanged `json.Marshal` / `json.Unmarshal` picks
-the generated codec up, and deleting the generated file undoes all of it. Do
-not re-introduce package level `MarshalT` / `AppendT` / `UnmarshalT`; "keep
-using the standard library, and take it off whenever you like" is the product,
-and a second entry point contradicts it.
+Those four methods are the **entire** generated API surface **by default**.
+Everything a caller reaches goes through the standard interfaces, so an
+unchanged `json.Marshal` / `json.Unmarshal` picks the generated codec up, and
+deleting the generated file undoes all of it. "Keep using the standard
+library, and take it off whenever you like" is the product, and that is what
+an invocation without flags must keep producing: never emit a second entry
+point unasked.
+
+`-direct` is the opt-in that adds one, per struct type `T`: package level
+`MarshalT(v *T) ([]byte, error)`, `AppendT(dst []byte, v *T) ([]byte, error)`
+and `UnmarshalT(data []byte, v *T) error`, spelled `marshalT` / `appendT` /
+`unmarshalT` for an unexported `T` so the functions are exactly as reachable
+as the type they serve. It **adds** to the four methods rather than replacing
+them, and it defaults to **false**. What it buys is the call overhead of
+`encoding/json` — the interface dispatch, the option decoding, the buffer
+handover — and, because it never touches `odjsonrt/direct.go`, that speed also
+survives `-tags odjson_safe` and a Go minor the direct path has not been
+verified against. What it costs is the thing the default stance protects:
+call sites that no longer compile once the generated file is deleted. Say so
+when documenting it.
+
+The functions follow **`encoding/json/v2`'s semantics** — they call the very
+`odjsonAppend` and `odjsonParseV2` the v2 methods call — so `-case-insensitive`
+does not reach them. Under the default `-escape-html` the encoder writes
+`odjsonrt.ModeV2HTML`, which makes `MarshalT` byte for byte what an
+`encoding/json` `Marshal` of the same value produces; `internal/testfixture/direct`
+pins exactly that, and pins `UnmarshalT` against `encoding/json/v2`'s
+`Unmarshal` on twenty documents, rejections included. Changing the mode or the
+`strict` argument breaks those oracles, which is the point of them.
 
 **Positioning** (measured, see `bench/`): the target is `encoding/json/v2`
 (2.7-4.4x faster on all six measurements: encode and decode of sonic's own
@@ -224,9 +246,12 @@ Within the root module:
   promotion and conflict resolution, `fallback` covers what the generator hands
   back to reflection, `crosspkg` covers types imported from another package,
   `suite` runs the JSON Test Suite through generated decoders,
-  `withmethods` covers a minimal type reached through every library, and
+  `withmethods` covers a minimal type reached through every library,
   `unexported` covers the default type selection, which takes unexported
-  struct types too.
+  struct types too, and `direct` covers `-direct`, pinning the generated
+  functions against `encoding/json`'s `Marshal` and `encoding/json/v2`'s
+  `Unmarshal` on the very same types — which is the only claim `-direct`
+  makes, so it needs no `plain` twin.
 
   Because the generated methods are what `encoding/json` now calls, the parity
   oracle cannot be `json.Marshal` on the fixture type itself. Each affected
