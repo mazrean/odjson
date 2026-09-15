@@ -190,9 +190,15 @@ Two things to read carefully there:
 
 - **The `json-v2` Marshal row is not like for like.** `json/v2` does not
   escape `<`, `>` and `&`, and `gen` is generated with the default
-  `-escape-html`, so `MarshalTwitterStruct` writes bytes that row does not.
-  Read the encode side against `encoding-json`, which escapes the same things.
-  The decode rows are comparable against either.
+  `-escape-html`, so `MarshalTwitterStruct` writes bytes that row does not —
+  worth 18 µs on `twitter`. Read the encode side against `encoding-json`,
+  which escapes the same things, and see `direct` below for the comparison
+  against `json/v2` at identical bytes. The decode rows have no escaping to
+  differ over and are comparable against either.
+- **`odjson-direct` runs last**, on a heap the rows above it have churned, and
+  that is worth about 5% on the encode. It makes `gen`'s encode figures
+  conservative rather than flattering, but do not quote one as a measured
+  margin: run the row in its own process first.
 - `BenchmarkAppendDirect` is the encoder with both the entry point and the
   result allocation taken out: it writes into a buffer the caller keeps. It
   is deliberately a benchmark of its own rather than a `Marshal` row, because
@@ -232,6 +238,36 @@ cd bench && go generate ./...
 
 That covers `gen` and `shapes/gen`, which carry the same directive, and
 `easyjson`, whose directive runs easyjson's generator.
+
+## `direct`
+
+`gen`'s types again, generated with `-direct -escape-html=false`. That one
+flag is the whole reason the package exists: it puts `MarshalT` on
+`odjsonrt.ModeV2`, the exact bytes `encoding/json/v2` writes, so the
+`odjson-direct` and `json-v2` rows are finally the same job.
+`TestDirectMatchesJSONV2` is what holds that — byte for byte on `small`, and
+by length and value on `twitter` and `medium`, whose `interface{}` members put
+a `map[string]any` in iteration order. `gen` cannot be regenerated this way,
+because its `encoding-json` rows are supposed to produce `encoding/json`'s
+bytes.
+
+**Run one row per process.** Both packages' `odjson-direct` rows come last in
+a single `go test -bench .`, after rows that have churned the heap, and that
+is worth about 5% on the encode:
+
+```sh
+cd bench/direct
+go test -run '^$' -bench '^BenchmarkMarshal$/^json-v2$/^twitter$' -count 6 > a.txt
+go test -run '^$' -bench '^BenchmarkMarshal$/^odjson-direct$/^twitter$' -count 6 > b.txt
+benchstat a.txt b.txt
+```
+
+Interleaving the two loops is better still. `docs/internals.md` quotes the
+numbers that come out of it.
+
+The package is deliberately out of the README chart and out of `bench.yml`: it
+answers a question about odjson's own API, not about where odjson sits among
+the host libraries.
 
 ## `ab`
 
