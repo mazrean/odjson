@@ -234,12 +234,31 @@ the generated codec still pays for itself on that shape:
 | `page-3k`, `page-12k`, `page-100k` | one top-level object at the sizes between the two fixtures |
 | `array-items`, `array-pages`, `map-items` | a top-level `[]T` / `map[string]T` of a generated type, so every generated value sits below the top level; the element size puts `array-items` under `odjsonrt.WholeValue`'s threshold and `array-pages` over it, which matters on the public path |
 | `generic` | the same document decoded into `any` |
-| `text-*` | strings of ASCII, Latin-1, Cyrillic, CJK, Hangul, emoji, and escape-heavy content |
+| `text-*` | strings of ASCII, Latin-1, Cyrillic, CJK, Hangul, emoji, and escape-heavy content, 96 lines of 80 bytes |
+| `text-ascii-short`, `text-cjk-short` | the same two scripts in 1024 strings of ~8 bytes, so the per string cost is read apart from the per byte one |
 | `unique-strings` | strings that never repeat, so the decoder's string cache never hits |
 | `numbers`, `floats` | full precision floats, exponents, float32, integer extremes |
+| `int-small`, `int-large`, `uint-large` | 1024 integers each, of one to three digits, of 19 digits with a sign, and of 20 digits without one |
+| `float-short`, `float-full`, `float32` | 1024 floats each, of two decimal places, of all 17 significant digits, and as `float32` |
+| `float-exp`, `float-exp-input` | exponent notation on both sides: values so large or small that every encoder spells them `1.2e+300`, and a hand written document that spells ordinary values `1.234567e+02`, which no encoder here writes (unmarshal only) |
+| `bool-array`, `null-array` | the two keyword values: 1024 booleans, and 1024 optional integers half of which are `null` |
+| `array-nested` | `int-small`'s 1024 integers again, in 128 rows of 8, so the difference between the rows is the nesting |
+| `map-string-1k`, `map-int-1k` | an object of 1024 entries used as a dictionary, whose member names are data the generator cannot know |
+| `obj-record`, `obj-map` | the same 42 KB document read as `[]Rec` and as `[]map[string]string`: struct against map, the same bytes both times |
+| `obj-long-names` | `obj-record`'s values under member names of 24 bytes |
+| `deep-nest` | 32 chains of 32 nested objects: a document that is deep where every other shape is wide |
+| `empties` | 1024 empty arrays, 1024 empty objects and 1024 empty strings: structure with no content |
 | `dense`, `sparse` | 56 short scalars per row; 48 optional members of which 10 are present |
 | `skip` | documents whose members are mostly unknown to the struct (unmarshal only) |
 | `canada`, `citm` | nativejson-benchmark's other two corpora, when `ODJSON_BENCH_CORPUS` points at a directory holding them; skipped otherwise |
+
+The last three groups are the characteristic rows: one spelling per document,
+1024 values in every one of them, where `numbers` is all six spellings at
+once. A mixed document is the shape a real payload has, and it is also the
+shape no measurement can be attributed to — a library that is quick on short
+integers and slow on full precision floats reads as one middling row. Divide
+such a row by 1024 and it is a per value cost that compares across the
+group; the `text-*` rows divide by 96, and the two `-short` rows by 1024.
 
 The synthetic documents are built from a fixed seed, so they are the same on
 every run. `canada.json` and `citm_catalog.json` are not committed: their
@@ -279,7 +298,13 @@ ratio between them, and the second form drops the hosts' `gen` rows but
 json/v2's, so it reads one column per library with odjson's own column
 (`json-v2` / `gen`) among them. What the shapes found is recorded in
 [`docs/internals.md`](../docs/internals.md#what-the-other-shapes-say), and
-the baselines' table under "The other libraries on the shapes" there.
+the baselines' table under "The other libraries on the shapes" there. The
+characteristic rows have a section of their own,
+["What the characteristic shapes say"](../docs/internals.md#what-the-characteristic-shapes-say):
+the nineteenth digit of an integer is a cliff in the decoder, the generated
+map encoder sorts its keys where the runtime path does not and pays its
+whole deficit to `json/v2` for it, and the float and depth rows are the
+widest margins in the file.
 
 ## `floor`
 
