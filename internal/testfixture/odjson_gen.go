@@ -4615,7 +4615,9 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 		for k547 := range v.StringMap {
 			keys546 = append(keys546, string(k547))
 		}
-		slices.Sort(keys546)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys546)
+		}
 		dst = append(dst, "{"...)
 		for i548, k547 := range keys546 {
 			if i548 > 0 {
@@ -4648,7 +4650,9 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 		for k552 := range v.InnerMap {
 			keys551 = append(keys551, string(k552))
 		}
-		slices.Sort(keys551)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys551)
+		}
 		dst = append(dst, "{"...)
 		for i553, k552 := range keys551 {
 			if i553 > 0 {
@@ -4680,7 +4684,9 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 		for k556 := range v.NamedMap {
 			keys555 = append(keys555, string(k556))
 		}
-		slices.Sort(keys555)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys555)
+		}
 		dst = append(dst, "{"...)
 		for i557, k556 := range keys555 {
 			if i557 > 0 {
@@ -4708,7 +4714,9 @@ func (v *Composites) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, er
 		for k560 := range v.ColorMap {
 			keys559 = append(keys559, string(k560))
 		}
-		slices.Sort(keys559)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys559)
+		}
 		dst = append(dst, "{"...)
 		for i561, k560 := range keys559 {
 			if i561 > 0 {

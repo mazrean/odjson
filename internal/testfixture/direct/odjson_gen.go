@@ -900,7 +900,9 @@ func (v *nested) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 		for k66 := range v.Meta {
 			keys65 = append(keys65, string(k66))
 		}
-		slices.Sort(keys65)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys65)
+		}
 		dst = append(dst, ",\"meta\":{"...)
 		for i67, k66 := range keys65 {
 			if i67 > 0 {

@@ -125,7 +125,11 @@ func TestNestedMarshalMatchesWritePath(t *testing.T) {
 			if err := jsonv2.MarshalWrite(&w, val); err != nil {
 				t.Fatalf("%s: MarshalWrite: %v", doc, err)
 			}
-			if !bytes.Equal(direct, w.Bytes()) {
+			// The two paths agree on the value, not on every byte: a
+			// plain Marshal writes a map's members in iteration order,
+			// as json/v2 does without Deterministic, and MarshalWrite,
+			// which cannot see the options, sorts them.
+			if !equivalent(t, direct, w.Bytes()) {
 				t.Errorf("%s: %T\n Marshal:      %s\n MarshalWrite: %s", doc, val, direct, w.Bytes())
 			}
 		}

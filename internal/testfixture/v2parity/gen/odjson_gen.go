@@ -549,7 +549,9 @@ func (v *Zoo) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 		for k27 := range v.Map {
 			keys26 = append(keys26, string(k27))
 		}
-		slices.Sort(keys26)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys26)
+		}
 		dst = append(dst, "],\"map\":{"...)
 		for i28, k27 := range keys26 {
 			if i28 > 0 {
@@ -577,7 +579,9 @@ func (v *Zoo) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 		for k31 := range v.StrMap {
 			keys30 = append(keys30, string(k31))
 		}
-		slices.Sort(keys30)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys30)
+		}
 		dst = append(dst, "{"...)
 		for i32, k31 := range keys30 {
 			if i32 > 0 {
@@ -644,7 +648,9 @@ func (v *Zoo) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 		for k36 := range v.NestedMap {
 			keys35 = append(keys35, string(k36))
 		}
-		slices.Sort(keys35)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys35)
+		}
 		dst = append(dst, "{"...)
 		for i37, k36 := range keys35 {
 			if i37 > 0 {
@@ -780,7 +786,9 @@ func (v *Zoo) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 			for k42 := range v.OmitMap {
 				keys41 = append(keys41, string(k42))
 			}
-			slices.Sort(keys41)
+			if m != odjsonrt.ModeV2 {
+				slices.Sort(keys41)
+			}
 			dst = append(dst, ",\"omit_map\":{"...)
 			for i43, k42 := range keys41 {
 				if i43 > 0 {

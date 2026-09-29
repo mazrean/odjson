@@ -85,7 +85,9 @@ func (v *Item) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) {
 		for k3 := range v.Attrs {
 			keys2 = append(keys2, string(k3))
 		}
-		slices.Sort(keys2)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2)
+		}
 		dst = append(dst, "{"...)
 		for i4, k3 := range keys2 {
 			if i4 > 0 {
@@ -2488,7 +2490,9 @@ func (v *Catalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 		for k208 := range v.Items {
 			keys207 = append(keys207, string(k208))
 		}
-		slices.Sort(keys207)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys207)
+		}
 		dst = append(dst, "{\"items\":{"...)
 		for i209, k208 := range keys207 {
 			if i209 > 0 {
@@ -9661,7 +9665,9 @@ func (v *StrMap) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 		for k730 := range v.Values {
 			keys729 = append(keys729, string(k730))
 		}
-		slices.Sort(keys729)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys729)
+		}
 		dst = append(dst, "{\"values\":{"...)
 		for i731, k730 := range keys729 {
 			if i731 > 0 {
@@ -10175,7 +10181,9 @@ func (v *IntMap) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 		for k765 := range v.Values {
 			keys764 = append(keys764, string(k765))
 		}
-		slices.Sort(keys764)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys764)
+		}
 		dst = append(dst, "{\"values\":{"...)
 		for i766, k765 := range keys764 {
 			if i766 > 0 {
@@ -12508,7 +12516,9 @@ func (v *MapDoc) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 				for k949 := range v.Rows[i947] {
 					keys948 = append(keys948, string(k949))
 				}
-				slices.Sort(keys948)
+				if m != odjsonrt.ModeV2 {
+					slices.Sort(keys948)
+				}
 				dst = append(dst, "{"...)
 				for i950, k949 := range keys948 {
 					if i950 > 0 {
@@ -15894,7 +15904,9 @@ func (v *Empties) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 				for k1168 := range v.Objects[i1164] {
 					keys1167 = append(keys1167, string(k1168))
 				}
-				slices.Sort(keys1167)
+				if m != odjsonrt.ModeV2 {
+					slices.Sort(keys1167)
+				}
 				dst = append(dst, "{"...)
 				for i1169, k1168 := range keys1167 {
 					if i1169 > 0 {
@@ -26489,7 +26501,9 @@ func (v *Canada) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error)
 				for k2685 := range v.Features[i2683].Properties {
 					keys2684 = append(keys2684, string(k2685))
 				}
-				slices.Sort(keys2684)
+				if m != odjsonrt.ModeV2 {
+					slices.Sort(keys2684)
+				}
 				dst = append(dst, "\",\"properties\":{"...)
 				for i2686, k2685 := range keys2684 {
 					if i2686 > 0 {
@@ -27037,7 +27051,9 @@ func (v *Feature) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error
 		for k2707 := range v.Properties {
 			keys2706 = append(keys2706, string(k2707))
 		}
-		slices.Sort(keys2706)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2706)
+		}
 		dst = append(dst, "\",\"properties\":{"...)
 		for i2708, k2707 := range keys2706 {
 			if i2708 > 0 {
@@ -28581,7 +28597,9 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 		for k2820 := range v.AreaNames {
 			keys2819 = append(keys2819, string(k2820))
 		}
-		slices.Sort(keys2819)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2819)
+		}
 		dst = append(dst, "{\"areaNames\":{"...)
 		for i2821, k2820 := range keys2819 {
 			if i2821 > 0 {
@@ -28615,7 +28633,9 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 		for k2824 := range v.AudienceSubCategoryNames {
 			keys2823 = append(keys2823, string(k2824))
 		}
-		slices.Sort(keys2823)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2823)
+		}
 		dst = append(dst, "{"...)
 		for i2825, k2824 := range keys2823 {
 			if i2825 > 0 {
@@ -28647,7 +28667,9 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 		for k2828 := range v.BlockNames {
 			keys2827 = append(keys2827, string(k2828))
 		}
-		slices.Sort(keys2827)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2827)
+		}
 		dst = append(dst, "{"...)
 		for i2829, k2828 := range keys2827 {
 			if i2829 > 0 {
@@ -28681,7 +28703,9 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 		for k2832 := range v.Events {
 			keys2831 = append(keys2831, string(k2832))
 		}
-		slices.Sort(keys2831)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2831)
+		}
 		dst = append(dst, "{"...)
 		for i2833, k2832 := range keys2831 {
 			if i2833 > 0 {
@@ -28737,7 +28761,9 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 		for k2837 := range v.SeatCategoryNames {
 			keys2836 = append(keys2836, string(k2837))
 		}
-		slices.Sort(keys2836)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2836)
+		}
 		dst = append(dst, "{"...)
 		for i2838, k2837 := range keys2836 {
 			if i2838 > 0 {
@@ -28772,7 +28798,9 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 		for k2841 := range v.SubTopicNames {
 			keys2840 = append(keys2840, string(k2841))
 		}
-		slices.Sort(keys2840)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2840)
+		}
 		dst = append(dst, "{"...)
 		for i2842, k2841 := range keys2840 {
 			if i2842 > 0 {
@@ -28806,7 +28834,9 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 		for k2845 := range v.SubjectNames {
 			keys2844 = append(keys2844, string(k2845))
 		}
-		slices.Sort(keys2844)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2844)
+		}
 		dst = append(dst, "{"...)
 		for i2846, k2845 := range keys2844 {
 			if i2846 > 0 {
@@ -28840,7 +28870,9 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 		for k2849 := range v.TopicNames {
 			keys2848 = append(keys2848, string(k2849))
 		}
-		slices.Sort(keys2848)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2848)
+		}
 		dst = append(dst, "{"...)
 		for i2850, k2849 := range keys2848 {
 			if i2850 > 0 {
@@ -28874,7 +28906,9 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 		for k2853 := range v.TopicSubTopics {
 			keys2852 = append(keys2852, string(k2853))
 		}
-		slices.Sort(keys2852)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2852)
+		}
 		dst = append(dst, "{"...)
 		for i2854, k2853 := range keys2852 {
 			if i2854 > 0 {
@@ -28916,7 +28950,9 @@ func (v *CitmCatalog) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, e
 		for k2857 := range v.VenueNames {
 			keys2856 = append(keys2856, string(k2857))
 		}
-		slices.Sort(keys2856)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys2856)
+		}
 		dst = append(dst, "{"...)
 		for i2858, k2857 := range keys2856 {
 			if i2858 > 0 {

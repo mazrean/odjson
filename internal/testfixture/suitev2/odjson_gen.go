@@ -1046,7 +1046,9 @@ func (v *Inner) odjsonAppend(dst []byte, m odjsonrt.StringMode) ([]byte, error) 
 		for k16 := range v.M {
 			keys15 = append(keys15, string(k16))
 		}
-		slices.Sort(keys15)
+		if m != odjsonrt.ModeV2 {
+			slices.Sort(keys15)
+		}
 		dst = append(dst, "{"...)
 		for i17, k16 := range keys15 {
 			if i17 > 0 {

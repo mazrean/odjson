@@ -473,7 +473,15 @@ func (g *generator) encodeFused(b *block, t *analyzer.Type, src ast.Expr, addres
 				g.rangeStmt(b, k, nil, src, func(b *block) {
 					g.emit(b, assign(keys, call(id("append"), keys, call(id("string"), k))))
 				})
-				g.emit(b, expr(call(sel(id("slices"), "Sort"), keys)))
+				// encoding/json/v2 writes an object's members in map
+				// iteration order unless asked for Deterministic output,
+				// and a plain json/v2 Marshal, which is what ModeV2 means,
+				// does not ask; encoding/json always sorts, and its Marshal
+				// (ModeV2HTML) carries that flag. The public path (ModeStream)
+				// cannot see the options, so it sorts to be safe.
+				g.ifStmt(b, nil, bin(mode, token.NEQ, rt("ModeV2")), func(b *block) {
+					g.emit(b, expr(call(sel(id("slices"), "Sort"), keys)))
+				})
 				g.appendLit(b, pre+"{")
 				g.rangeStmt(b, i, k, keys, func(b *block) {
 					g.ifStmt(b, nil, bin(i, token.GTR, num(0)), func(b *block) {
