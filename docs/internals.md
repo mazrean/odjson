@@ -2656,6 +2656,19 @@ ahead by 1.4–2.6×.
   document left in the cache's stack) was inlined at fifteen sites and
   cost `generic` **+16%** — a clear in each and its arguments live across
   the loop; out of line it costs nothing.
+- **A hashed dispatch over the member name's first word**, in place of
+  the decision tree, for the names that fit one word with both quotes:
+  `NameWord` masks the word at the closing quote, a multiplier found at
+  generation time makes a perfect hash of the struct's names into 128
+  slots, and a `switch` on it compiles to a jump table (checked in the
+  assembly: `JMP (CX)(DX*8)`), with the one full compare in the case.
+  Tried by hand on `Sparse`'s thirty-three names, the shape where the
+  tree's branches are least predictable: `sparse` **+0.9%** with the mask
+  as a call and **+5.1%** with the load in the caller and the mask at
+  cost 85, against the tree. The tree's byte switches predict better
+  than the indirect jump does, on a document whose names come in a
+  sorted order even when their set varies; whatever `sparse` pays against
+  go-json, it is not the dispatch.
 - **`GOGC=off` as a mutator measurement**: it moves odjson's `generic`
   from 58 to 76–85 µs and go-json's not at all, because every allocation
   then touches fresh pages, and odjson's chunks are the larger pages. The
@@ -2665,11 +2678,10 @@ ahead by 1.4–2.6×.
 **What is left, by the profiles.** `skip`'s remaining gap to go-json is
 strictness: UTF-8 and duplicate names in what is skipped, which
 `encoding/json` does not check and json/v2 does. `sparse` (0.78×) is
-random subsets of forty-eight names, where the generated decision tree
-mispredicts a branch per level and go-json's table lookup on the first
-word of the name has no data-dependent branch to mispredict; a hashed
-dispatch in the generator is the untried lever, and it would not move
-`twitter`, whose members come in one order. `twitter-compact` (0.93×) is
+random subsets of thirty-three names; the hashed dispatch above, which
+was the obvious reading of it, lost to the tree, so what it pays is
+elsewhere — the pointer per present member and the null test before
+each are the next things to time. `twitter-compact` (0.93×) is
 the strict skip's rate against an AVX2 scan that checks nothing. The
 collector's share of a decode is the bytes allocated per call, which the
 target type dictates, plus whatever is retained — which is what the box
