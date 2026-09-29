@@ -909,19 +909,16 @@ func (g *generator) decodeMap(b *block, t *analyzer.Type, target ast.Expr, c ctx
 		g.loop(b, func(b *block) {
 			g.emit(b, varDecl(k.Name, sliceType(id("byte"))))
 			g.emit(b, c.skipSpace())
+			kp := id(g.tmp("kp"))
 			if c.strict {
-				kp := id(g.tmp("kp"))
 				g.emit(b, define(kp, c.posV()))
 				g.emit(b, assignN(token.ASSIGN, []ast.Expr{k, c.posV(), errV}, callRT("ParseKeyV2", c.dataV(), c.posV(), strict)))
 				g.decErr(b, c)
+				// A map that was empty when decoding began settles a
+				// repeated name at the insert: the map does not grow. A
+				// lookup here first would hash the name twice per member.
 				dup := id("dup")
-				s1 := g.ifStmt(b, nil, not(strict), func(b *block) {})
-				s1 = g.elseIf(s1, nil, bin(seen, token.EQL, nilV), func(b *block) {
-					g.ifStmt(b, assignN(token.DEFINE, []ast.Expr{id("_"), dup}, index(m, conv(t.Key.Expr, call(id("string"), k)))), dup, func(b *block) {
-						g.emit(b, c.fail(callRT("ErrDuplicateName", c.dataV(), kp, k)))
-					})
-				})
-				g.elseBlock(s1, func(b *block) {
+				g.ifStmt(b, nil, and(strict, bin(seen, token.NEQ, nilV)), func(b *block) {
 					g.ifStmt(b, assignN(token.DEFINE, []ast.Expr{id("_"), dup}, index(seen, call(id("string"), k))), dup, func(b *block) {
 						g.emit(b, c.fail(callRT("ErrDuplicateName", c.dataV(), kp, k)))
 					})
@@ -937,7 +934,16 @@ func (g *generator) decodeMap(b *block, t *analyzer.Type, target ast.Expr, c ctx
 			if c.cache != "" {
 				mk = call(sel(id(c.cache), "Make"), k)
 			}
-			g.emit(b, assign(index(m, conv(t.Key.Expr, mk)), mv))
+			if c.strict {
+				n := id(g.tmp("n"))
+				g.emit(b, define(n, call(id("len"), m)))
+				g.emit(b, assign(index(m, conv(t.Key.Expr, mk)), mv))
+				g.ifStmt(b, nil, and(strict, bin(seen, token.EQL, nilV), bin(call(id("len"), m), token.EQL, n)), func(b *block) {
+					g.emit(b, c.fail(callRT("ErrDuplicateName", c.dataV(), kp, k)))
+				})
+			} else {
+				g.emit(b, assign(index(m, conv(t.Key.Expr, mk)), mv))
+			}
 			g.separator(b, c, '}', "after object key:value pair")
 		})
 	})
