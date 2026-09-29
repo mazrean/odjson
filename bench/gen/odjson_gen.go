@@ -778,6 +778,8 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -1359,12 +1361,10 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -2218,6 +2218,8 @@ func (v *Author) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -2326,12 +2328,10 @@ func (v *Author) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -2786,6 +2786,8 @@ func (v *TwitterStruct) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCac
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -2888,12 +2890,10 @@ func (v *TwitterStruct) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCac
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -3887,6 +3887,8 @@ func (v *Statuses) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -4426,12 +4428,10 @@ func (v *Statuses) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -5413,6 +5413,8 @@ func (v *Entities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -5630,12 +5632,10 @@ func (v *Entities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -6211,6 +6211,8 @@ func (v *Hashtags) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -6332,12 +6334,10 @@ func (v *Hashtags) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -6773,6 +6773,8 @@ func (v *Metadata) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -6846,12 +6848,10 @@ func (v *Metadata) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -8280,6 +8280,8 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -9337,12 +9339,10 @@ func (v *User) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -10489,6 +10489,8 @@ func (v *UserEntities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -10548,12 +10550,10 @@ func (v *UserEntities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCach
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -10966,6 +10966,8 @@ func (v *URL) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -11048,12 +11050,10 @@ func (v *URL) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -11525,6 +11525,8 @@ func (v *Urls) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -11668,12 +11670,10 @@ func (v *Urls) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -12167,6 +12167,8 @@ func (v *Description) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -12256,12 +12258,10 @@ func (v *Description) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)
@@ -12852,6 +12852,8 @@ func (v *SearchMetadata) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCa
 	var seen [1]uint64
 	_ = seen
 	unknown, umark := odjsonrt.UnknownNames(sc)
+	var ufilter uint64
+	_ = ufilter
 	for {
 		var key []byte
 		if uint(p) >= uint(len(data)) || data[p] <= ' ' {
@@ -13114,12 +13116,10 @@ func (v *SearchMetadata) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCa
 			}
 		default:
 			if strict {
-				for _, u := range unknown[umark:] {
-					if string(u) == string(key) {
-						return kp, odjsonrt.ErrDuplicateName(data, kp, key)
-					}
+				var dup bool
+				if unknown, dup = odjsonrt.UnknownName(sc, unknown, umark, &ufilter, key); dup {
+					return kp, odjsonrt.ErrDuplicateName(data, kp, key)
 				}
-				unknown = odjsonrt.AddUnknownName(sc, unknown, key)
 			}
 			p = odjsonrt.SkipSpace(data, p)
 			p, err = odjsonrt.SkipValueV2(data, p, strict)

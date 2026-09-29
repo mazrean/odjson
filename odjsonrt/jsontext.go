@@ -243,6 +243,32 @@ func AddUnknownName(c *StringCache, names [][]byte, name []byte) [][]byte {
 	return names
 }
 
+// UnknownName is [AddUnknownName] with the duplicate check the strict
+// decoders make first: dup reports that the object, whose names start at
+// mark, already holds name, and nothing is added. filter is the object's
+// 64 bit filter over the names it has added, a smaller cousin of the one
+// [SkipValueStrict] keeps per level: a name whose bit is clear is known to
+// be new, so the scan of the list, which was every name against every
+// earlier one, is paid only on a hit, and an object with a dozen unknown
+// members takes one or two. One word, because every object zeroes it,
+// and most objects have no unknown member to put in it.
+func UnknownName(c *StringCache, names [][]byte, mark int, filter *uint64, name []byte) (out [][]byte, dup bool) {
+	bit := uint64(1) << (nameHash(name) >> 58)
+	if *filter&bit != 0 {
+		for _, n := range names[mark:] {
+			if string(n) == string(name) {
+				return names, true
+			}
+		}
+	}
+	*filter |= bit
+	names = append(names, name)
+	if c != nil {
+		*c.names = names
+	}
+	return names, false
+}
+
 // EndUnknownNames gives the list back once the object is closed, with this
 // object's names dropped. Only a decoder that returns normally calls it; a
 // failed decode leaves its names for [PutStringCache] to clear.

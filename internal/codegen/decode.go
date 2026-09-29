@@ -111,6 +111,10 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 		// that it costs neither an allocation nor zeroing per object; this
 		// object's names start at umark.
 		g.emit(b, assignN(token.DEFINE, []ast.Expr{unknown, umark}, callRT("UnknownNames", cacheExpr(c))))
+		// The filter over this object's unknown names, which settles
+		// most of them as new without scanning the list.
+		g.emit(b, varDecl("ufilter", id("uint64")))
+		g.emit(b, assign(id("_"), id("ufilter")))
 	}
 	// The strict decoder reads the name back for its duplicate check. A
 	// struct with no members and no such check never looks at it, and a
@@ -208,14 +212,12 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 			}
 			g.defaultClause(sw, func(b *block) {
 				if c.strict {
-					u := id("u")
+					dup := id("dup")
 					g.ifStmt(b, nil, strict, func(b *block) {
-						g.rangeStmt(b, id("_"), u, slice(unknown, umark, nil), func(b *block) {
-							g.ifStmt(b, nil, bin(call(id("string"), u), token.EQL, call(id("string"), key)), func(b *block) {
-								g.emit(b, ret(kp, callRT("ErrDuplicateName", data, kp, key)))
-							})
+						g.emit(b, varDecl(dup.Name, id("bool")))
+						g.ifStmt(b, assignN(token.ASSIGN, []ast.Expr{unknown, dup}, callRT("UnknownName", cacheExpr(c), unknown, umark, ref(id("ufilter")), key)), dup, func(b *block) {
+							g.emit(b, ret(kp, callRT("ErrDuplicateName", data, kp, key)))
 						})
-						g.emit(b, assign(unknown, callRT("AddUnknownName", cacheExpr(c), unknown, key)))
 					})
 					g.emit(b, c.skipSpace())
 					g.emit(b, assignN(token.ASSIGN, []ast.Expr{p, errV}, callRT("SkipValueV2", data, p, strict)))
