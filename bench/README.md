@@ -305,9 +305,10 @@ cd bench && go test -bench . -count 5 ./ab/
 `ab` covers every host library — the two standard libraries, sonic, go-json,
 json-iterator, segmentio and (encode only) jettison; the sonic and go-json
 rows are what settle
-whether odjson wins their small unmarshal (sonic's by 1.15x, go-json's by
-1.07x), is level on sonic's medium unmarshal (0.99x), and loses everything
-else on them (it does, by the floor).
+whether odjson wins sonic's small unmarshal (by 1.13x), how far behind it is
+on sonic's medium unmarshal (0.95x), and that it loses everything else on
+them — every go-json row included, since go-json v0.11.1 (it does, by the
+floor).
 
 ## `shapes`
 

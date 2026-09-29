@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 **odjson**（*overdrive JSON*）は、`encoding/json/v2` をコード編集なしで [`bytedance/sonic`](https://github.com/bytedance/sonic) より速くする CLI コードジェネレータです。
-標準の `encoding/json/v2` をそのまま使って行っている JSON エンコード/デコードが、以下のコメントを追加し、`go generate` するだけで 2.7×〜4.4× 高速化します。
+標準の `encoding/json/v2` をそのまま使って行っている JSON エンコード/デコードが、以下のコメントを追加し、`go generate` するだけで 2.6×〜4.6× 高速化します。
 ```go
 //go:generate go tool odjson -type User
 ```
@@ -16,10 +16,10 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bench-dark.svg">
-  <img alt="1 操作あたりの時間、低いほど速い。Marshal large: encoding/json/v2 401 µs, odjson あり 95 µs, sonic 117 µs, go-json 251 µs, json-iterator 405 µs, segmentio/encoding 217 µs, jettison 298 µs, easyjson 433 µs, gojay 395 µs。Marshal medium: 12259 ns, odjson あり 2790 ns, sonic 3606 ns, go-json 4571 ns, json-iterator 9011 ns, segmentio/encoding 4721 ns, jettison 7817 ns, easyjson 9787 ns, gojay 17719 ns。Marshal small: 1033 ns, odjson あり 255 ns, sonic 323 ns, go-json 402 ns, json-iterator 537 ns, segmentio/encoding 379 ns, jettison 464 ns, easyjson 660 ns, gojay 636 ns。Unmarshal large: 1100 µs, odjson あり 376 µs, sonic 505 µs, go-json 662 µs, json-iterator 1064 µs, segmentio/encoding 837 µs, simdjson-go 607 µs, easyjson 1086 µs, gojay 2570 µs。Unmarshal medium: 22222 ns, odjson あり 8263 ns, sonic 13941 ns, go-json 14991 ns, json-iterator 21630 ns, segmentio/encoding 16306 ns, simdjson-go 30207 ns, easyjson 18376 ns, gojay 25770 ns。Unmarshal small: 1853 ns, odjson あり 547 ns, sonic 964 ns, go-json 788 ns, json-iterator 1113 ns, segmentio/encoding 1108 ns, simdjson-go 1572 ns, easyjson 1158 ns, gojay 1069 ns。" src="./docs/assets/bench-light.svg" width="912">
+  <img alt="1 操作あたりの時間、低いほど速い。Marshal large: encoding/json/v2 385 µs, odjson あり 97 µs, sonic 116 µs, go-json 190 µs, json-iterator 424 µs, segmentio/encoding 225 µs, jettison 320 µs, easyjson 440 µs, gojay 413 µs。Marshal medium: 12118 ns, odjson あり 2616 ns, sonic 3419 ns, go-json 3532 ns, json-iterator 9244 ns, segmentio/encoding 4900 ns, jettison 8507 ns, easyjson 9528 ns, gojay 18583 ns。Marshal small: 1018 ns, odjson あり 256 ns, sonic 300 ns, go-json 371 ns, json-iterator 575 ns, segmentio/encoding 405 ns, jettison 468 ns, easyjson 669 ns, gojay 647 ns。Unmarshal large: 1127 µs, odjson あり 394 µs, sonic 527 µs, go-json 407 µs, json-iterator 1100 µs, segmentio/encoding 919 µs, simdjson-go 610 µs, easyjson 1078 µs, gojay 2579 µs。Unmarshal medium: 22146 ns, odjson あり 8602 ns, sonic 14854 ns, go-json 8980 ns, json-iterator 22448 ns, segmentio/encoding 17660 ns, simdjson-go 29870 ns, easyjson 18171 ns, gojay 25465 ns。Unmarshal small: 1882 ns, odjson あり 586 ns, sonic 1041 ns, go-json 548 ns, json-iterator 1110 ns, segmentio/encoding 1160 ns, simdjson-go 1626 ns, easyjson 1174 ns, gojay 1072 ns。" src="./docs/assets/bench-light.svg" width="912">
 </picture>
 
-ベンチマーク上で、sonic のベンチマークと同一の 3 つのサイズの入力で、エンコード/デコードともに **`encoding/json/v2` に対して 2.7×〜4.4×** の速度向上を確認しています。また、[`goccy/go-json`](https://github.com/goccy/go-json) をいずれのベンチマークでも 1.4×〜2.6× 上回り、アセンブリを用いて JIT コンパイルや SIMD なども活用する [`bytedance/sonic`](https://github.com/bytedance/sonic) も 6 つすべてで上回ります。
+ベンチマーク上で、sonic のベンチマークと同一の 3 つのサイズの入力で、エンコード/デコードともに **`encoding/json/v2` に対して 2.6×〜4.6×** の速度向上を確認しています。また、アセンブリを用いて JIT コンパイルや SIMD なども活用する [`bytedance/sonic`](https://github.com/bytedance/sonic) を 6 つすべてで上回ります。デコーダが SIMD で文書の構造を走査するようになった [`goccy/go-json`](https://github.com/goccy/go-json) v0.11 に対しては、3 つのエンコードで 1.35×〜1.96× 上回り、3 つのデコードでは互角で、small のデコードは go-json がわずかに上回ります。
 
 その他、[`json-iterator/go`](https://github.com/json-iterator/go)、[`segmentio/encoding`](https://github.com/segmentio/encoding)、[`jettison`](https://github.com/wI2L/jettison)、[`simdjson-go`](https://github.com/minio/simdjson-go)、[`easyjson`](https://github.com/mailru/easyjson)、[`gojay`](https://github.com/francoispqt/gojay) についても、6つのベンチマーク全てで上回っています。
 
