@@ -717,6 +717,13 @@ var loadShapes = sync.OnceValue(func() []shape {
 			}
 			return m
 		}())),
+		build[gen.Catalog, plain.Catalog, easyjson.Catalog]("map-items-in", "the map-items map as a member of a struct: the same 50 entries, on the direct path", mustJSON(func() plain.Catalog {
+			c := plain.Catalog{Items: map[string]plain.Item{}}
+			for _, it := range items(r, 50) {
+				c.Items[it.UUID] = it
+			}
+			return c
+		}())),
 		build[gen.Generic, plain.Generic, easyjson.Generic]("generic", "page-12k decoded into any: the runtime's generic parser end to end", mustJSON(map[string]any{"payload": generic})),
 
 		build[gen.Text, plain.Text, easyjson.Text]("text-ascii", "strings of ASCII words", mustJSON(text(r, pickFrom(asciiWords)))),
