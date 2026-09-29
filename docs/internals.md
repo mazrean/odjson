@@ -2646,6 +2646,16 @@ ahead by 1.4–2.6×.
   to publish the list the skip had grown, and every skip grew it again
   from the published length — `twitter` **+14%**, one `growslice` per
   level.
+- **The `any` decoder's duplicate name raised at the name**, where
+  jsontext raises it, by a 64 bit filter per object like `UnknownName`'s:
+  `generic` **+3.5%**, for a difference in *which* error a document with
+  both a repeated name and a later fault gets, never in whether it is
+  refused. The map's insert at the object's close says whether a name was
+  new for nothing, and that is where the error stays. On the way, the
+  error-path cleanup (`anyFail`, which clears the entries a failed
+  document left in the cache's stack) was inlined at fifteen sites and
+  cost `generic` **+16%** — a clear in each and its arguments live across
+  the loop; out of line it costs nothing.
 - **`GOGC=off` as a mutator measurement**: it moves odjson's `generic`
   from 58 to 76–85 µs and go-json's not at all, because every allocation
   then touches fresh pages, and odjson's chunks are the larger pages. The
