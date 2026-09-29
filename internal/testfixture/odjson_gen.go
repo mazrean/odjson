@@ -1906,7 +1906,7 @@ func (v *Scalars) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 			if np99, ok100 := odjsonrt.ParseNull(data, p); ok100 {
 				p = np99
 			} else {
-				if x101, np102, ok103 := odjsonrt.ParseDecimal(data, p); ok103 && data[p] != '-' {
+				if x101, np102, ok103 := odjsonrt.ParseUnsigned(data, p); ok103 {
 					v.Uint = uint(x101)
 					p = np102
 				} else {
@@ -1922,7 +1922,7 @@ func (v *Scalars) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 			if np105, ok106 := odjsonrt.ParseNull(data, p); ok106 {
 				p = np105
 			} else {
-				if x107, np108, ok109 := odjsonrt.ParseDecimal(data, p); ok109 && data[p] != '-' && x107 <= 255 {
+				if x107, np108, ok109 := odjsonrt.ParseUnsigned(data, p); ok109 && x107 <= 255 {
 					v.Uint8 = uint8(x107)
 					p = np108
 				} else {
@@ -1938,7 +1938,7 @@ func (v *Scalars) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 			if np111, ok112 := odjsonrt.ParseNull(data, p); ok112 {
 				p = np111
 			} else {
-				if x113, np114, ok115 := odjsonrt.ParseDecimal(data, p); ok115 && data[p] != '-' && x113 <= 65535 {
+				if x113, np114, ok115 := odjsonrt.ParseUnsigned(data, p); ok115 && x113 <= 65535 {
 					v.Uint16 = uint16(x113)
 					p = np114
 				} else {
@@ -1954,7 +1954,7 @@ func (v *Scalars) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 			if np117, ok118 := odjsonrt.ParseNull(data, p); ok118 {
 				p = np117
 			} else {
-				if x119, np120, ok121 := odjsonrt.ParseDecimal(data, p); ok121 && data[p] != '-' && x119 <= 4294967295 {
+				if x119, np120, ok121 := odjsonrt.ParseUnsigned(data, p); ok121 && x119 <= 4294967295 {
 					v.Uint32 = uint32(x119)
 					p = np120
 				} else {
@@ -1970,7 +1970,7 @@ func (v *Scalars) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 			if np123, ok124 := odjsonrt.ParseNull(data, p); ok124 {
 				p = np123
 			} else {
-				if x125, np126, ok127 := odjsonrt.ParseDecimal(data, p); ok127 && data[p] != '-' {
+				if x125, np126, ok127 := odjsonrt.ParseUnsigned(data, p); ok127 {
 					v.Uint64 = uint64(x125)
 					p = np126
 				} else {
@@ -2861,7 +2861,7 @@ func (v *Scalars) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np277
 				v.Uint = 0
 			} else {
-				if x279, np280, ok281 := odjsonrt.ParseDecimal(data, p); ok281 && data[p] != '-' {
+				if x279, np280, ok281 := odjsonrt.ParseUnsigned(data, p); ok281 {
 					v.Uint = uint(x279)
 					p = np280
 				} else {
@@ -2882,7 +2882,7 @@ func (v *Scalars) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np283
 				v.Uint8 = 0
 			} else {
-				if x285, np286, ok287 := odjsonrt.ParseDecimal(data, p); ok287 && data[p] != '-' && x285 <= 255 {
+				if x285, np286, ok287 := odjsonrt.ParseUnsigned(data, p); ok287 && x285 <= 255 {
 					v.Uint8 = uint8(x285)
 					p = np286
 				} else {
@@ -2903,7 +2903,7 @@ func (v *Scalars) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np289
 				v.Uint16 = 0
 			} else {
-				if x291, np292, ok293 := odjsonrt.ParseDecimal(data, p); ok293 && data[p] != '-' && x291 <= 65535 {
+				if x291, np292, ok293 := odjsonrt.ParseUnsigned(data, p); ok293 && x291 <= 65535 {
 					v.Uint16 = uint16(x291)
 					p = np292
 				} else {
@@ -2924,7 +2924,7 @@ func (v *Scalars) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np295
 				v.Uint32 = 0
 			} else {
-				if x297, np298, ok299 := odjsonrt.ParseDecimal(data, p); ok299 && data[p] != '-' && x297 <= 4294967295 {
+				if x297, np298, ok299 := odjsonrt.ParseUnsigned(data, p); ok299 && x297 <= 4294967295 {
 					v.Uint32 = uint32(x297)
 					p = np298
 				} else {
@@ -2945,7 +2945,7 @@ func (v *Scalars) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 				p = np301
 				v.Uint64 = 0
 			} else {
-				if x303, np304, ok305 := odjsonrt.ParseDecimal(data, p); ok305 && data[p] != '-' {
+				if x303, np304, ok305 := odjsonrt.ParseUnsigned(data, p); ok305 {
 					v.Uint64 = uint64(x303)
 					p = np304
 				} else {
@@ -5164,7 +5164,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 							if np574, ok575 := odjsonrt.ParseNull(data, p); ok575 {
 								p = np574
 							} else {
-								if x576, np577, ok578 := odjsonrt.ParseDecimal(data, p); ok578 && data[p] != '-' && x576 <= 255 {
+								if x576, np577, ok578 := odjsonrt.ParseUnsigned(data, p); ok578 && x576 <= 255 {
 									v.ByteArray[i572] = byte(x576)
 									p = np577
 								} else {
@@ -6279,7 +6279,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 								p = np703
 								v.ByteArray[i701] = 0
 							} else {
-								if x705, np706, ok707 := odjsonrt.ParseDecimal(data, p); ok707 && data[p] != '-' && x705 <= 255 {
+								if x705, np706, ok707 := odjsonrt.ParseUnsigned(data, p); ok707 && x705 <= 255 {
 									v.ByteArray[i701] = byte(x705)
 									p = np706
 								} else {
@@ -7460,7 +7460,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 								vp845 = np850
 								v.ByteArray[i848] = 0
 							} else {
-								if x852, np853, ok854 := odjsonrt.ParseDecimal(val844, vp845); ok854 && val844[vp845] != '-' && x852 <= 255 {
+								if x852, np853, ok854 := odjsonrt.ParseUnsigned(val844, vp845); ok854 && x852 <= 255 {
 									v.ByteArray[i848] = byte(x852)
 									vp845 = np853
 								} else {

@@ -617,13 +617,13 @@ func (g *generator) decode(b *block, t *analyzer.Type, target ast.Expr, c ctx) {
 			})
 		case analyzer.KindUint:
 			x, np, ok := id(g.tmp("x")), id(g.tmp("np")), id(g.tmp("ok"))
-			// ParseDecimal reads at most eighteen digits, so a non-negative
-			// result always fits a uint64; the sign is the only other check.
-			conds := []ast.Expr{ok, bin(c.at(), token.NEQ, chr('-'))}
+			// ParseUnsigned takes no sign and stops at what a uint64
+			// holds, so a narrower type's range is the only other check.
+			conds := []ast.Expr{ok}
 			if t.Bits < 64 {
 				conds = append(conds, bin(x, token.LEQ, unum(uint64(1)<<t.Bits-1)))
 			}
-			s := g.ifStmt(b, assignN(token.DEFINE, []ast.Expr{x, np, ok}, callRT("ParseDecimal", c.dataV(), c.posV())), and(conds...), func(b *block) {
+			s := g.ifStmt(b, assignN(token.DEFINE, []ast.Expr{x, np, ok}, callRT("ParseUnsigned", c.dataV(), c.posV())), and(conds...), func(b *block) {
 				g.emit(b, assign(target, conv(t.Expr, x)))
 				g.emit(b, assign(c.posV(), np))
 			})

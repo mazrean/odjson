@@ -4110,7 +4110,7 @@ func (v *Numbers) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 						if np283, ok284 := odjsonrt.ParseNull(data, p); ok284 {
 							p = np283
 						} else {
-							if x285, np286, ok287 := odjsonrt.ParseDecimal(data, p); ok287 && data[p] != '-' {
+							if x285, np286, ok287 := odjsonrt.ParseUnsigned(data, p); ok287 {
 								e282 = uint64(x285)
 								p = np286
 							} else {
@@ -4591,7 +4591,7 @@ func (v *Numbers) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 							p = np343
 							e342 = 0
 						} else {
-							if x345, np346, ok347 := odjsonrt.ParseDecimal(data, p); ok347 && data[p] != '-' {
+							if x345, np346, ok347 := odjsonrt.ParseUnsigned(data, p); ok347 {
 								e342 = uint64(x345)
 								p = np346
 							} else {
@@ -5079,7 +5079,7 @@ func (v *Numbers) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 							vp402 = np407
 							e406 = 0
 						} else {
-							if x409, np410, ok411 := odjsonrt.ParseDecimal(val401, vp402); ok411 && val401[vp402] != '-' {
+							if x409, np410, ok411 := odjsonrt.ParseUnsigned(val401, vp402); ok411 {
 								e406 = uint64(x409)
 								vp402 = np410
 							} else {
@@ -6068,7 +6068,7 @@ func (v *Uints) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, 
 						if np499, ok500 := odjsonrt.ParseNull(data, p); ok500 {
 							p = np499
 						} else {
-							if x501, np502, ok503 := odjsonrt.ParseDecimal(data, p); ok503 && data[p] != '-' {
+							if x501, np502, ok503 := odjsonrt.ParseUnsigned(data, p); ok503 {
 								e498 = uint64(x501)
 								p = np502
 							} else {
@@ -6204,7 +6204,7 @@ func (v *Uints) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stri
 							p = np509
 							e508 = 0
 						} else {
-							if x511, np512, ok513 := odjsonrt.ParseDecimal(data, p); ok513 && data[p] != '-' {
+							if x511, np512, ok513 := odjsonrt.ParseUnsigned(data, p); ok513 {
 								e508 = uint64(x511)
 								p = np512
 							} else {
@@ -6349,7 +6349,7 @@ func (v *Uints) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache)
 							vp516 = np521
 							e520 = 0
 						} else {
-							if x523, np524, ok525 := odjsonrt.ParseDecimal(val515, vp516); ok525 && val515[vp516] != '-' {
+							if x523, np524, ok525 := odjsonrt.ParseUnsigned(val515, vp516); ok525 {
 								e520 = uint64(x523)
 								vp516 = np524
 							} else {

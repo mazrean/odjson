@@ -210,10 +210,12 @@ func parseIntSlow(data []byte, p int, bits int) (int64, int, error) {
 
 // ParseDecimal reads the integer literal at p in one pass, accumulating the
 // digits while it scans for the end of the number. It handles the common
-// shape, an optional minus sign and up to eighteen digits with nothing after
-// them, which can neither overflow nor need strconv's range checks. Anything
-// else, including a fraction, an exponent or a leading zero followed by more
-// digits, is left to the general path, which also produces the right error.
+// shape, an optional minus sign and up to nineteen digits with nothing after
+// them, whose value fits an int64: nineteen digits cannot overflow the
+// accumulator, so the one range test at the end is all that stands between
+// the digits and the value. Anything else, including a fraction, an
+// exponent, a leading zero followed by more digits or a magnitude beyond
+// int64, is left to the general path, which also produces the right error.
 func ParseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 	i := p
 	neg := uint(i) < uint(len(data)) && data[i] == '-'
@@ -231,26 +233,73 @@ func ParseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 		i++
 	}
 	n := i - start
-	if n == 0 || n > 18 || (data[start] == '0' && n > 1) {
+	if n == 0 || n > 19 || (data[start] == '0' && n > 1) {
 		return 0, p, false
 	}
 	if uint(i) < uint(len(data)) && (data[i] == '.' || data[i] == 'e' || data[i] == 'E') {
 		return 0, p, false
 	}
 	if neg {
+		// 1<<63 is the one magnitude the negative side has and the
+		// positive side has not; -int64(1<<63) wraps to math.MinInt64,
+		// which is the value.
+		if u > 1<<63 {
+			return 0, p, false
+		}
 		return -int64(u), i, true
 	}
+	if u > 1<<63-1 {
+		return 0, p, false
+	}
 	return int64(u), i, true
+}
+
+// ParseUnsigned is [ParseDecimal] for an unsigned integer: no sign, and up to
+// twenty digits, the width of a uint64. The first nineteen are accumulated
+// without a check, which they cannot overflow; only a twentieth digit is
+// tested against what the accumulator has room for.
+func ParseUnsigned(data []byte, p int) (v uint64, end int, ok bool) {
+	i := p
+	var u uint64
+	for uint(i) < uint(len(data)) && i-p < 19 {
+		c := data[i] - '0'
+		if c > 9 {
+			break
+		}
+		u = u*10 + uint64(c)
+		i++
+	}
+	n := i - p
+	if n == 0 || (data[p] == '0' && n > 1) {
+		return 0, p, false
+	}
+	if uint(i) < uint(len(data)) {
+		if c := data[i] - '0'; c <= 9 {
+			// The twentieth digit, and the only step that can overflow.
+			if n < 19 || u > (1<<64-1-uint64(c))/10 {
+				return 0, p, false
+			}
+			u = u*10 + uint64(c)
+			i++
+			if uint(i) < uint(len(data)) && data[i]-'0' <= 9 {
+				return 0, p, false
+			}
+		}
+	}
+	if uint(i) < uint(len(data)) && (data[i] == '.' || data[i] == 'e' || data[i] == 'E') {
+		return 0, p, false
+	}
+	return u, i, true
 }
 
 // ParseUint parses the JSON number at p into an unsigned integer of the given
 // bit size (8, 16, 32 or 64). A negative, fractional or out of range literal
 // produces a [TypeError].
 func ParseUint(data []byte, p int, bits int) (uint64, int, error) {
-	// A minus sign is rejected by strconv even before a zero, so "-0" has to
-	// take the general path to produce that error.
-	if v, end, ok := ParseDecimal(data, p); ok && data[p] != '-' && (bits == 64 || v <= 1<<bits-1) {
-		return uint64(v), end, nil
+	// ParseUnsigned takes no sign, so "-0" takes the general path, where
+	// strconv rejects the sign even before a zero and produces that error.
+	if v, end, ok := ParseUnsigned(data, p); ok && (bits == 64 || v <= 1<<bits-1) {
+		return v, end, nil
 	}
 	return parseUintSlow(data, p, bits)
 }

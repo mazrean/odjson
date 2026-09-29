@@ -1171,7 +1171,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 			if np54, ok55 := odjsonrt.ParseNull(data, p); ok55 {
 				p = np54
 			} else {
-				if x56, np57, ok58 := odjsonrt.ParseDecimal(data, p); ok58 && data[p] != '-' {
+				if x56, np57, ok58 := odjsonrt.ParseUnsigned(data, p); ok58 {
 					v.Uint64 = uint64(x56)
 					p = np57
 				} else {
@@ -2375,7 +2375,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 				p = np222
 				v.Uint64 = 0
 			} else {
-				if x224, np225, ok226 := odjsonrt.ParseDecimal(data, p); ok226 && data[p] != '-' {
+				if x224, np225, ok226 := odjsonrt.ParseUnsigned(data, p); ok226 {
 					v.Uint64 = uint64(x224)
 					p = np225
 				} else {
