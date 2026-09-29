@@ -511,7 +511,12 @@ type anyFrame struct {
 	// keyPos is where key stands in the document, for the duplicate
 	// error, which is raised when the map is made rather than when the
 	// name is read: a lookup then and an insert later would hash the
-	// name twice, and the insert alone says whether the name was new.
+	// name twice, and the insert alone says whether the name was new. A
+	// filter per object that settled it at the name, the way UnknownName
+	// does, cost the generic row 3.5%; so where an object holds both a
+	// repeated name and a later fault, the fault is the error here and
+	// the name is jsontext's — a difference in which error, never in
+	// whether.
 	keyPos int
 }
 
@@ -521,6 +526,21 @@ type anyEntry struct {
 	key    string
 	val    any
 	keyPos int
+}
+
+// anyFail is what parseAny returns on an error: the entries of the objects
+// it had open are cleared, since they hold the values decoded so far, and
+// the stack is given back cut to where the call found it. It is kept out
+// of line: inlined at every error site it put a clear in each and kept
+// its arguments live across the loop, which cost the loop 16%.
+//
+//go:noinline
+func anyFail(sl *slab, entries []anyEntry, base, p int, err error) (any, int, error) {
+	if sl != nil {
+		clear(entries[base:])
+		sl.entries = entries[:base]
+	}
+	return nil, p, err
 }
 
 // ParseAny decodes the value at p the way encoding/json decodes into an
@@ -574,12 +594,12 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 
 	for {
 		if uint(p) >= uint(len(data)) {
-			return nil, p, errUnexpectedEnd(p)
+			return anyFail(sl, entries, base, p, errUnexpectedEnd(p))
 		}
 		switch c := data[p]; c {
 		case '{':
 			if len(stack) >= MaxDepth {
-				return nil, p, ErrSyntax(data, p, "exceeded max depth")
+				return anyFail(sl, entries, base, p, ErrSyntax(data, p, "exceeded max depth"))
 			}
 			p = SkipSpace(data, p+1)
 			if uint(p) < uint(len(data)) && data[p] == '}' {
@@ -589,14 +609,14 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 			}
 			key, next, err := parseKeyString(data, p, sc, strict)
 			if err != nil {
-				return nil, next, err
+				return anyFail(sl, entries, base, next, err)
 			}
 			stack = append(stack, anyFrame{obj: true, base: len(entries), key: key, keyPos: p})
 			p = next
 			continue
 		case '[':
 			if len(stack) >= MaxDepth {
-				return nil, p, ErrSyntax(data, p, "exceeded max depth")
+				return anyFail(sl, entries, base, p, ErrSyntax(data, p, "exceeded max depth"))
 			}
 			p = SkipSpace(data, p+1)
 			if uint(p) < uint(len(data)) && data[p] == ']' {
@@ -621,31 +641,31 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 				s, next, err = ParseStringWith(data, p, sc)
 			}
 			if err != nil {
-				return nil, next, err
+				return anyFail(sl, entries, base, next, err)
 			}
 			v, p = sc.boxString(s), next
 		case 't':
 			if !isTrue(data, p) {
-				return nil, p, errBeginValue(data, p)
+				return anyFail(sl, entries, base, p, errBeginValue(data, p))
 			}
 			v, p = true, p+4
 		case 'f':
 			if !isFalse(data, p) {
-				return nil, p, errBeginValue(data, p)
+				return anyFail(sl, entries, base, p, errBeginValue(data, p))
 			}
 			v, p = false, p+5
 		case 'n':
 			if !isNull(data, p) {
-				return nil, p, errBeginValue(data, p)
+				return anyFail(sl, entries, base, p, errBeginValue(data, p))
 			}
 			v, p = nil, p+4
 		default:
 			if c != '-' && (c < '0' || c > '9') {
-				return nil, p, errBeginValue(data, p)
+				return anyFail(sl, entries, base, p, errBeginValue(data, p))
 			}
 			f, next, err := ParseFloat(data, p, 64)
 			if err != nil {
-				return nil, next, err
+				return anyFail(sl, entries, base, next, err)
 			}
 			if i := int(f); f >= 0 && f < float64(len(smallAny)) && float64(i) == f && data[p] != '-' {
 				// A small non-negative integer, however it was spelled:
@@ -674,7 +694,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 			}
 			p = SkipSpace(data, p)
 			if uint(p) >= uint(len(data)) {
-				return nil, p, errUnexpectedEnd(p)
+				return anyFail(sl, entries, base, p, errUnexpectedEnd(p))
 			}
 			switch {
 			case data[p] == ',':
@@ -682,7 +702,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 				if f.obj {
 					key, next, err := parseKeyString(data, p, sc, strict)
 					if err != nil {
-						return nil, next, err
+						return anyFail(sl, entries, base, next, err)
 					}
 					f.key, f.keyPos = key, p
 					p = next
@@ -698,7 +718,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 						// value it replaced was the earlier member's,
 						// which no longer matters: the document is
 						// refused.
-						return nil, e.keyPos, ErrDuplicateName(data, e.keyPos, []byte(e.key))
+						return anyFail(sl, entries, base, e.keyPos, ErrDuplicateName(data, e.keyPos, []byte(e.key)))
 					}
 				}
 				// The entries hold the values, which the map now does;
@@ -715,9 +735,9 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 				stack = stack[:len(stack)-1]
 				continue
 			case f.obj:
-				return nil, p, errChar(data, p, "after object key:value pair")
+				return anyFail(sl, entries, base, p, errChar(data, p, "after object key:value pair"))
 			default:
-				return nil, p, errChar(data, p, "after array element")
+				return anyFail(sl, entries, base, p, errChar(data, p, "after array element"))
 			}
 			break
 		}

@@ -3,6 +3,7 @@ package odjsonrt_test
 import (
 	"bytes"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"math"
 	"reflect"
@@ -738,4 +739,33 @@ func FuzzParity(f *testing.F) {
 			t.Fatalf("ParseAny = %#v, encoding/json = %#v for %q", got, want, b)
 		}
 	})
+}
+
+// TestParseAnyStrictDuplicate checks that the any decoder refuses a
+// repeated name wherever it sits, as json/v2 does, and names it when the
+// object closes cleanly. Where the object also holds a later fault, the
+// fault is reported here and the name by jsontext (see anyFrame): the two
+// agree on refusing, not always on the reason.
+func TestParseAnyStrictDuplicate(t *testing.T) {
+	for _, tc := range []struct {
+		doc  string
+		name bool
+	}{
+		{`{"a": [], "a": null]`, false},
+		{`{"a": {}, "a": -12.5e1, "a": true`, false},
+		{`{"x": 1, "a": {"b": 1, "b": 2}, "a": 3}`, true},
+		{`{"a": 1, "b": {"c": 2}, "a": 3}`, true},
+	} {
+		c := odjsonrt.GetStringCache()
+		_, _, err := odjsonrt.ParseAnyStrict([]byte(tc.doc), 0, c)
+		odjsonrt.PutStringCache(c)
+		var v map[string]any
+		want := jsonv2.Unmarshal([]byte(tc.doc), &v)
+		if err == nil || want == nil {
+			t.Fatalf("%s: err %v, json/v2 %v", tc.doc, err, want)
+		}
+		if tc.name && !strings.Contains(err.Error(), "duplicate") {
+			t.Errorf("%s: err %v, want the duplicate name", tc.doc, err)
+		}
+	}
 }
