@@ -2618,7 +2618,64 @@ ahead.
   without the table's hash and probe; member names, which repeat, keep the
   table. `generic` **−5.0%**, `twitter` level.
 
-**The branch against `ad0861e`, one layout, n=4, every shape:** `generic`
+- **The any decoder as recursion.** Asked to take `generic` further, on
+  the ground that go-json does nothing there a pure Go decoder cannot:
+  its loop body was 11.6 µs of the row against go-json's 5.3 by the two
+  profiles side by side, and the costliest line was the append of an
+  entry literal, which the compiler builds on the stack and moves into
+  the slice through the write barrier's typed copy (`runtime.wbMove`, a
+  call per member while the collector runs — read off the disassembly).
+  The decoder is now a function per kind of container, the way go-json's
+  is, with the containers made once at their close, sized exactly — the
+  map from the entry stack, the slice from an element stack — and every
+  push a store into a slot. `generic` **−5.8%** (n=8). Writing the entry
+  field by field into the old loop had given −2.8%: the frame stack and
+  the attach loop behind a pointer were the rest.
+- **A member name in two words.** `parseKeyString` settles a plain name of
+  up to fifteen bytes and its colon by `shortName`'s two words and
+  `AfterName`'s inline test; the general path's three calls take the
+  rest. `generic` **−4.9%**.
+- **Values not interned.** Every string value paid the table's hash, probe
+  and compare for a hit that comes on names, which repeat, far more than
+  on values. `ParseStringStrict`, `ParseStringWith`, `ParseStringCached`
+  and `ParseStringValue` carve the value from the slab and leave the
+  table to the names (map keys, and the names an `any` object reads).
+  `obj-record` **−19%**, `unique-strings` **−15.5%**, `small` −6.4%,
+  `page-12k` −3.6%, `twitter` −2.1% at 261 KB per call from 248 — the
+  strings that repeated; the `text-*` rows, whose eighty byte lines
+  repeat and were deduplicated, **+6 to +15%** pooled (`text-ascii` 3.1 →
+  3.6 µs, its bytes per call doubled). The trade is a few percent of
+  memory on a document whose values repeat, for a fifth of the time on
+  one whose values do not; a decoder that wanted the old behaviour would
+  keep a hit counter and intern while it pays, which was not built.
+- **A map's repeated name settled at the insert.** The strict map decoder
+  looked a name up before decoding the value and inserted it after, two
+  hashes per member; a map that was empty when decoding began says
+  whether the name was new at the insert, since it does not grow.
+  `map-string-1k` **−12.5%**, `obj-map` **−16.5%**, `map-int-1k` −7.9%,
+  `map-items-in` −6.8%, `page-12k` −6.0% (with the interning change).
+- **`map-items-in`**, the map-items map behind a struct, added to
+  `bench/shapes`: a top-level map has no direct path, and `Catalog` puts
+  the same fifty entries behind a member, where the generated decoder
+  reads the map itself. In one process: odjson 30.3 µs, go-json 34.3,
+  sonic 38.4 — where the top-level `map-items` reads 40.4 / 34.0 / 35.4.
+  `page-12k`, which is the top-level `array-items` behind a struct, reads
+  25.7 against go-json's 29.9 the same way.
+
+**The second sitting of the round against its first end (`bf8d08d`), one
+layout, n=4:** `obj-record` −21%, `obj-map` −17%, `obj-long-names` −18%,
+`text-ascii-short` −23%, `unique-strings` −17%, `map-string-1k` −13%,
+`page-100k` −11%, `page-12k` −12%, `array-pages` −11%, `generic` −8%,
+`array-items` −8%, `map-items` −6%, `twitter` −4%, `small` −3%,
+`skip` −5%; against that, `text-ascii` +14%, `text-cjk` +5%, `text-latin`
++6%, `int-small` +13%. Pooled over four layouts, n=8, the last four read
++15%, +11%, +6% and +6% (p=0.02), `twitter` −2.2%, `small` −3.2%, and the
+other integer rows level: the text rows are the interning trade above,
+and `int-small`, whose path nothing touched, is within what a
+regenerated file moves.
+
+**The branch against `ad0861e`, one layout, n=4, every shape** (first
+sitting, before the items above): `generic`
 −17%, `skip` −23%, `text-escaped` −52%, `numbers` −54%, `int-large` −73%,
 `uint-large` −72%, `float32` −61%, the `page-*` rows −4 to −7%,
 `array-items` −4%, `array-pages` −4.5%, `deep-nest` −4%, `int-18` −6.5%,
