@@ -127,6 +127,11 @@ func swarUnsafeOrHigh(w uint64) uint64 {
 	return (cq | e | w) & swarHi
 }
 
+// longStringCopy is the length from which [appendStringBodyChecked] scans a
+// string before copying it rather than storing it word by word as it
+// scans.
+const longStringCopy = 32
+
 // swarUnsafeOrHigh32 is [swarUnsafeOrHigh] for four packed bytes, for the
 // halves a string shorter than a word is judged in.
 func swarUnsafeOrHigh32(w uint32) uint32 {
@@ -291,6 +296,28 @@ func appendStringBodyChecked(dst []byte, src []byte, m StringMode) ([]byte, erro
 	mark := len(dst)
 	n := mark
 	i := 0
+	if len(src) >= longStringCopy {
+		// A long string is judged first and copied after: the words are
+		// read without a store each, and the clean prefix — the whole of
+		// most long strings — goes in one memmove, which moves thirty-two
+		// bytes a step where the fused loop below stores eight. On a
+		// string of twenty bytes the call is most of the cost, which is
+		// why the fused loop exists; on one of eighty it is a tenth.
+		j := 0
+		for ; j+8 <= len(src); j += 8 {
+			if swarUnsafeOrHigh(load64(src, j)) != 0 {
+				break
+			}
+		}
+		if j+8 > len(src) && swarUnsafeOrHigh(load64(src, len(src)-8)) == 0 {
+			return append(dst, src...), nil
+		}
+		if j > 0 {
+			dst = append(dst, src[:j]...)
+			n += j
+			i = j
+		}
+	}
 	for {
 		// Room for what is left of the source plus a word of slack:
 		// source and destination advance together, so one reservation
