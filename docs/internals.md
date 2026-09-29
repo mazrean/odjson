@@ -1225,16 +1225,22 @@ so even with the sort removed odjson would not reach sonic on a dictionary,
 and `map[string]T` would stay the shape where the generator has least to
 offer.
 
-Two things follow, and only the first is about speed. Dropping the sort
-under `ModeV2` would take the two dictionary encodes from 0.82× / 0.67× to
-somewhere above 1.3×, and cost `obj-map` its 16% too. Independently of any
-of that, a generated `MarshalJSONTo` is behaving as though
-`jsonv2.Deterministic(true)` were always in force, whatever the caller
-passed, where the semantics table below says it follows `encoding/json/v2`'s
-rules; the runtime path in the same binary does not. A sorted object is
-valid JSON and every parity fixture compares canonically, so nothing caught
-it. Neither change has been made here — this section measures, it does not
-fix.
+Two things followed, and only the first was about speed. Dropping the
+sort under `ModeV2` would take the two dictionary encodes from 0.82× /
+0.67× to somewhere above 1.3×, and cost `obj-map` its 16% too.
+Independently of any of that, a generated `MarshalJSONTo` was behaving as
+though `jsonv2.Deterministic(true)` were always in force, whatever the
+caller passed, where the semantics table below says it follows
+`encoding/json/v2`'s rules; the runtime path in the same binary did not. A
+sorted object is valid JSON and every parity fixture compares canonically,
+so nothing caught it. **The fifth decode round's encode sitting made the
+change**: the generated encoder sorts unless the mode is `ModeV2`, a plain
+json/v2 Marshal on the direct path, whose options are known not to ask for
+Deterministic output; `ModeV2HTML`, encoding/json's Marshal, carries that
+flag and keeps the sort, and so does the public path, which cannot see the
+options. `map-string-1k` **−61%**, `obj-map` **−34%**, `map-items-in` −9%
+(n=6). The runtime's `appendAny` sorts under `ModeV2HTML` now too, which
+it had not.
 
 The practical reading for a caller is unchanged by either: `map[string]T`
 in a hot type gives up most of what odjson is for, and the one place it
@@ -1308,13 +1314,18 @@ v1's spellings — `null` for a nil slice, a zero dropped by `omitempty`, a
 case-insensitive member match — that is the one thing generating a codec does
 change, and `-case-insensitive` covers the last of the three.
 
-The map row is the one place the generated code does *not* follow its
-interface's rules. `encoding/json/v2` leaves map members in iteration order;
-`odjsonAppend` sorts them (`slices.Sort` over the collected keys) in every
-mode, so generated output stays byte-stable for a document containing maps
-whichever method runs. That is a deliberate departure — byte stability is
-worth more to a caller than matching `json/v2`'s non-determinism — and it is
-the reason adopting odjson does not disturb golden files or a signed body.
+The map row followed its interface's rules from the fifth decode round on.
+`encoding/json/v2` leaves map members in iteration order unless asked for
+`Deterministic` output; `odjsonAppend` sorted them in every mode until
+then, a departure that kept generated output byte-stable whichever method
+ran, at the cost of the sort on every map (see "The generated map encoder
+sorts"). It now sorts where the caller's options ask for it or cannot be
+seen — under `encoding/json`, whose defaults include `Deterministic`, and
+on the public path, which the options do not reach — and writes iteration
+order under a plain `json/v2` Marshal, as `json/v2` itself does. A golden
+file made from a plain `json/v2` Marshal of a map was never stable; one
+made with `Deterministic(true)` takes the public path and stays sorted;
+one made by encoding/json stays sorted.
 
 This is verified, not asserted: `internal/testfixture/v2parity` decodes the same
 documents into a generated type and an identical reflection-only type and
@@ -2661,6 +2672,26 @@ ahead.
   sonic 38.4 — where the top-level `map-items` reads 40.4 / 34.0 / 35.4.
   `page-12k`, which is the top-level `array-items` behind a struct, reads
   25.7 against go-json's 29.9 the same way.
+
+- **The encode side, asked for after the decode.** go-json's encoder gained
+  a SIMD scan of the string (`string_scan_amd64.s`) and a compaction fast
+  path for a marshaler's output; against odjson it was ahead on two encode
+  rows, `text-ascii` (0.84×) and `map-items` (0.94×, a top-level map,
+  which is json/v2's row). Two things were taken. **The map sort** above,
+  which the semantics section had recorded as a deliberate departure and
+  the shapes section as the whole of the dictionary rows' deficit, is now
+  made only where the caller asks for it or where the options cannot be
+  seen: `map-string-1k` **−61%**, `obj-map` **−34%**, `map-items-in` −9%,
+  `page-12k` −4%. **A long string is judged before it is copied**: the
+  fused scan-and-copy stores each word as it judges it, the right shape
+  for the twenty byte strings a document is full of, but on thirty-two
+  bytes or more the words are now read first and the clean prefix goes in
+  one memmove, thirty-two bytes a step. Pooled, n=8: `text-ascii`
+  **−10.8%**, `unique-strings` −6.5%, `twitter`, `small`, `page-12k`,
+  `obj-record` level, `text-latin` and `text-ascii-short` +1.6%.
+  `text-ascii` still reads 2.27 µs against go-json's 1.67: what is left
+  there is the SIMD scan, and the allocation of the result, which is
+  json/v2's.
 
 **The second sitting of the round against its first end (`bf8d08d`), one
 layout, n=4:** `obj-record` −21%, `obj-map` −17%, `obj-long-names` −18%,
