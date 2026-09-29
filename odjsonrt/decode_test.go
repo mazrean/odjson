@@ -744,7 +744,7 @@ func FuzzParity(f *testing.F) {
 // TestParseAnyStrictDuplicate checks that the any decoder refuses a
 // repeated name wherever it sits, as json/v2 does, and names it when the
 // object closes cleanly. Where the object also holds a later fault, the
-// fault is reported here and the name by jsontext (see anyFrame): the two
+// fault is reported here and the name by jsontext (see anyState.object): the two
 // agree on refusing, not always on the reason.
 func TestParseAnyStrictDuplicate(t *testing.T) {
 	for _, tc := range []struct {

@@ -87,14 +87,19 @@ func ErrKindFrom(dec *jsontext.Decoder, goType string) error {
 	return ErrKind(byte(k), goType)
 }
 
-// StringCache remembers recently decoded strings so that a value that occurs
-// many times in a document, or across documents, is allocated once, and
-// carves the strings it does allocate out of shared chunks.
+// StringCache carves the strings a decode produces out of shared chunks,
+// and remembers the member names it has made, so that a name that occurs
+// in every object of a document — a map's keys, an object's names read
+// into an any — is allocated once.
 //
 // encoding/json/v2 keeps the same kind of cache inside its decoder state, and
 // a decoder that lacks one allocates a string per member where json/v2 does
 // not. The cache is a direct mapped table keyed by a hash of the string's
-// first and last bytes, so a lookup costs the same for every length.
+// first and last bytes, so a lookup costs the same for every length. The
+// values are not interned: they repeat less than the names do, and the
+// table's hash, probe and compare on every one of them cost the rows
+// whose strings are unique up to a fifth (the obj-record shape), for a
+// few percent of memory on the documents whose values repeat.
 //
 // The any decoder's interface values are built the same way: the string and
 // slice headers and the floats they point to are carved from chunks of
@@ -158,10 +163,11 @@ type slab struct {
 	// boxes holds the header chunks the any decoder's interface values
 	// point into; see box.go.
 	boxes *boxes
-	// entries is parseAny's scratch for the members of the objects it has
-	// open: each object's map is made once, sized to its members, from
-	// the entries the object pushed. See parseAny.
+	// entries and anys are the any decoder's scratch for the members of
+	// the objects and the elements of the arrays it has open: each
+	// container is made once, sized, from what it pushed. See anyState.
 	entries []anyEntry
+	anys    []any
 }
 
 // alloc returns b as a string, carved from the cache's current chunk when
@@ -321,11 +327,12 @@ func PutStringCache(c *StringCache) {
 		// box.go).
 		*c.slab.boxes = boxes{}
 	}
-	if c.slab != nil && len(c.slab.entries) > 0 {
-		// A decoder that failed inside an object left its members, which
-		// hold the values decoded so far.
+	if c.slab != nil && (len(c.slab.entries) > 0 || len(c.slab.anys) > 0) {
+		// A decoder that failed inside a container left its members,
+		// which hold the values decoded so far.
 		clear(c.slab.entries)
-		c.slab.entries = c.slab.entries[:0]
+		clear(c.slab.anys)
+		c.slab.entries, c.slab.anys = c.slab.entries[:0], c.slab.anys[:0]
 	}
 	if c.slab != nil && cap(c.slab.scratch) > slabScratchMax {
 		// One document with a huge escaped string should not size the
@@ -435,7 +442,7 @@ func ParseStringValue(val []byte, c *StringCache) (string, error) {
 	}
 	body := val[1 : len(val)-1]
 	if bytes.IndexByte(body, '\\') < 0 {
-		return c.Make(body), nil
+		return c.alloc(body), nil
 	}
 	s, ok := c.unquoteString(body, false)
 	if !ok {
@@ -454,7 +461,7 @@ func ParseStringWith(data []byte, p int, c *StringCache) (string, int, error) {
 	}
 	if uint(p+9) <= uint(len(data)) {
 		if end := shortString(load64(data, p+1), p); end > 0 {
-			return c.Make(data[p+1 : end-1]), end, nil
+			return c.alloc(data[p+1 : end-1]), end, nil
 		}
 	}
 	end, hasEscape, _, err := scanString(data, p)
@@ -463,7 +470,7 @@ func ParseStringWith(data []byte, p int, c *StringCache) (string, int, error) {
 	}
 	body := data[p+1 : end-1]
 	if !hasEscape {
-		return c.Make(body), end, nil
+		return c.alloc(body), end, nil
 	}
 	s, ok := c.unquoteString(body, false)
 	if !ok {

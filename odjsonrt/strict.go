@@ -456,16 +456,9 @@ func validEscapes(s []byte) bool {
 
 // ParseStringStrict is [ParseString] under json/v2's rules: invalid UTF-8 and
 // an unpaired surrogate escape are errors rather than U+FFFD. The result is
-// interned through c when it is not nil.
+// carved from c's slab when c is not nil, and not interned: see
+// [StringCache].
 func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) {
-	return parseStringStrict(data, p, c, true)
-}
-
-// parseStringStrict is [ParseStringStrict], interning the result only when
-// intern is set: the values that reach an any are mostly unique, so the
-// any decoder carves them from the slab without the table's hash and
-// probe, while member names, which repeat, keep the table.
-func parseStringStrict(data []byte, p int, c *StringCache, intern bool) (string, int, error) {
 	if uint(p) >= uint(len(data)) {
 		return "", p, errUnexpectedEnd(p)
 	}
@@ -474,28 +467,17 @@ func parseStringStrict(data []byte, p int, c *StringCache, intern bool) (string,
 	}
 	if uint(p+9) <= uint(len(data)) {
 		if end := shortString(load64(data, p+1), p); end > 0 {
-			if !intern {
-				return c.alloc(data[p+1 : end-1]), end, nil
-			}
-			return c.Make(data[p+1 : end-1]), end, nil
+			return c.alloc(data[p+1 : end-1]), end, nil
 		}
 	}
 	// A string with escapes is decoded in the scan's own pass, into the
 	// cache's scratch buffer, and carved from its slab like any other.
-	body, aliased, nonASCII, end, err := scanStringStrictInto(data, p, c)
+	body, aliased, _, end, err := scanStringStrictInto(data, p, c)
 	if err != nil {
 		return "", end, err
 	}
 	if aliased {
-		if !intern {
-			return c.alloc(body), end, nil
-		}
-		if !nonASCII {
-			return c.Make(body), end, nil
-		}
-		// The scan has validated the body, so the entry can be marked
-		// for the callers that would otherwise check it again.
-		return c.MakeValid(body), end, nil
+		return c.alloc(body), end, nil
 	}
 	if c != nil && cap(body) > cap(c.slab.scratch) {
 		c.slab.scratch = body[:0]
