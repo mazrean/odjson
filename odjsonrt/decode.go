@@ -616,7 +616,7 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 			case legacy:
 				s, next, err = ParseStringCached(data, p, sc)
 			case strict:
-				s, next, err = ParseStringStrict(data, p, sc)
+				s, next, err = parseStringStrict(data, p, sc, false)
 			default:
 				s, next, err = ParseStringWith(data, p, sc)
 			}
