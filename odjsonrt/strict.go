@@ -257,17 +257,18 @@ func hex4(s []byte, i int) (r rune, bad int) {
 
 // scanStringStrictInto is [scanStringStrict] that also produces the string:
 // the body as a slice of data, aliased, when the literal has no escape, and
-// otherwise its decoded bytes, built in out's array from the first escape
-// on, in the same pass that validates the literal. A string with escapes
-// used to be scanned once and unescaped by a second walk that found each
-// backslash again; here the scan is already standing on it. The rules are
-// json/v2's: the body must be UTF-8, every \u escape must decode, and a
-// surrogate must be one half of a pair. err is at the byte it names.
-func scanStringStrictInto(data []byte, p int, out []byte) (body []byte, aliased, nonASCII bool, end int, err error) {
+// otherwise its decoded bytes, built in the cache's scratch from the first
+// escape on by unescapeStrictFrom, in the same pass that validates the
+// literal. A string with escapes used to be scanned once and unescaped by
+// a second walk that found each backslash again; here the scan is already
+// standing on it. The loop here is scanStringStrict's, with nothing more
+// in it: the copying loop lives in the function the first escape hands
+// over to, so that the strings without one, which are most, cost what
+// they did. The rules are json/v2's: the body must be UTF-8, every \u
+// escape must decode, and a surrogate must be one half of a pair. err is
+// at the byte it names.
+func scanStringStrictInto(data []byte, p int, cache *StringCache) (body []byte, aliased, nonASCII bool, end int, err error) {
 	i := p + 1
-	// run is where the bytes not yet copied to out start, once an escape
-	// has been met; before that, out is unused and the body is data's.
-	run, escaped := i, false
 	for uint(i) < uint(len(data)) {
 		for i+8 <= len(data) {
 			w := load64(data, i)
@@ -282,17 +283,74 @@ func scanStringStrictInto(data []byte, p int, out []byte) (body []byte, aliased,
 		}
 		switch c := data[i]; {
 		case c == '"':
-			if !escaped {
-				return data[p+1 : i], true, nonASCII, i + 1, nil
+			return data[p+1 : i], true, nonASCII, i + 1, nil
+		case c == '\\':
+			return unescapeStrictFrom(data, p, i, nonASCII, cache)
+		case c < 0x20:
+			return nil, false, nonASCII, i, errChar(data, i, "in string literal")
+		case c >= utf8.RuneSelf:
+			nonASCII = true
+			if c-0xC2 < 0x1E && uint(i+1) < uint(len(data)) && data[i+1]&0xC0 == 0x80 {
+				i += 2
+				if uint(i) < uint(len(data)) && data[i] >= utf8.RuneSelf {
+					// A dense run: skipNonASCII takes it a word at a time.
+				} else {
+					for i+8 <= len(data) {
+						w := load64(data, i)
+						if w&swarHi == 0 || swarStringStop(w) != 0 || !swarLatin(w) {
+							break
+						}
+						i += 8
+					}
+					continue
+				}
 			}
+			if next := skipNonASCII(data, i); next >= 0 {
+				i = next
+			} else if bytes.IndexByte(data[i:], '"') < 0 {
+				return nil, false, nonASCII, len(data), errUnexpectedEnd(len(data))
+			} else {
+				return nil, false, nonASCII, p, errInvalidUTF8(data, p)
+			}
+		default:
+			i++
+		}
+	}
+	return nil, false, nonASCII, i, errUnexpectedEnd(i)
+}
+
+// unescapeStrictFrom continues scanStringStrictInto from i, the first
+// backslash of the literal at p: the bytes before it are copied to the
+// cache's scratch, and from there every run and every decoded escape is
+// appended as the scan passes it. Its result is the decoded body, in the
+// scratch's array, which the caller carves from the slab.
+//
+//go:noinline
+func unescapeStrictFrom(data []byte, p, i int, nonASCII bool, cache *StringCache) (body []byte, aliased, nonASCIIOut bool, end int, err error) {
+	var out []byte
+	if cache != nil {
+		out = cache.scratch()
+	}
+	out = append(out, data[p+1:i]...)
+	// run is where the bytes not yet copied to out start.
+	run := i
+	for uint(i) < uint(len(data)) {
+		for i+8 <= len(data) {
+			w := load64(data, i)
+			if m := swarStringStop(w) | w&swarHi; m != 0 {
+				i += swarIndex(m)
+				break
+			}
+			i += 8
+		}
+		if uint(i) >= uint(len(data)) {
+			break
+		}
+		switch c := data[i]; {
+		case c == '"':
 			return append(out, data[run:i]...), false, nonASCII, i + 1, nil
 		case c == '\\':
-			if !escaped {
-				escaped = true
-				out = append(out[:0], data[p+1:i]...)
-			} else {
-				out = append(out, data[run:i]...)
-			}
+			out = append(out, data[run:i]...)
 			i++
 			if uint(i) >= uint(len(data)) {
 				return nil, false, nonASCII, i, errUnexpectedEnd(i)
@@ -350,21 +408,6 @@ func scanStringStrictInto(data []byte, p int, out []byte) (body []byte, aliased,
 			return nil, false, nonASCII, i, errChar(data, i, "in string literal")
 		case c >= utf8.RuneSelf:
 			nonASCII = true
-			if c-0xC2 < 0x1E && uint(i+1) < uint(len(data)) && data[i+1]&0xC0 == 0x80 {
-				i += 2
-				if uint(i) < uint(len(data)) && data[i] >= utf8.RuneSelf {
-					// A dense run: skipNonASCII takes it a word at a time.
-				} else {
-					for i+8 <= len(data) {
-						w := load64(data, i)
-						if w&swarHi == 0 || swarStringStop(w) != 0 || !swarLatin(w) {
-							break
-						}
-						i += 8
-					}
-					continue
-				}
-			}
 			if next := skipNonASCII(data, i); next >= 0 {
 				i = next
 			} else if bytes.IndexByte(data[i:], '"') < 0 {
@@ -439,16 +482,7 @@ func parseStringStrict(data []byte, p int, c *StringCache, intern bool) (string,
 	}
 	// A string with escapes is decoded in the scan's own pass, into the
 	// cache's scratch buffer, and carved from its slab like any other.
-	var sl *slab
-	var scratch []byte
-	if c != nil {
-		if sl = c.slab; sl == nil {
-			sl = new(slab)
-			c.slab = sl
-		}
-		scratch = sl.scratch[:0]
-	}
-	body, aliased, nonASCII, end, err := scanStringStrictInto(data, p, scratch)
+	body, aliased, nonASCII, end, err := scanStringStrictInto(data, p, c)
 	if err != nil {
 		return "", end, err
 	}
@@ -463,8 +497,8 @@ func parseStringStrict(data []byte, p int, c *StringCache, intern bool) (string,
 		// for the callers that would otherwise check it again.
 		return c.MakeValid(body), end, nil
 	}
-	if sl != nil && cap(body) > cap(sl.scratch) {
-		sl.scratch = body[:0]
+	if c != nil && cap(body) > cap(c.slab.scratch) {
+		c.slab.scratch = body[:0]
 	}
 	return c.alloc(body), end, nil
 }

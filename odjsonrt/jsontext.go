@@ -189,6 +189,17 @@ func (c *StringCache) alloc(b []byte) string {
 	return s
 }
 
+// scratch returns the cache's unescaping buffer, empty, allocating the slab
+// on first use.
+func (c *StringCache) scratch() []byte {
+	sl := c.slab
+	if sl == nil {
+		sl = new(slab)
+		c.slab = sl
+	}
+	return sl.scratch[:0]
+}
+
 // unquoteString decodes the body of a string literal with escapes into a
 // string carved through [StringCache.alloc]: the unescaped bytes are built
 // in the cache's scratch buffer rather than in a fresh slice per string.
