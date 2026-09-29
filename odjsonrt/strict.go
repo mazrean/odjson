@@ -493,12 +493,50 @@ func strictKey(data []byte, p int, names [][]byte, lv *strictLevel) ([][]byte, i
 // SkipValueStrict is [SkipValue] under json/v2's rules: strings must be valid
 // UTF-8 and no object may hold a name twice, at any depth.
 //
+// A scalar is settled here, with nothing on the stack: most of the values
+// a struct decoder skips are the strings and numbers of members it does
+// not know, and the arrays an object or array needs would cost each of
+// them two kilobytes of zeroing. Those live in [skipCompoundStrict].
+func SkipValueStrict(data []byte, p int) (int, error) {
+	if uint(p) >= uint(len(data)) {
+		return p, errUnexpectedEnd(p)
+	}
+	switch c := data[p]; c {
+	case '{', '[':
+		return skipCompoundStrict(data, p)
+	case '"':
+		return skipStringStrict(data, p)
+	case 't':
+		if !isTrue(data, p) {
+			return p, errBeginValue(data, p)
+		}
+		return p + 4, nil
+	case 'f':
+		if !isFalse(data, p) {
+			return p, errBeginValue(data, p)
+		}
+		return p + 5, nil
+	case 'n':
+		if !isNull(data, p) {
+			return p, errBeginValue(data, p)
+		}
+		return p + 4, nil
+	default:
+		if c != '-' && (c < '0' || c > '9') {
+			return p, errBeginValue(data, p)
+		}
+		return scanNumber(data, p)
+	}
+}
+
+// skipCompoundStrict is [SkipValueStrict] for the object or array at p.
+//
 // The names of every open object are kept back to back in one list, with a
 // [strictLevel] per non-empty object saying where that object's names start
 // and which of them might already be present. Both live in small arrays on
-// the stack, so skipping a scalar or a small object allocates nothing; only a
-// wide or deep object spills them to the heap.
-func SkipValueStrict(data []byte, p int) (int, error) {
+// the stack, so skipping a small object allocates nothing; only a wide or
+// deep object spills them to the heap.
+func skipCompoundStrict(data []byte, p int) (int, error) {
 	var inline [inlineDepth]byte
 	stack := inline[:0]
 	var namesBuf [64][]byte
