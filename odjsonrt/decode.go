@@ -503,12 +503,23 @@ var smallAny = func() (t [1000]any) {
 // with a non-nil obj describes an object, otherwise it describes an array.
 type anyFrame struct {
 	arr []any
-	obj map[string]any
-	key string
+	// obj says the frame is an object's; base is where its members start
+	// in the entry stack, and key the name of the member being read.
+	obj  bool
+	base int
+	key  string
 	// keyPos is where key stands in the document, for the duplicate
-	// error, which is raised when the value is attached rather than when
-	// the name is read: a lookup then and an insert later would hash the
+	// error, which is raised when the map is made rather than when the
+	// name is read: a lookup then and an insert later would hash the
 	// name twice, and the insert alone says whether the name was new.
+	keyPos int
+}
+
+// anyEntry is a member of an object parseAny has open: its name, its
+// value, and where the name stands, for the duplicate error.
+type anyEntry struct {
+	key    string
+	val    any
 	keyPos int
 }
 
@@ -536,12 +547,29 @@ func ParseAnyCached(data []byte, p int, c *StringCache) (any, int, error) {
 // has validated, where nothing can occur that needs checking. They are two
 // booleans rather than one mode so that [ParseAnyV2] stays a single call
 // the compiler inlines into generated code.
+//
+// An object's members are pushed to a stack of entries as they are read,
+// and its map is made once, when it closes, sized to hold them: a map
+// filled a member at a time grows and rehashes on the way, which cost
+// more than the members did. The stack is the cache's, kept from one
+// document to the next; without a cache it is allocated on the first
+// object.
 func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, int, error) {
 	// The values that reach an interface are shallow: an object or two
 	// with an array of numbers inside. Room for a few levels on the stack
 	// keeps the container stack itself from being an allocation per value.
 	var inline [4]anyFrame
 	stack := inline[:0]
+	var entries []anyEntry
+	var sl *slab
+	if sc != nil {
+		if sl = sc.slab; sl == nil {
+			sl = new(slab)
+			sc.slab = sl
+		}
+		entries = sl.entries
+	}
+	base := len(entries)
 	var v any
 
 	for {
@@ -553,18 +581,17 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 			if len(stack) >= MaxDepth {
 				return nil, p, ErrSyntax(data, p, "exceeded max depth")
 			}
-			obj := make(map[string]any)
 			p = SkipSpace(data, p+1)
 			if uint(p) < uint(len(data)) && data[p] == '}' {
 				p++
-				v = obj
+				v = map[string]any{}
 				break
 			}
 			key, next, err := parseKeyString(data, p, sc, strict)
 			if err != nil {
 				return nil, next, err
 			}
-			stack = append(stack, anyFrame{obj: obj, key: key, keyPos: p})
+			stack = append(stack, anyFrame{obj: true, base: len(entries), key: key, keyPos: p})
 			p = next
 			continue
 		case '[':
@@ -634,18 +661,14 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 		// A value has been decoded; attach it and close finished containers.
 		for {
 			if len(stack) == 0 {
+				if sl != nil {
+					sl.entries = entries[:base]
+				}
 				return v, p, nil
 			}
 			f := &stack[len(stack)-1]
-			if f.obj != nil {
-				n := len(f.obj)
-				f.obj[f.key] = v
-				if strict && len(f.obj) == n {
-					// The insert found the name already there. The
-					// value it replaced was the earlier member's, which
-					// no longer matters: the document is refused.
-					return nil, f.keyPos, ErrDuplicateName(data, f.keyPos, []byte(f.key))
-				}
+			if f.obj {
+				entries = append(entries, anyEntry{key: f.key, val: v, keyPos: f.keyPos})
 			} else {
 				f.arr = append(f.arr, v)
 			}
@@ -653,11 +676,10 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 			if uint(p) >= uint(len(data)) {
 				return nil, p, errUnexpectedEnd(p)
 			}
-			isObj := f.obj != nil
 			switch {
 			case data[p] == ',':
 				p = SkipSpace(data, p+1)
-				if isObj {
+				if f.obj {
 					key, next, err := parseKeyString(data, p, sc, strict)
 					if err != nil {
 						return nil, next, err
@@ -665,17 +687,34 @@ func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, in
 					f.key, f.keyPos = key, p
 					p = next
 				}
-			case isObj && data[p] == '}':
-				v = f.obj
+			case f.obj && data[p] == '}':
+				members := entries[f.base:]
+				m := make(map[string]any, len(members))
+				for i := range members {
+					e := &members[i]
+					m[e.key] = e.val
+					if strict && len(m) != i+1 {
+						// The insert found the name already there. The
+						// value it replaced was the earlier member's,
+						// which no longer matters: the document is
+						// refused.
+						return nil, e.keyPos, ErrDuplicateName(data, e.keyPos, []byte(e.key))
+					}
+				}
+				// The entries hold the values, which the map now does;
+				// a pooled cache must not keep them alive.
+				clear(members)
+				entries = entries[:f.base]
+				v = m
 				p++
 				stack = stack[:len(stack)-1]
 				continue
-			case !isObj && data[p] == ']':
+			case !f.obj && data[p] == ']':
 				v = sc.boxSlice(f.arr)
 				p++
 				stack = stack[:len(stack)-1]
 				continue
-			case isObj:
+			case f.obj:
 				return nil, p, errChar(data, p, "after object key:value pair")
 			default:
 				return nil, p, errChar(data, p, "after array element")

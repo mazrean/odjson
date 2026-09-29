@@ -158,6 +158,10 @@ type slab struct {
 	// boxes holds the header chunks the any decoder's interface values
 	// point into; see box.go.
 	boxes *boxes
+	// entries is parseAny's scratch for the members of the objects it has
+	// open: each object's map is made once, sized to its members, from
+	// the entries the object pushed. See parseAny.
+	entries []anyEntry
 }
 
 // alloc returns b as a string, carved from the cache's current chunk when
@@ -273,6 +277,12 @@ func PutStringCache(c *StringCache) {
 		// they alias its document.
 		clear(*c.names)
 		*c.names = (*c.names)[:0]
+	}
+	if c.slab != nil && len(c.slab.entries) > 0 {
+		// A decoder that failed inside an object left its members, which
+		// hold the values decoded so far.
+		clear(c.slab.entries)
+		c.slab.entries = c.slab.entries[:0]
 	}
 	if c.slab != nil && cap(c.slab.scratch) > slabScratchMax {
 		// One document with a huge escaped string should not size the
