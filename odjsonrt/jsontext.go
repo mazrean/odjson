@@ -278,6 +278,12 @@ func PutStringCache(c *StringCache) {
 		clear(*c.names)
 		*c.names = (*c.names)[:0]
 	}
+	if c.slab != nil && c.slab.boxes != nil {
+		// The header chunks are this document's: carried into the next
+		// they would keep it alive, and its predecessors through it (see
+		// box.go).
+		*c.slab.boxes = boxes{}
+	}
 	if c.slab != nil && len(c.slab.entries) > 0 {
 		// A decoder that failed inside an object left its members, which
 		// hold the values decoded so far.
