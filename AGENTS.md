@@ -153,8 +153,14 @@ it puts the `small` margin lowest again: 1.15x on `twitter` and 1.06x on
 first-order term for both (`GOGC=800` moves sonic's encodes -17..-21% and
 odjson's -13..-19%) but does not explain that binary on its own; treat the
 `small` encode over sonic as narrow, 1.06-1.17x depending on the binary. On
-decode, go-json v0.11.1 is ahead of odjson on nine of the 26 shapes and
-level on eight; say so rather than citing only the three payloads.
+decode, go-json v0.11.1 was ahead of odjson on nine of the 26 shapes and
+level on eight in that sitting; the fifth decode round that followed
+(`perf/decode-round5`, "The fifth decode round" in `docs/internals.md`)
+took back `numbers`, `text-escaped`, `int-large`, `uint-large` and
+`float32` (−54% to −73% on its own A/B) and left it ahead on `skip`,
+`generic` and the rows without a direct path. The shapes tables predate
+the round; say so rather than citing only the three payloads, and
+re-measure before restating them.
 
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,

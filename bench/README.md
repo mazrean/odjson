@@ -393,7 +393,8 @@ json/v2's, so it reads one column per library with odjson's own column
 the baselines' table under "The other libraries on the shapes" there. The
 characteristic rows have a section of their own,
 ["What the characteristic shapes say"](../docs/internals.md#what-the-characteristic-shapes-say):
-the nineteenth digit of an integer is a cliff in the decoder, the generated
+the nineteenth digit of an integer was a cliff in the decoder until the
+fifth decode round, the generated
 map encoder sorts its keys where the runtime path does not and pays its
 whole deficit to `json/v2` for it, and the float and depth rows are the
 widest margins in the file.

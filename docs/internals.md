@@ -976,7 +976,11 @@ What the tables say, beyond the three payloads:
   (0.87×), `text-ascii` (0.92×) and `numbers` (0.93×), and behind on the
   other 14, by 1.07× (`array-items`) to 2.92× (`dense`).
 - **go-json v0.11.1 is the one library here that decodes level with odjson
-  across the board.** It is ahead on nine rows — `skip` 0.56×,
+  across the board** — as of this sitting; the fifth decode round, which
+  followed it and is described under "Measured and rejected", moved the
+  rows it was furthest ahead on (`numbers`, `text-escaped`, `skip`,
+  `generic`, and `int-large`, `uint-large` and `float32` below) by 17–73%
+  and is quoted there against this table. It is ahead on nine rows — `skip` 0.56×,
   `text-escaped` 0.63×, `generic` 0.66×, `numbers` 0.71×, `sparse` 0.78×,
   `map-items` 0.80×, `array-items` 0.90×, `unique-strings` 0.91×,
   `twitter-compact` 0.93× — level on eight (`small`, the four `page-*`,
@@ -1110,22 +1114,24 @@ values beside the others:
 | `int-large` | 19 + sign | 50.1 ns/value | go-json 18.8 |
 | `uint-large` | 20 | 55.8 ns/value | sonnet 20.2 |
 
-Eighteen digits is the fastest decode of any library measured; nineteen is
-4.2× slower than eighteen and puts odjson behind nearly every one of them,
-including the `json/v2` reflection it is built on (0.83× / 0.68× on
-`int-large` / `uint-large`); only `encoding/json` (1.13×, and 0.92× on
-`uint-large`) and easyjson (level at 0.95×, then 0.84×) are not ahead on
-the first. `int-large` and `uint-large` are the only two rows
-in this file where the generated *decoder* loses to its own baseline; the
-generated *encoder* loses to it on the two dictionary rows, for the
-unrelated reason "The generated map encoder sorts" gives below. The cliff
-is not a semantic
-requirement — a nineteen digit literal still fits an `int64` more often than
-not — but a width the one-pass accumulator was cut at; widening it means
-either a `bits.Mul64`-style overflow check per digit or a second
-accumulator, and neither has been measured. The encode side is unaffected
+Eighteen digits was the fastest decode of any library measured; nineteen
+was 4.2× slower than eighteen and put odjson behind nearly every one of
+them, including the `json/v2` reflection it is built on (0.83× / 0.68× on
+`int-large` / `uint-large`). The cliff was not a semantic requirement — a
+nineteen digit literal still fits an `int64` more often than not — but a
+width the one-pass accumulator was cut at, where the *accumulator* could
+not overflow but the *value* could exceed the type; and nineteen digits
+cannot overflow a `uint64` either. **The fifth decode round took it** (see
+"The fifth decode round" under "Measured and rejected"): `ParseDecimal`
+accumulates nineteen digits and tests the value against the type once at
+the end, and `ParseUnsigned` takes the twentieth digit a `uint64` has room
+for with a check on that digit alone. In that round's A/B, one binary a
+side, n=6, `int-large` reads **−73%** (51.7 → 14.0 µs, 13.6 ns/value) and
+`uint-large` **−71%** (57.2 → 16.4 µs), and the table's 0.38× against
+go-json becomes roughly 1.4× the other way — roughly, because the two
+figures are from different sittings. The encode side was never affected
 (1.62× / 1.72× over `json/v2`, since `AppendInt` is width-driven and has no
-such boundary), and so are `int64` fields whose values are ordinary —
+such boundary), and neither were `int64` fields whose values are ordinary —
 timestamps in milliseconds are thirteen digits, Snowflake IDs nineteen.
 
 #### Floats: the short decimal and the exponent are odjson's, `float32` is not
@@ -1140,14 +1146,22 @@ one-pass Eisel-Lemire parser is not tuned only to the spellings odjson
 itself writes. Encoding, only `float-short` beats sonic (1.39×); full
 precision and exponents go to sonic by 0.79× and 0.73×.
 
-`float32` is the exception in both directions: 0.53× encoding and 0.56×
+`float32` was the exception in both directions: 0.53× encoding and 0.56×
 decoding against sonic, and behind go-json (0.46×) and json-iterator (0.73×)
-on decode, level with sonnet (0.99×). `ParseSimpleFloat` takes the `float32` branch only when the
-mantissa is below `1<<24` and the fraction is within `pow10f32`, and it
-declines an exponent outright at that bit size; a value needing nine
-significant digits exceeds the first, so most of these literals reach the
-general path. What that path then costs for a `float32` result has not been
-measured — only the decline condition was read.
+on decode, level with sonnet (0.99×). `ParseSimpleFloat` took the `float32`
+branch only when the mantissa was below `1<<24` and the fraction within
+`pow10f32`, and declined an exponent outright at that bit size; a value
+needing nine significant digits exceeds the first, so most of these
+literals reached the general path, and `strconv` cost them the row. **The
+fifth decode round took the decode side**: the same two steps the float64
+arm takes, at 24 bits — one exact float32 operation when both parts are
+exact, and otherwise the Eisel-Lemire product cut at 25 bits, with the
+same declines — so the result is what `strconv.ParseFloat(s, 32)` returns,
+rounded once to the nearest float32 and never through a float64 (a float64
+rounded again to float32 is the double-rounding trap). `float32` decode
+reads **−60%** in that round's A/B (27.3 → 10.8 µs, n=6), and `numbers`,
+which carries the float32 and the nineteen digit integers together,
+**−54%**. The encode side stays sonic's.
 
 #### Strings: per byte against per string
 
@@ -2507,6 +2521,149 @@ the design that won `twitter` its 16%; `swarMixed` refuses four byte
 sequences, so a document of dense emoji still goes through the table;
 and the mixed loop costs some sixty operations a word where the two byte
 loop costs twenty, because it classifies three sequence lengths at once.
+
+### The fifth decode round
+
+A round on `chore/go-json-v0.11.1` at `ad0861e`, after the re-measure that
+found go-json v0.11.1 level with odjson on decode (branch
+`perf/decode-round5`). The question was what go-json's rewrite does that
+odjson does not, and where odjson loses to it by shape. Read from its
+source: the input is copied with a nul byte after it, so every scan runs
+without a bounds test; the values of an unknown member are skipped by a
+goto state machine that calls nothing (`skipFast`), and a whole compound
+value by 64 byte masks of quotes and brackets with a prefix-xor for the
+string state, AVX2 on amd64 and words elsewhere; strings and keys are
+found by `keyEndBytes`, a word scan like `swarStringStop`; numbers are
+parsed in one pass to nineteen digits; strings go to an arena and their
+interface headers to slabs, as odjson's do; an object decoded into an
+`any` pushes its members to a stack and makes its map once, sized. Most
+of that odjson already had. What it did not, by the profiles of the rows
+it lost — `int-large` 0.38×, `float32` 0.46×, `skip` 0.56×, `text-escaped`
+0.63×, `generic` 0.66×, `numbers` 0.71× — is below, in the order it was
+taken. Pure Go throughout, as before: no assembly.
+
+Every figure is a `bench/shapes` json/v2 decode row, the branch's binary
+against the previous commit's, interleaved, `n=6` on one layout unless it
+says *pooled*, which is four `-randlayout` seeds a side, `n=8`. The
+README's three rows (`bench/gen`, pooled, n=8) are level on every one of
+them: the round is about the shapes, not the payloads that were already
+ahead.
+
+**Kept:**
+
+- **Integers to the width of the type.** `ParseDecimal` declined at more
+  than eighteen digits, where the value could exceed an `int64`, and
+  `strconv` took every nineteen digit literal (see "The nineteenth digit
+  is a cliff"). Nineteen digits cannot overflow the `uint64` accumulator,
+  so the one range test at the end is all it costs to take them; the new
+  `ParseUnsigned` takes the twentieth digit a `uint64` has room for with a
+  check on that digit alone, and the generated decoders use it for
+  unsigned fields, where the sign test goes away. `int-large` **−73%**,
+  `uint-large` **−71%**, `int-18` −5.6%, `int-small` −2.3%.
+- **float32 in one pass.** The Eisel-Lemire product cut at 25 bits, with
+  the float64 arm's declines, after the exact float32 operation, which now
+  takes an exponent too. `float32` **−60%**, `numbers` **−54%** (its
+  `int64`, `uint64` and `float32` slices together), `float-short` level.
+  `TestParseSimpleFloatRandom` holds every accepted float32 literal to
+  `strconv`'s bits, on the float64 sweep and on a sweep of the literals a
+  float32 field sees, and `TestParseDecimalWidth` pins the widths.
+- **A skipped scalar without the compound skip's stack.**
+  `SkipValueStrict` declared the name list and the per-object filters of
+  its duplicate check on entry, whatever the value: two kilobytes zeroed to
+  skip a string. The scalars are settled first with nothing declared, and
+  only an object or array reaches `skipCompoundStrict`. `skip` **−16%**,
+  `map-items` −3.2%, `twitter` −1.9%.
+- **Unescaping in the pass that validates.** `ParseStringStrict` scanned a
+  literal with escapes to its end, then `unquoteAppend` walked the body
+  again, finding every backslash a second time with an `IndexByte` call
+  per run and decoding `\u` a byte at a time. The scan's loop is unchanged
+  for the strings without an escape, which are most; the first backslash
+  hands over to `unescapeStrictFrom`, which copies the prefix into the
+  cache's scratch and from there appends each run and each decoded escape
+  as it passes them, with a table for the hex digits. `text-escaped`
+  **−54%** pooled (25.4 → 11.7 µs, against go-json's 15.9), `text-ascii`
+  +2%, the other text rows level. A first form carried the copying loop's
+  state through the loop every string runs, and the strings without an
+  escape paid for it — `text-ascii` +7%, `text-latin` +6%,
+  `unique-strings` +3% pooled — which is why the two loops are two
+  functions.
+- **An object's map made once, sized, in `parseAny`.** The members go to a
+  stack of entries the cache keeps, and the map is made when the object
+  closes, with room for all of them; the duplicate check moves to that
+  insert, where it costs what it did. `generic` **−7.3%**, `sparse` −2.5%.
+- **The any boxes' chunks, per document.** The profile of `generic` was 30%
+  collector against go-json's 20% at the same bytes per call, and
+  `GODEBUG=gctrace=1` said why: a live heap of 24 MB against 15, with
+  13 MB of it `parseAny`'s output by the in-use profile — output that
+  should have been garbage. The header chunks of box.go were the cache's,
+  carried from one document to the next, and a chunk stays alive while
+  any one box in it does; a box points at a value whose elements point at
+  boxes in the chunk before, so a pooled cache held every document it had
+  ever decoded, through a chain of chunks, and the collector scanned all
+  of them on every cycle. `PutStringCache` now drops the chunks, and a
+  document starts with chunks of sixteen headers that double up to the
+  full size. Live heap 14 MB; `generic` **−4.3%**, `small` −3.9%,
+  `map-items` −2.1%, `twitter` and `page-3k` level. This was a memory
+  leak by any name, in every pooled decode of a type with an `any` in it;
+  the speed is the smaller half of the fix.
+- **A filter over an object's unknown names.** The strict decoders
+  compared every unknown member name against every earlier one in the
+  object, k²/2 string compares for k unknown members. `UnknownName` keeps a
+  64 bit filter per object, one word the object zeroes, and scans the list
+  only on a hit. `skip` **−7.1%** pooled, `twitter`, `small` and `page-3k`
+  level (p > 0.1) — where the single-layout run had read `small` +3%,
+  which the pooled one refuted.
+- **An `any` value's string carved without interning.** The strings that
+  reach an `any` are mostly unique, so `parseAny` takes them from the slab
+  without the table's hash and probe; member names, which repeat, keep the
+  table. `generic` **−5.0%**, `twitter` level.
+
+**The branch against `ad0861e`, one layout, n=4, every shape:** `generic`
+−17%, `skip` −23%, `text-escaped` −52%, `numbers` −54%, `int-large` −73%,
+`uint-large` −72%, `float32` −61%, the `page-*` rows −4 to −7%,
+`array-items` −4%, `array-pages` −4.5%, `deep-nest` −4%, `int-18` −6.5%,
+`int-small` −4%; the rest within ±3% but the string rows the fused
+scan's first form had cost, which the pooled run above put back to level.
+Against the table above, go-json v0.11.1 is left ahead on decode only
+where the skip's strictness is the difference — `skip` (0.72×, from
+0.56×), `generic` (0.85×, from 0.66×) — and on the rows without a direct
+path, `map-items` and `array-items`, where `json/v2` decodes the top-level
+map or slice and the ceiling is its; and behind on `numbers`,
+`text-escaped`, `int-large`, `uint-large` and `float32`, where it was
+ahead by 1.4–2.6×.
+
+**Rejected, with numbers:**
+
+- **The unknown member in one call** (`SkipUnknownV2`: the duplicate check,
+  the whitespace and the skip, with the compound skip's names and levels
+  taken from the cache's scratch instead of two kilobytes of stack): `skip`
+  **level** (+1.4%), `page-3k` +6%. The unknown member's 37 ns are the
+  name parse and json/v2's duplicate tracking, which go-json, under
+  `encoding/json`'s semantics, does not do at all; fewer calls do not
+  reach it. Two lessons on the way: the first form gave the cleanup back
+  through a deferred closure that captured the loop's slices, and the
+  loop's state left the registers — `twitter` **+21%**; the second forgot
+  to publish the list the skip had grown, and every skip grew it again
+  from the published length — `twitter` **+14%**, one `growslice` per
+  level.
+- **`GOGC=off` as a mutator measurement**: it moves odjson's `generic`
+  from 58 to 76–85 µs and go-json's not at all, because every allocation
+  then touches fresh pages, and odjson's chunks are the larger pages. The
+  gctrace live-heap figure and the in-use profile were the measurement
+  that found the leak; the `GOGC=off` run was noise about page faults.
+
+**What is left, by the profiles.** `skip`'s remaining gap to go-json is
+strictness: UTF-8 and duplicate names in what is skipped, which
+`encoding/json` does not check and json/v2 does. `sparse` (0.78×) is
+random subsets of forty-eight names, where the generated decision tree
+mispredicts a branch per level and go-json's table lookup on the first
+word of the name has no data-dependent branch to mispredict; a hashed
+dispatch in the generator is the untried lever, and it would not move
+`twitter`, whose members come in one order. `twitter-compact` (0.93×) is
+the strict skip's rate against an AVX2 scan that checks nothing. The
+collector's share of a decode is the bytes allocated per call, which the
+target type dictates, plus whatever is retained — which is what the box
+chunks were.
 
 ## Measurement notes
 
