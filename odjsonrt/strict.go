@@ -105,19 +105,11 @@ func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next in
 	if end := shortName(data, p); end > 0 {
 		return data[p+1 : end-1], true, end, nil
 	}
-	end, hasEscape, _, err := scanStringStrict(data, p)
+	body, aliased, _, end, err := scanStringStrictInto(data, p, nil)
 	if err != nil {
 		return nil, false, end, err
 	}
-	body := data[p+1 : end-1]
-	if !hasEscape {
-		return body, true, end, nil
-	}
-	out, ok := unquote(body, true)
-	if !ok {
-		return nil, false, p, ErrSyntax(data, p, "invalid string literal")
-	}
-	return out, false, end, nil
+	return body, aliased, end, nil
 }
 
 // skipStringStrict scans the string literal at p under json/v2's rules
@@ -227,6 +219,166 @@ func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, er
 	return i, hasEscape, nonASCII, errUnexpectedEnd(i)
 }
 
+// hexVal maps a byte to the value of the hexadecimal digit it is, and to
+// 0xff for anything else, so that four lookups or-ed together say whether
+// all four were digits with one test.
+var hexVal = func() (t [256]uint8) {
+	for i := range t {
+		t[i] = 0xff
+	}
+	for c := '0'; c <= '9'; c++ {
+		t[c] = uint8(c - '0')
+	}
+	for c := 'a'; c <= 'f'; c++ {
+		t[c] = uint8(c-'a') + 10
+		t[c-'a'+'A'] = uint8(c-'a') + 10
+	}
+	return t
+}()
+
+// hex4 decodes the four hexadecimal digits at s[i:i+4], which must exist,
+// or reports the offset of the first byte that is not one.
+func hex4(s []byte, i int) (r rune, bad int) {
+	a, b, c, d := hexVal[s[i]], hexVal[s[i+1]], hexVal[s[i+2]], hexVal[s[i+3]]
+	if a|b|c|d > 0xf {
+		switch {
+		case a > 0xf:
+			return 0, i
+		case b > 0xf:
+			return 0, i + 1
+		case c > 0xf:
+			return 0, i + 2
+		default:
+			return 0, i + 3
+		}
+	}
+	return rune(a)<<12 | rune(b)<<8 | rune(c)<<4 | rune(d), -1
+}
+
+// scanStringStrictInto is [scanStringStrict] that also produces the string:
+// the body as a slice of data, aliased, when the literal has no escape, and
+// otherwise its decoded bytes, built in out's array from the first escape
+// on, in the same pass that validates the literal. A string with escapes
+// used to be scanned once and unescaped by a second walk that found each
+// backslash again; here the scan is already standing on it. The rules are
+// json/v2's: the body must be UTF-8, every \u escape must decode, and a
+// surrogate must be one half of a pair. err is at the byte it names.
+func scanStringStrictInto(data []byte, p int, out []byte) (body []byte, aliased, nonASCII bool, end int, err error) {
+	i := p + 1
+	// run is where the bytes not yet copied to out start, once an escape
+	// has been met; before that, out is unused and the body is data's.
+	run, escaped := i, false
+	for uint(i) < uint(len(data)) {
+		for i+8 <= len(data) {
+			w := load64(data, i)
+			if m := swarStringStop(w) | w&swarHi; m != 0 {
+				i += swarIndex(m)
+				break
+			}
+			i += 8
+		}
+		if uint(i) >= uint(len(data)) {
+			break
+		}
+		switch c := data[i]; {
+		case c == '"':
+			if !escaped {
+				return data[p+1 : i], true, nonASCII, i + 1, nil
+			}
+			return append(out, data[run:i]...), false, nonASCII, i + 1, nil
+		case c == '\\':
+			if !escaped {
+				escaped = true
+				out = append(out[:0], data[p+1:i]...)
+			} else {
+				out = append(out, data[run:i]...)
+			}
+			i++
+			if uint(i) >= uint(len(data)) {
+				return nil, false, nonASCII, i, errUnexpectedEnd(i)
+			}
+			switch e := data[i]; e {
+			case '"', '\\', '/':
+				out = append(out, e)
+				i++
+			case 'b':
+				out = append(out, '\b')
+				i++
+			case 'f':
+				out = append(out, '\f')
+				i++
+			case 'n':
+				out = append(out, '\n')
+				i++
+			case 'r':
+				out = append(out, '\r')
+				i++
+			case 't':
+				out = append(out, '\t')
+				i++
+			case 'u':
+				if uint(i+4) >= uint(len(data)) {
+					return nil, false, nonASCII, len(data), errUnexpectedEnd(len(data))
+				}
+				r, bad := hex4(data, i+1)
+				if bad >= 0 {
+					return nil, false, nonASCII, bad, errChar(data, bad, "in \\u hexadecimal character escape")
+				}
+				i += 5
+				if utf16.IsSurrogate(r) {
+					// The other half has to follow, spelled the same way,
+					// and the two have to be a high and a low in that
+					// order: anything else is an unpaired surrogate.
+					if uint(i+5) >= uint(len(data)) || data[i] != '\\' || data[i+1] != 'u' {
+						return nil, false, nonASCII, p, ErrSyntax(data, p, "invalid string literal")
+					}
+					r2, bad := hex4(data, i+2)
+					if bad >= 0 {
+						return nil, false, nonASCII, bad, errChar(data, bad, "in \\u hexadecimal character escape")
+					}
+					if r = utf16.DecodeRune(r, r2); r == utf8.RuneError {
+						return nil, false, nonASCII, p, ErrSyntax(data, p, "invalid string literal")
+					}
+					i += 6
+				}
+				out = utf8.AppendRune(out, r)
+			default:
+				return nil, false, nonASCII, i, errChar(data, i, "in string escape code")
+			}
+			run = i
+		case c < 0x20:
+			return nil, false, nonASCII, i, errChar(data, i, "in string literal")
+		case c >= utf8.RuneSelf:
+			nonASCII = true
+			if c-0xC2 < 0x1E && uint(i+1) < uint(len(data)) && data[i+1]&0xC0 == 0x80 {
+				i += 2
+				if uint(i) < uint(len(data)) && data[i] >= utf8.RuneSelf {
+					// A dense run: skipNonASCII takes it a word at a time.
+				} else {
+					for i+8 <= len(data) {
+						w := load64(data, i)
+						if w&swarHi == 0 || swarStringStop(w) != 0 || !swarLatin(w) {
+							break
+						}
+						i += 8
+					}
+					continue
+				}
+			}
+			if next := skipNonASCII(data, i); next >= 0 {
+				i = next
+			} else if bytes.IndexByte(data[i:], '"') < 0 {
+				return nil, false, nonASCII, len(data), errUnexpectedEnd(len(data))
+			} else {
+				return nil, false, nonASCII, p, errInvalidUTF8(data, p)
+			}
+		default:
+			i++
+		}
+	}
+	return nil, false, nonASCII, i, errUnexpectedEnd(i)
+}
+
 // validEscapes reports whether every \u escape in a string body that
 // scanString has accepted decodes under json/v2's rules. Only surrogates can
 // fail: a high surrogate must be followed by a low one, and a low one may not
@@ -274,12 +426,22 @@ func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) 
 			return c.Make(data[p+1 : end-1]), end, nil
 		}
 	}
-	end, hasEscape, nonASCII, err := scanStringStrict(data, p)
+	// A string with escapes is decoded in the scan's own pass, into the
+	// cache's scratch buffer, and carved from its slab like any other.
+	var sl *slab
+	var scratch []byte
+	if c != nil {
+		if sl = c.slab; sl == nil {
+			sl = new(slab)
+			c.slab = sl
+		}
+		scratch = sl.scratch[:0]
+	}
+	body, aliased, nonASCII, end, err := scanStringStrictInto(data, p, scratch)
 	if err != nil {
 		return "", end, err
 	}
-	body := data[p+1 : end-1]
-	if !hasEscape {
+	if aliased {
 		if !nonASCII {
 			return c.Make(body), end, nil
 		}
@@ -287,11 +449,10 @@ func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) 
 		// for the callers that would otherwise check it again.
 		return c.MakeValid(body), end, nil
 	}
-	s, ok := c.unquoteString(body, true)
-	if !ok {
-		return "", p, ErrSyntax(data, p, "invalid string literal")
+	if sl != nil && cap(body) > cap(sl.scratch) {
+		sl.scratch = body[:0]
 	}
-	return s, end, nil
+	return c.alloc(body), end, nil
 }
 
 // ParseStringInnerStrict is [ParseStringInner] under json/v2's rules.
