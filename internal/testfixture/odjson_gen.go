@@ -2622,7 +2622,7 @@ func (v *Scalars) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int
 					p++
 				} else {
 					if cap(s271) == 0 {
-						s271 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapScalarsOmitEmptySlice))
+						s271 = odjsonrt.CarveSlice[int](sc, odjsonrt.CarveCap[int](&odjsonCapScalarsOmitEmptySlice))
 					}
 					for {
 						var e272 int
@@ -3979,7 +3979,7 @@ func (v *Scalars) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, st
 					p++
 				} else {
 					if cap(s484) == 0 {
-						s484 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapScalarsOmitEmptySlice))
+						s484 = odjsonrt.CarveSlice[int](sc, odjsonrt.CarveCap[int](&odjsonCapScalarsOmitEmptySlice))
 					}
 					for {
 						var e485 int
@@ -4895,7 +4895,7 @@ func (v *Scalars) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCach
 					vp608++
 				} else {
 					if cap(s611) == 0 {
-						s611 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapScalarsOmitEmptySlice))
+						s611 = odjsonrt.CarveSlice[int](sc, odjsonrt.CarveCap[int](&odjsonCapScalarsOmitEmptySlice))
 					}
 					for {
 						var e612 int
@@ -6053,7 +6053,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 					p++
 				} else {
 					if cap(s703) == 0 {
-						s703 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapCompositesInts))
+						s703 = odjsonrt.CarveSlice[int](sc, odjsonrt.CarveCap[int](&odjsonCapCompositesInts))
 					}
 					for {
 						var e704 int
@@ -6115,7 +6115,7 @@ func (v *Composites) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (
 					p++
 				} else {
 					if cap(s714) == 0 {
-						s714 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapCompositesStrings))
+						s714 = odjsonrt.CarveStrings(sc, odjsonrt.CarveCap[string](&odjsonCapCompositesStrings))
 					}
 					for {
 						var e715 string
@@ -7381,7 +7381,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 					p++
 				} else {
 					if cap(s867) == 0 {
-						s867 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapCompositesInts))
+						s867 = odjsonrt.CarveSlice[int](sc, odjsonrt.CarveCap[int](&odjsonCapCompositesInts))
 					}
 					for {
 						var e868 int
@@ -7448,7 +7448,7 @@ func (v *Composites) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache,
 					p++
 				} else {
 					if cap(s878) == 0 {
-						s878 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapCompositesStrings))
+						s878 = odjsonrt.CarveStrings(sc, odjsonrt.CarveCap[string](&odjsonCapCompositesStrings))
 					}
 					for {
 						var e879 string
@@ -8612,7 +8612,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 					vp1026++
 				} else {
 					if cap(s1029) == 0 {
-						s1029 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapCompositesInts))
+						s1029 = odjsonrt.CarveSlice[int](sc, odjsonrt.CarveCap[int](&odjsonCapCompositesInts))
 					}
 					for {
 						var e1030 int
@@ -8679,7 +8679,7 @@ func (v *Composites) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringC
 					vp1039++
 				} else {
 					if cap(s1042) == 0 {
-						s1042 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapCompositesStrings))
+						s1042 = odjsonrt.CarveStrings(sc, odjsonrt.CarveCap[string](&odjsonCapCompositesStrings))
 					}
 					for {
 						var e1043 string

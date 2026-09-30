@@ -823,13 +823,13 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 				return
 			}
 			if hint != "" && c.cache != "" && scalarElem(t.Elem) {
-				g.emit(b, assign(s, call(index(rt("CarveSlice"), typ(t.Elem.Expr)), cacheExpr(c), capExpr(hint, t))))
+				g.emit(b, assign(s, call(index(rt("CarveSlice"), typ(t.Elem.Expr)), cacheExpr(c), carveCapExpr(hint, t))))
 				return
 			}
 			if hint != "" && c.cache != "" && plainString(t.Elem) {
 				// A field's slice of strings is carved from a chunk of
 				// string headers the cache keeps (see odjsonrt.CarveStrings).
-				g.emit(b, assign(s, callRT("CarveStrings", cacheExpr(c), capExpr(hint, t))))
+				g.emit(b, assign(s, callRT("CarveStrings", cacheExpr(c), carveCapExpr(hint, t))))
 				return
 			}
 			if hint != "" && c.cache != "" && t.Elem.Kind == analyzer.KindStruct {
@@ -904,6 +904,12 @@ func plainString(t *analyzer.Type) bool {
 
 // capExpr renders the capacity a slice of type t is allocated with: the
 // field's hint when it has one, otherwise room for a few elements.
+// carveCapExpr is capExpr for a slice carved from a chunk, which takes the
+// hint as it is (see odjsonrt.CarveCap).
+func carveCapExpr(hint string, t *analyzer.Type) ast.Expr {
+	return call(index(rt("CarveCap"), typ(t.Elem.Expr)), addr(id(hint)))
+}
+
 func capExpr(hint string, t *analyzer.Type) ast.Expr {
 	if hint == "" {
 		return num(4)

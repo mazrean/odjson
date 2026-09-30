@@ -96,7 +96,7 @@ const carveStrings = 256
 func CarveElems[T any](c *StringCache, h *CapHint) []T {
 	var zero T
 	size := int(unsafe.Sizeof(zero))
-	n := CapFor[T](h)
+	n := CarveCap[T](h)
 	if c == nil || size == 0 || n*size > carveElemsBytes {
 		return make([]T, 0, n)
 	}

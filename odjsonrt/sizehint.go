@@ -118,6 +118,23 @@ func CapFor[T any](h *CapHint) int {
 	return n
 }
 
+// CarveCap is [CapFor] for a slice carved from a chunk rather than
+// allocated: the hint is taken as it is, down to one element, because a
+// carve that reserves more than the document fills costs no time but
+// bytes the collector then paces by, where an allocation rounded up to
+// minCap costs the same object either way. A field with no hint yet still
+// gets minCap.
+func CarveCap[T any](h *CapHint) int {
+	n := int(h.n.Load())
+	if n <= 0 {
+		return minCap
+	}
+	if size := int(unsafe.Sizeof(*new(T))); size > 0 && n > maxCapBytes/size {
+		return max(maxCapBytes/size, 1)
+	}
+	return n
+}
+
 // Record notes the length of a non-empty slice a decode has just filled in.
 // A larger length raises the hint; a length below a quarter of it lowers the
 // hint to twice that length. Each is a single attempt: losing the race to
