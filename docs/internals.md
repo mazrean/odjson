@@ -1239,8 +1239,11 @@ json/v2 Marshal on the direct path, whose options are known not to ask for
 Deterministic output; `ModeV2HTML`, encoding/json's Marshal, carries that
 flag and keeps the sort, and so does the public path, which cannot see the
 options. `map-string-1k` **−61%**, `obj-map` **−34%**, `map-items-in` −9%
-(n=6). The runtime's `appendAny` sorts under `ModeV2HTML` now too, which
-it had not.
+(n=6). The runtime's `appendAny`, which encodes an `any`-held map, was made
+to sort under `ModeV2HTML` in the same commit and put back: `ModeV2HTML`
+is what encoding/json's Marshal makes of the public path's output, which
+writes those members in iteration order, and the sort cost encoding/json's
+`twitter` encode 12% on `user_mentions`.
 
 The practical reading for a caller is unchanged by either: `map[string]T`
 in a hot type gives up most of what odjson is for, and the one place it
