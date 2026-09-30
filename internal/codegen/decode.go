@@ -820,16 +820,36 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 			}
 			g.emit(b, assign(s, call(id("make"), typ(t.Expr), num(0), capExpr(hint, t))))
 		})
+		inPlace := t.Elem.Kind == analyzer.KindStruct
+		n := id(g.tmp("n"))
 		g.loop(b, func(b *block) {
-			g.emit(b, varDecl(e.Name, typ(t.Elem.Expr)))
+			if inPlace {
+				// A struct element is decoded in its slot rather than in a
+				// local that append then copies: the slot is zeroed, since
+				// the slice's array may be one the caller's value held.
+				g.emit(b, define(n, call(id("len"), s)))
+				s1 := g.ifStmt(b, nil, bin(n, token.LSS, call(id("cap"), s)), func(b *block) {
+					g.emit(b, assign(s, slice(s, nil, bin(n, token.ADD, num(1)))))
+					g.emit(b, assign(index(s, n), composite(typ(t.Elem.Expr))))
+				})
+				g.elseBlock(s1, func(b *block) {
+					g.emit(b, assign(s, call(id("append"), s, composite(typ(t.Elem.Expr)))))
+				})
+			} else {
+				g.emit(b, varDecl(e.Name, typ(t.Elem.Expr)))
+			}
 			// The element's leading whitespace is an indent run in an
 			// indented document, settled here without a call; the
 			// element decoder then starts on its first byte.
 			g.skipIndent(b, c)
 			ec := c
 			ec.trimmed = true
-			g.decode(b, t.Elem, e, ec)
-			g.emit(b, assign(s, call(id("append"), s, e)))
+			if inPlace {
+				g.decode(b, t.Elem, index(s, n), ec)
+			} else {
+				g.decode(b, t.Elem, e, ec)
+				g.emit(b, assign(s, call(id("append"), s, e)))
+			}
 			g.separator(b, c, ']', "after array element")
 		})
 		if carve {
