@@ -2787,7 +2787,9 @@ the parse's 25: level, go-json ahead.
 - **The member loop dispatched by `goto`**: each member is a labelled
   block that the raw name tree and the general `switch` jump to, and that
   jumps to the separator, so a settled name no longer walks the chain of
-  conditions between the match and its value.
+  conditions between the match and its value. With it, `UnknownNames`
+  keeps its first-call allocation out of line so that the call every
+  object makes inlines.
 - **A struct element decoded in its slot**: the slice is extended by one
   within its capacity and the element decoded there, rather than in a
   local that `append` copies.
@@ -2878,9 +2880,13 @@ a percentage between two separately built binaries is not one this page
 trusts, and none is quoted.
 
 The `bench/plain` / `bench/gen` tables are one run. Every row quoted from
-them is within ±3% by `benchstat` but simdjson-go's `small` decode (±7%)
-in `bench/plain`; the ones outside it in `bench/gen` are the hosts' own
-rows over generated types (±4–6%), which the tables do not quote. The
+them is within ±3% by `benchstat` but two: simdjson-go's `small` decode
+(±7% in the 2026-09-30 `ea59374` sitting) in `bench/plain`, and in the
+`1cbcbb1` sitting the `encoding/json` `twitter` decode in `bench/gen`
+(±5%), a row the pooled runs of "The small payload against go-json" found
+bimodal by layout, its samples split about 1.11 and 1.17 ms; the ones
+outside it otherwise in `bench/gen` are the hosts' own rows over generated
+types (±4–6%), which the tables do not quote. The
 tables quote the medians because a re-run is a different measurement
 rather than a better one: the 2026-09-13 sitting re-ran its wide rows
 alone at `-count 20` and they came back 3–12% from the suite, about what
