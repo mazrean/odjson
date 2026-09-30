@@ -1481,7 +1481,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s114) == 0 {
-						s114 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooSlice))
+						s114 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapZooSlice))
 					}
 					for {
 						var e115 int
@@ -1543,7 +1543,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s125) == 0 {
-						s125 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapZooStrings))
+						s125 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapZooStrings))
 					}
 					for {
 						var e126 string
@@ -1835,7 +1835,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s172) == 0 {
-						s172 = make([]Nested, 0, odjsonrt.CapFor[Nested](&odjsonCapZooNesteds))
+						s172 = odjsonrt.CarveElems[Nested](sc, &odjsonCapZooNesteds)
 					}
 					for {
 						n174 := len(s172)
@@ -2180,7 +2180,7 @@ func (v *Zoo) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s233) == 0 {
-						s233 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooOmitSlice))
+						s233 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapZooOmitSlice))
 					}
 					for {
 						var e234 int
@@ -3007,7 +3007,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s325) == 0 {
-						s325 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooSlice))
+						s325 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapZooSlice))
 					}
 					for {
 						var e326 int
@@ -3074,7 +3074,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s336) == 0 {
-						s336 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapZooStrings))
+						s336 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapZooStrings))
 					}
 					for {
 						var e337 string
@@ -3428,7 +3428,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s387) == 0 {
-						s387 = make([]Nested, 0, odjsonrt.CapFor[Nested](&odjsonCapZooNesteds))
+						s387 = odjsonrt.CarveElems[Nested](sc, &odjsonCapZooNesteds)
 					}
 					for {
 						n389 := len(s387)
@@ -3853,7 +3853,7 @@ func (v *Zoo) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s452) == 0 {
-						s452 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooOmitSlice))
+						s452 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapZooOmitSlice))
 					}
 					for {
 						var e453 int
@@ -4355,7 +4355,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					vp498++
 				} else {
 					if cap(s501) == 0 {
-						s501 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooSlice))
+						s501 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapZooSlice))
 					}
 					for {
 						var e502 int
@@ -4422,7 +4422,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					vp511++
 				} else {
 					if cap(s514) == 0 {
-						s514 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapZooStrings))
+						s514 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapZooStrings))
 					}
 					for {
 						var e515 string
@@ -5072,7 +5072,7 @@ func (v *Zoo) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) e
 					vp632++
 				} else {
 					if cap(s635) == 0 {
-						s635 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapZooOmitSlice))
+						s635 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapZooOmitSlice))
 					}
 					for {
 						var e636 int

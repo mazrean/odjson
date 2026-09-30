@@ -425,7 +425,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s27) == 0 {
-						s27 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookBookIds))
+						s27 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapBookBookIds))
 					}
 					for {
 						var e28 int
@@ -501,7 +501,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s41) == 0 {
-						s41 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapBookTitles))
+						s41 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapBookTitles))
 					}
 					for {
 						var e42 string
@@ -577,7 +577,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s55) == 0 {
-						s55 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapBookPrices))
+						s55 = odjsonrt.CarveSlice[float64](sc, odjsonrt.CapFor[float64](&odjsonCapBookPrices))
 					}
 					for {
 						var e56 float64
@@ -661,7 +661,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s69) == 0 {
-						s69 = make([]bool, 0, odjsonrt.CapFor[bool](&odjsonCapBookHots))
+						s69 = odjsonrt.CarveSlice[bool](sc, odjsonrt.CapFor[bool](&odjsonCapBookHots))
 					}
 					for {
 						var e70 bool
@@ -734,7 +734,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s77) == 0 {
-						s77 = make([]Author, 0, odjsonrt.CapFor[Author](&odjsonCapBookAuthors))
+						s77 = odjsonrt.CarveElems[Author](sc, &odjsonCapBookAuthors)
 					}
 					for {
 						n79 := len(s77)
@@ -790,7 +790,7 @@ func (v *Book) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s82) == 0 {
-						s82 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookWeights))
+						s82 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapBookWeights))
 					}
 					for {
 						var e83 int
@@ -1109,7 +1109,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s111) == 0 {
-						s111 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookBookIds))
+						s111 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapBookBookIds))
 					}
 					for {
 						var e112 int
@@ -1195,7 +1195,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s125) == 0 {
-						s125 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapBookTitles))
+						s125 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapBookTitles))
 					}
 					for {
 						var e126 string
@@ -1281,7 +1281,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s139) == 0 {
-						s139 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapBookPrices))
+						s139 = odjsonrt.CarveSlice[float64](sc, odjsonrt.CapFor[float64](&odjsonCapBookPrices))
 					}
 					for {
 						var e140 float64
@@ -1375,7 +1375,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s153) == 0 {
-						s153 = make([]bool, 0, odjsonrt.CapFor[bool](&odjsonCapBookHots))
+						s153 = odjsonrt.CarveSlice[bool](sc, odjsonrt.CapFor[bool](&odjsonCapBookHots))
 					}
 					for {
 						var e154 bool
@@ -1457,7 +1457,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s161) == 0 {
-						s161 = make([]Author, 0, odjsonrt.CapFor[Author](&odjsonCapBookAuthors))
+						s161 = odjsonrt.CarveElems[Author](sc, &odjsonCapBookAuthors)
 					}
 					for {
 						n163 := len(s161)
@@ -1517,7 +1517,7 @@ func (v *Book) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s166) == 0 {
-						s166 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookWeights))
+						s166 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapBookWeights))
 					}
 					for {
 						var e167 int
@@ -1707,7 +1707,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp178++
 				} else {
 					if cap(s181) == 0 {
-						s181 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookBookIds))
+						s181 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapBookBookIds))
 					}
 					for {
 						var e182 int
@@ -1790,7 +1790,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp193++
 				} else {
 					if cap(s196) == 0 {
-						s196 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapBookTitles))
+						s196 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapBookTitles))
 					}
 					for {
 						var e197 string
@@ -1868,7 +1868,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp205++
 				} else {
 					if cap(s208) == 0 {
-						s208 = make([]float64, 0, odjsonrt.CapFor[float64](&odjsonCapBookPrices))
+						s208 = odjsonrt.CarveSlice[float64](sc, odjsonrt.CapFor[float64](&odjsonCapBookPrices))
 					}
 					for {
 						var e209 float64
@@ -1951,7 +1951,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp220++
 				} else {
 					if cap(s223) == 0 {
-						s223 = make([]bool, 0, odjsonrt.CapFor[bool](&odjsonCapBookHots))
+						s223 = odjsonrt.CarveSlice[bool](sc, odjsonrt.CapFor[bool](&odjsonCapBookHots))
 					}
 					for {
 						var e224 bool
@@ -2060,7 +2060,7 @@ func (v *Book) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp232++
 				} else {
 					if cap(s235) == 0 {
-						s235 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapBookWeights))
+						s235 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapBookWeights))
 					}
 					for {
 						var e236 int
@@ -2949,7 +2949,7 @@ func (v *TwitterStruct) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache
 					p++
 				} else {
 					if cap(s288) == 0 {
-						s288 = make([]Statuses, 0, odjsonrt.CapFor[Statuses](&odjsonCapTwitterStructStatuses))
+						s288 = odjsonrt.CarveElems[Statuses](sc, &odjsonCapTwitterStructStatuses)
 					}
 					for {
 						n290 := len(s288)
@@ -3113,7 +3113,7 @@ func (v *TwitterStruct) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCac
 					p++
 				} else {
 					if cap(s296) == 0 {
-						s296 = make([]Statuses, 0, odjsonrt.CapFor[Statuses](&odjsonCapTwitterStructStatuses))
+						s296 = odjsonrt.CarveElems[Statuses](sc, &odjsonCapTwitterStructStatuses)
 					}
 					for {
 						n298 := len(s296)
@@ -5931,7 +5931,7 @@ func (v *Entities) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 					p++
 				} else {
 					if cap(s549) == 0 {
-						s549 = make([]Hashtags, 0, odjsonrt.CapFor[Hashtags](&odjsonCapEntitiesHashtags))
+						s549 = odjsonrt.CarveElems[Hashtags](sc, &odjsonCapEntitiesHashtags)
 					}
 					for {
 						n551 := len(s549)
@@ -6219,7 +6219,7 @@ func (v *Entities) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 					p++
 				} else {
 					if cap(s574) == 0 {
-						s574 = make([]Hashtags, 0, odjsonrt.CapFor[Hashtags](&odjsonCapEntitiesHashtags))
+						s574 = odjsonrt.CarveElems[Hashtags](sc, &odjsonCapEntitiesHashtags)
 					}
 					for {
 						n576 := len(s574)
@@ -6817,7 +6817,7 @@ func (v *Hashtags) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (in
 					p++
 				} else {
 					if cap(s616) == 0 {
-						s616 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapHashtagsIndices))
+						s616 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapHashtagsIndices))
 					}
 					for {
 						var e617 int
@@ -6998,7 +6998,7 @@ func (v *Hashtags) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, s
 					p++
 				} else {
 					if cap(s633) == 0 {
-						s633 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapHashtagsIndices))
+						s633 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapHashtagsIndices))
 					}
 					for {
 						var e634 int
@@ -7152,7 +7152,7 @@ func (v *Hashtags) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCac
 					vp645++
 				} else {
 					if cap(s648) == 0 {
-						s648 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapHashtagsIndices))
+						s648 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapHashtagsIndices))
 					}
 					for {
 						var e649 int
@@ -12328,7 +12328,7 @@ func (v *URL) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, er
 					p++
 				} else {
 					if cap(s1131) == 0 {
-						s1131 = make([]Urls, 0, odjsonrt.CapFor[Urls](&odjsonCapURLUrls))
+						s1131 = odjsonrt.CarveElems[Urls](sc, &odjsonCapURLUrls)
 					}
 					for {
 						n1133 := len(s1131)
@@ -12467,7 +12467,7 @@ func (v *URL) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, strict
 					p++
 				} else {
 					if cap(s1138) == 0 {
-						s1138 = make([]Urls, 0, odjsonrt.CapFor[Urls](&odjsonCapURLUrls))
+						s1138 = odjsonrt.CarveElems[Urls](sc, &odjsonCapURLUrls)
 					}
 					for {
 						n1140 := len(s1138)
@@ -12908,7 +12908,7 @@ func (v *Urls) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int, e
 					p++
 				} else {
 					if cap(s1156) == 0 {
-						s1156 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapUrlsIndices))
+						s1156 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapUrlsIndices))
 					}
 					for {
 						var e1157 int
@@ -13120,7 +13120,7 @@ func (v *Urls) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, stric
 					p++
 				} else {
 					if cap(s1177) == 0 {
-						s1177 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapUrlsIndices))
+						s1177 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapUrlsIndices))
 					}
 					for {
 						var e1178 int
@@ -13297,7 +13297,7 @@ func (v *Urls) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache) 
 					vp1194++
 				} else {
 					if cap(s1197) == 0 {
-						s1197 = make([]int, 0, odjsonrt.CapFor[int](&odjsonCapUrlsIndices))
+						s1197 = odjsonrt.CarveSlice[int](sc, odjsonrt.CapFor[int](&odjsonCapUrlsIndices))
 					}
 					for {
 						var e1198 int

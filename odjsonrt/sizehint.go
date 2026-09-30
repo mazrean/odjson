@@ -74,6 +74,26 @@ func (h *SizeHint) Record(b []byte) {
 // safe for concurrent use.
 type CapHint struct {
 	n atomic.Int64
+	// slot is the field's index into a cache's typed chunks (see
+	// CarveElems), one more than the index so that zero means none yet.
+	slot atomic.Int32
+}
+
+// elemSlots hands out the typed chunk indexes, one per field, in the order
+// the fields first carve.
+var elemSlots atomic.Int32
+
+// elemSlot returns the field's index into a cache's typed chunks, taking
+// the next one the first time.
+func (h *CapHint) elemSlot() int {
+	if i := h.slot.Load(); i != 0 {
+		return int(i - 1)
+	}
+	i := elemSlots.Add(1)
+	if !h.slot.CompareAndSwap(0, i) {
+		i = h.slot.Load()
+	}
+	return int(i - 1)
 }
 
 const (

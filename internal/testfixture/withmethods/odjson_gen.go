@@ -687,7 +687,7 @@ func (v *Person) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 					p++
 				} else {
 					if cap(s46) == 0 {
-						s46 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapPersonTags))
+						s46 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapPersonTags))
 					}
 					for {
 						var e47 string
@@ -959,7 +959,7 @@ func (v *Person) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 					p++
 				} else {
 					if cap(s74) == 0 {
-						s74 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapPersonTags))
+						s74 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapPersonTags))
 					}
 					for {
 						var e75 string
@@ -1176,7 +1176,7 @@ func (v *Person) odjsonParseFrom(dec *jsontext.Decoder, sc *odjsonrt.StringCache
 					vp92++
 				} else {
 					if cap(s95) == 0 {
-						s95 = make([]string, 0, odjsonrt.CapFor[string](&odjsonCapPersonTags))
+						s95 = odjsonrt.CarveStrings(sc, odjsonrt.CapFor[string](&odjsonCapPersonTags))
 					}
 					for {
 						var e96 string

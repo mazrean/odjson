@@ -982,7 +982,7 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 					p++
 				} else {
 					if cap(s50) == 0 {
-						s50 = make([]secret, 0, odjsonrt.CapFor[secret](&odjsonCapHolderList))
+						s50 = odjsonrt.CarveElems[secret](sc, &odjsonCapHolderList)
 					}
 					for {
 						n52 := len(s50)
@@ -1182,7 +1182,7 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 					p++
 				} else {
 					if cap(s61) == 0 {
-						s61 = make([]secret, 0, odjsonrt.CapFor[secret](&odjsonCapHolderList))
+						s61 = odjsonrt.CarveElems[secret](sc, &odjsonCapHolderList)
 					}
 					for {
 						n63 := len(s61)

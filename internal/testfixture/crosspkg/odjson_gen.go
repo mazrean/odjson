@@ -284,7 +284,7 @@ func (v *Holder) odjsonParse(data []byte, p int, sc *odjsonrt.StringCache) (int,
 					p++
 				} else {
 					if cap(s18) == 0 {
-						s18 = make([]other.Thing, 0, odjsonrt.CapFor[other.Thing](&odjsonCapHolderList))
+						s18 = odjsonrt.CarveElems[other.Thing](sc, &odjsonCapHolderList)
 					}
 					for {
 						n20 := len(s18)
@@ -641,7 +641,7 @@ func (v *Holder) odjsonParseV2(data []byte, p int, sc *odjsonrt.StringCache, str
 					p++
 				} else {
 					if cap(s45) == 0 {
-						s45 = make([]other.Thing, 0, odjsonrt.CapFor[other.Thing](&odjsonCapHolderList))
+						s45 = odjsonrt.CarveElems[other.Thing](sc, &odjsonCapHolderList)
 					}
 					for {
 						n47 := len(s45)
@@ -1662,7 +1662,7 @@ func odjsonOtherWrapperParse(data []byte, v *other.Wrapper, p int, sc *odjsonrt.
 					p++
 				} else {
 					if cap(s110) == 0 {
-						s110 = make([]other.Thing, 0, odjsonrt.CapFor[other.Thing](&odjsonCapodjsonOtherWrapperList))
+						s110 = odjsonrt.CarveElems[other.Thing](sc, &odjsonCapodjsonOtherWrapperList)
 					}
 					for {
 						n112 := len(s110)
@@ -1862,7 +1862,7 @@ func odjsonOtherWrapperParseV2(data []byte, v *other.Wrapper, p int, sc *odjsonr
 					p++
 				} else {
 					if cap(s121) == 0 {
-						s121 = make([]other.Thing, 0, odjsonrt.CapFor[other.Thing](&odjsonCapodjsonOtherWrapperList))
+						s121 = odjsonrt.CarveElems[other.Thing](sc, &odjsonCapodjsonOtherWrapperList)
 					}
 					for {
 						n123 := len(s121)

@@ -812,10 +812,30 @@ func (g *generator) decodeSlice(b *block, t *analyzer.Type, target ast.Expr, c c
 		// free. A slice of scalars that is not a struct field, one of many
 		// in the slice or map around it, is carved from the cache's chunk
 		// instead of allocated (see odjsonrt.SliceFrom).
+		// A struct field's slice of scalars is carved too, at the
+		// capacity its hint gives: an allocation and an object per field
+		// where a carve is a bump of the chunk's tail (see
+		// odjsonrt.CarveSlice).
 		carve := hint == "" && c.cache != "" && scalarElem(t.Elem)
 		g.ifStmt(b, nil, bin(call(id("cap"), s), token.EQL, num(0)), func(b *block) {
 			if carve {
 				g.emit(b, assign(s, call(index(rt("SliceFrom"), typ(t.Elem.Expr)), cacheExpr(c))))
+				return
+			}
+			if hint != "" && c.cache != "" && scalarElem(t.Elem) {
+				g.emit(b, assign(s, call(index(rt("CarveSlice"), typ(t.Elem.Expr)), cacheExpr(c), capExpr(hint, t))))
+				return
+			}
+			if hint != "" && c.cache != "" && plainString(t.Elem) {
+				// A field's slice of strings is carved from a chunk of
+				// string headers the cache keeps (see odjsonrt.CarveStrings).
+				g.emit(b, assign(s, callRT("CarveStrings", cacheExpr(c), capExpr(hint, t))))
+				return
+			}
+			if hint != "" && c.cache != "" && t.Elem.Kind == analyzer.KindStruct {
+				// A field's slice of structs is carved from a chunk of
+				// that struct the cache keeps (see odjsonrt.CarveElems).
+				g.emit(b, assign(s, call(index(rt("CarveElems"), typ(t.Elem.Expr)), cacheExpr(c), ref(id(hint)))))
 				return
 			}
 			g.emit(b, assign(s, call(id("make"), typ(t.Expr), num(0), capExpr(hint, t))))
@@ -874,6 +894,12 @@ func scalarElem(t *analyzer.Type) bool {
 		return !t.Unmarshaler && !t.PtrUnmarshaler && !t.TextUnmarshaler && !t.PtrTextUnmarshaler && !t.Interface
 	}
 	return false
+}
+
+// plainString reports whether t is a string decoded by the inline string
+// path, so that a slice of it can be carved from the string header chunk.
+func plainString(t *analyzer.Type) bool {
+	return t.Kind == analyzer.KindString && !t.Unmarshaler && !t.PtrUnmarshaler && !t.TextUnmarshaler && !t.PtrTextUnmarshaler && !t.Interface
 }
 
 // capExpr renders the capacity a slice of type t is allocated with: the

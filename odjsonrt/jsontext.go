@@ -168,6 +168,29 @@ type slab struct {
 	// container is made once, sized, from what it pushed. See anyState.
 	entries []anyEntry
 	anys    []any
+	// strs is the chunk of string headers a struct field's []string is
+	// carved from (see CarveStrings). Unlike the any decoder's boxes it is
+	// kept from one document to the next: a header points at bytes and
+	// at nothing else, so a chunk holds no document but through the
+	// strings its headers name.
+	strs []string
+	// typed is one chunk per struct field of []T, for a T the collector
+	// has to scan, indexed by the field's CapHint (see CarveElems); the
+	// same rule as strs, since a chunk is typed and the collector scans
+	// it.
+	typed []typedChunk
+}
+
+// typedChunk is a chunk of T for one field: the chunk's first element,
+// how many elements have been handed out and how many the chunk holds.
+// The chunk itself is a []T from make, so its type is on the heap and the
+// collector scans what has been handed out and what has not alike. The
+// tail is kept as a count rather than a pointer so that no pointer past
+// the chunk's end is ever formed, which checkptr would refuse.
+type typedChunk struct {
+	base unsafe.Pointer
+	used int
+	size int
 }
 
 // alloc returns b as a string, carved from the cache's current chunk when

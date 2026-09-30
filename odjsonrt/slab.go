@@ -64,6 +64,104 @@ func SliceFrom[T Scalar](c *StringCache) []T {
 	return unsafe.Slice((*T)(unsafe.Pointer(unsafe.SliceData(tail))), len(tail)/size)[:0]
 }
 
+// CarveStrings is [CarveSlice] for a []string, whose elements point at
+// bytes: they come from a chunk of string headers of their own, which the
+// collector scans, rather than from the byte chunk. A nil cache and a
+// request larger than a chunk allocate.
+func CarveStrings(c *StringCache, n int) []string {
+	if c == nil || n > carveStrings {
+		return make([]string, 0, n)
+	}
+	sl := c.slab
+	if sl == nil {
+		sl = new(slab)
+		c.slab = sl
+	}
+	if len(sl.strs) < n {
+		sl.strs = make([]string, carveStrings)
+	}
+	s := sl.strs[:0:n]
+	sl.strs = sl.strs[n:]
+	return s
+}
+
+// carveStrings is the size of a chunk of string headers, 4 KiB.
+const carveStrings = 256
+
+// CarveElems is [CarveSlice] for a T the collector has to scan — a struct
+// with a string in it — at the capacity the field's hint h gives, carved
+// from a 4 KiB chunk of T the cache keeps per field, so that a document's
+// []Author costs a bump of that chunk's tail rather than an object. A nil
+// cache and a capacity larger than a chunk allocate.
+func CarveElems[T any](c *StringCache, h *CapHint) []T {
+	var zero T
+	size := int(unsafe.Sizeof(zero))
+	n := CapFor[T](h)
+	if c == nil || size == 0 || n*size > carveElemsBytes {
+		return make([]T, 0, n)
+	}
+	sl := c.slab
+	if sl == nil {
+		sl = new(slab)
+		c.slab = sl
+	}
+	i := h.elemSlot()
+	if i >= len(sl.typed) {
+		sl.typed = append(sl.typed, make([]typedChunk, i+1-len(sl.typed))...)
+	}
+	ch := &sl.typed[i]
+	if ch.size-ch.used < n {
+		chunk := make([]T, carveElemsBytes/size)
+		ch.base = unsafe.Pointer(unsafe.SliceData(chunk))
+		ch.used = 0
+		ch.size = len(chunk)
+	}
+	s := unsafe.Slice((*T)(unsafe.Add(ch.base, ch.used*size)), n)[:0]
+	ch.used += n
+	return s
+}
+
+// carveElemsBytes is the size of a chunk of T, 4 KiB.
+const carveElemsBytes = 4096
+
+// CarveSlice returns an empty slice of T with room for n elements, carved
+// from c's current chunk: the slices a struct's fields hold are a few
+// elements each, and each was an allocation and an object for the
+// collector where a carve is a bump of the chunk's tail. The capacity is
+// the caller's [CapFor] hint, so nothing is reserved and nothing given
+// back: an array longer than the hint moves to the heap by append, as any
+// slice does. A nil cache, a request the chunk's size cannot hold, and a
+// chunk whose tail [SliceFrom] has reserved allocate instead.
+func CarveSlice[T Scalar](c *StringCache, n int) []T {
+	if c == nil {
+		return make([]T, 0, n)
+	}
+	var zero T
+	size := int(unsafe.Sizeof(zero))
+	need := n * size
+	if need > slabMax {
+		return make([]T, 0, n)
+	}
+	sl := c.slab
+	if sl == nil {
+		sl = new(slab)
+		c.slab = sl
+	}
+	if sl.reserved != nil {
+		return make([]T, 0, n)
+	}
+	// Every scalar's alignment divides eight, and a fresh chunk is at
+	// least that aligned; only a tail left by a string may not be.
+	pad := int(-uintptr(unsafe.Pointer(unsafe.SliceData(sl.free))) & (uintptr(unsafe.Alignof(zero)) - 1))
+	if len(sl.free) < pad+need {
+		sl.free = make([]byte, slabSize)
+		pad = 0
+	}
+	tail := sl.free[pad:]
+	sl.free = tail[need:]
+	return unsafe.Slice((*T)(unsafe.Pointer(unsafe.SliceData(tail))), n)[:0]
+}
+
 // SliceDone finishes a slice [SliceFrom] began: the elements appended to
 // it are kept, clipped to their length, and the rest of the reserved tail
 // returns to the chunk. A slice append moved to the heap, and any other
