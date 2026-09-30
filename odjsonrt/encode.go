@@ -523,12 +523,9 @@ func appendAny(dst []byte, v any, m StringMode, depth int) ([]byte, error) {
 		if x == nil {
 			return append(dst, "null"...), nil
 		}
-		if m == ModeV2 || m == ModeStream {
-			// encoding/json/v2 writes object members in map iteration order
-			// unless asked for Deterministic output, which a plain json/v2
-			// Marshal does not ask for; encoding/json's Marshal does, and
-			// ModeV2HTML, which is that call on the direct path, sorts
-			// below with the v1 modes. Skipping the sort is both the
+		if m.V2() {
+			// encoding/json/v2 writes object members in map iteration order;
+			// only encoding/json sorts them. Skipping the sort is both the
 			// matching semantics and one less allocation per object.
 			dst = append(dst, '{')
 			first := true
