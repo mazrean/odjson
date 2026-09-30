@@ -5,6 +5,7 @@ import (
 	"encoding"
 	"encoding/base64"
 	"encoding/json"
+	"math/bits"
 	"strconv"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -222,6 +223,17 @@ func ParseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 	}
 	start := i
 	var u uint64
+	// The first eight bytes as one word: the digits among them are found
+	// and folded together, which settles most integers in one step where
+	// the loop below took one per digit. A number of more than eight
+	// digits, or one near the end of the input, continues in the loop.
+	if uint(i+8) <= uint(len(data)) {
+		var n int
+		if u, n = wordDigits(load64(data, i)); n == 0 {
+			return 0, p, false
+		}
+		i += n
+	}
 	for uint(i) < uint(len(data)) {
 		c := data[i] - '0'
 		if c > 9 {
@@ -252,6 +264,25 @@ func ParseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 	return int64(u), i, true
 }
 
+// wordDigits reads the run of decimal digits at the start of the word w, the
+// eight bytes of a document loaded little-endian, and returns their value
+// and their number: 8 when every byte is a digit, and 0 when the first is
+// not. The digits move to the top lanes and the rest are zero, which fold
+// to the value of the digits alone; a shift by the word's width is zero,
+// so n = 0 folds to 0. Spelled into the generated decoders, with the load
+// and the tests around it, it cost the small payload's row more than the
+// call it saved: its integers are eight and ten digits, which the word
+// does not settle, and the byte loop then read them a second time.
+func wordDigits(w uint64) (u uint64, n int) {
+	t := w ^ digitZeros
+	nz := (t + 0x7676767676767676 | t) & 0x8080808080808080
+	if nz == 0 {
+		return fold8(t), 8
+	}
+	n = bits.TrailingZeros64(nz) >> 3
+	return fold8(t << (8 * uint(8-n))), n
+}
+
 // ParseUnsigned is [ParseDecimal] for an unsigned integer: no sign, and up to
 // twenty digits, the width of a uint64. The first nineteen are accumulated
 // without a check, which they cannot overflow; only a twentieth digit is
@@ -259,6 +290,14 @@ func ParseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 func ParseUnsigned(data []byte, p int) (v uint64, end int, ok bool) {
 	i := p
 	var u uint64
+	// The first eight bytes as one word, as ParseDecimal reads them.
+	if uint(i+8) <= uint(len(data)) {
+		var n int
+		if u, n = wordDigits(load64(data, i)); n == 0 {
+			return 0, p, false
+		}
+		i += n
+	}
 	for uint(i) < uint(len(data)) && i-p < 19 {
 		c := data[i] - '0'
 		if c > 9 {
