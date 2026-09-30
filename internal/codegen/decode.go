@@ -120,28 +120,28 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 	// struct with no members and no such check never looks at it, and a
 	// declared and unused key would not compile.
 	keyUsed := len(s.Fields) > 0 || c.strict
+	// Every member's value code sits behind a label of its own, and the
+	// name match jumps to it: the raw match from its leaf, the general
+	// path from its string switch. That is one branch from the name to
+	// the value, where an index set by the match and switched on again
+	// cost every member a store, a test and an indirect jump.
+	labels := make([]string, len(s.Fields))
+	for i := range labels {
+		labels[i] = g.tmp("m")
+	}
+	next := g.tmp("next")
 	g.loop(b, func(b *block) {
-		if keyUsed {
-			g.emit(b, varDecl("key", sliceType(id("byte"))))
-		}
 		g.skipIndent(b, c)
 		if c.strict {
 			g.emit(b, define(kp, p))
 		}
-		g.emit(b, define(idx, num(-1)))
-		g.rawKeys(b, s, c)
-		s0 := g.ifStmt(b, nil, bin(idx, token.GEQ, num(0)), func(b *block) {
-			// AfterName settles the colon and the value's first byte, or
-			// the one space between them, inline; anything else (more
-			// whitespace, or an error) is AfterKey's call.
-			s1 := g.ifStmt(b, define(np, callRT("AfterName", data, p)), bin(np, token.GTR, num(0)), func(b *block) {
-				g.emit(b, assign(p, np))
-			})
-			g.elseIf(s1, assignN(token.ASSIGN, []ast.Expr{p, errV}, callRT("AfterKey", data, p)), bin(errV, token.NEQ, nilV), func(b *block) {
-				g.emit(b, ret(p, errV))
-			})
-		})
-		g.elseBlock(s0, func(b *block) {
+		g.rawKeys(b, s, c, labels)
+		// The general path: a name the raw match did not settle, an
+		// escaped or folded spelling, or one the struct does not know.
+		g.blockStmt(b, func(b *block) {
+			if keyUsed {
+				g.emit(b, varDecl("key", sliceType(id("byte"))))
+			}
 			if c.strict {
 				g.emit(b, assignN(token.ASSIGN, []ast.Expr{key, p, errV}, callRT("ParseKeyV2", data, p, strict)))
 			} else {
@@ -158,7 +158,7 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 				g.switchStmt(b, call(id("string"), key), func(sw *block) {
 					for i, f := range s.Fields {
 						g.caseClause(sw, []ast.Expr{str(f.JSONName)}, func(b *block) {
-							g.emit(b, assign(idx, num(int64(i))))
+							g.emit(b, gotoStmt(labels[i]))
 						})
 					}
 				})
@@ -168,86 +168,95 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 					// a call per field: only a non-ASCII name can fold to a name of a
 					// different byte length.
 					fold := id("fold")
-					g.ifStmt(b, nil, bin(idx, token.LSS, num(0)), func(b *block) {
-						g.emit(b, define(fold, not(callRT("ASCII", key))))
-						g.switchStmt(b, nil, func(sw *block) {
-							for i, f := range s.Fields {
-								cond := bin(
-									paren(bin(bin(call(id("len"), key), token.EQL, num(int64(len(f.JSONName)))), token.LOR, fold)),
-									token.LAND,
-									callRT("EqualFold", key, str(f.JSONName)))
-								g.caseClause(sw, []ast.Expr{cond}, func(b *block) {
-									g.emit(b, assign(idx, num(int64(i))))
-								})
-							}
-						})
-					})
-				}
-			}
-		})
-		g.switchStmt(b, idx, func(sw *block) {
-			for i, f := range s.Fields {
-				g.caseClause(sw, []ast.Expr{num(int64(i))}, func(b *block) {
-					if c.strict {
-						word, bit := num(int64(i/64)), num(int64(i%64))
-						g.ifStmt(b, nil,
-							bin(strict, token.LAND, bin(bin(index(seen, word), token.AND, paren(bin(num(1), token.SHL, bit))), token.NEQ, num(0))),
-							func(b *block) {
-								g.emit(b, ret(kp, callRT("ErrDuplicateNameAt", data, kp)))
+					g.emit(b, define(fold, not(callRT("ASCII", key))))
+					g.switchStmt(b, nil, func(sw *block) {
+						for i, f := range s.Fields {
+							cond := bin(
+								paren(bin(bin(call(id("len"), key), token.EQL, num(int64(len(f.JSONName)))), token.LOR, fold)),
+								token.LAND,
+								callRT("EqualFold", key, str(f.JSONName)))
+							g.caseClause(sw, []ast.Expr{cond}, func(b *block) {
+								g.emit(b, gotoStmt(labels[i]))
 							})
-						g.emit(b, assignN(token.OR_ASSIGN, []ast.Expr{index(seen, word)}, bin(num(1), token.SHL, bit)))
-					}
-					g.allocSteps(b, f)
-					if f.AsString {
-						g.decodeQuoted(b, f.Type, selector(f), c)
-					} else {
-						// Both key paths leave p on the value's first byte.
-						mc := c
-						mc.trimmed = true
-						g.capHint = capHintName(s, f)
-						g.decode(b, f.Type, selector(f), mc)
-						g.capHint = ""
-					}
-				})
-			}
-			g.defaultClause(sw, func(b *block) {
-				if c.strict {
-					dup := id("dup")
-					g.ifStmt(b, nil, strict, func(b *block) {
-						g.emit(b, varDecl(dup.Name, id("bool")))
-						g.ifStmt(b, assignN(token.ASSIGN, []ast.Expr{unknown, dup}, callRT("UnknownName", cacheExpr(c), unknown, umark, ref(id("ufilter")), key)), dup, func(b *block) {
-							g.emit(b, ret(kp, callRT("ErrDuplicateName", data, kp, key)))
-						})
+						}
 					})
-					g.emit(b, c.skipSpace())
-					g.emit(b, assignN(token.ASSIGN, []ast.Expr{p, errV}, callRT("SkipValueV2", data, p, strict)))
-				} else {
-					g.emit(b, c.skipSpace())
-					g.emit(b, assignN(token.ASSIGN, []ast.Expr{p, errV}, callRT("SkipValue", data, p)))
 				}
-				g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
-					g.emit(b, ret(p, errV))
+			}
+			// A name that matched no member: json/v2's duplicate check on
+			// it, then the value is skipped.
+			if c.strict {
+				dup := id("dup")
+				g.ifStmt(b, nil, strict, func(b *block) {
+					g.emit(b, varDecl(dup.Name, id("bool")))
+					g.ifStmt(b, assignN(token.ASSIGN, []ast.Expr{unknown, dup}, callRT("UnknownName", cacheExpr(c), unknown, umark, ref(id("ufilter")), key)), dup, func(b *block) {
+						g.emit(b, ret(kp, callRT("ErrDuplicateName", data, kp, key)))
+					})
+				})
+				g.emit(b, c.skipSpace())
+				g.emit(b, assignN(token.ASSIGN, []ast.Expr{p, errV}, callRT("SkipValueV2", data, p, strict)))
+			} else {
+				g.emit(b, c.skipSpace())
+				g.emit(b, assignN(token.ASSIGN, []ast.Expr{p, errV}, callRT("SkipValue", data, p)))
+			}
+			g.ifStmt(b, nil, bin(errV, token.NEQ, nilV), func(b *block) {
+				g.emit(b, ret(p, errV))
+			})
+			if len(s.Fields) > 0 {
+				g.emit(b, gotoStmt(next))
+			}
+		})
+		for i, f := range s.Fields {
+			g.labeledBlock(b, labels[i], func(b *block) {
+				if c.strict {
+					word, bit := num(int64(i/64)), num(int64(i%64))
+					g.ifStmt(b, nil,
+						bin(strict, token.LAND, bin(bin(index(seen, word), token.AND, paren(bin(num(1), token.SHL, bit))), token.NEQ, num(0))),
+						func(b *block) {
+							g.emit(b, ret(kp, callRT("ErrDuplicateNameAt", data, kp)))
+						})
+					g.emit(b, assignN(token.OR_ASSIGN, []ast.Expr{index(seen, word)}, bin(num(1), token.SHL, bit)))
+				}
+				g.allocSteps(b, f)
+				if f.AsString {
+					g.decodeQuoted(b, f.Type, selector(f), c)
+				} else {
+					// Both key paths leave p on the value's first byte.
+					mc := c
+					mc.trimmed = true
+					g.capHint = capHintName(s, f)
+					g.decode(b, f.Type, selector(f), mc)
+					g.capHint = ""
+				}
+				if i < len(s.Fields)-1 {
+					g.emit(b, gotoStmt(next))
+				}
+			})
+		}
+		sep := func(b *block) {
+			g.emit(b, c.skipSpace())
+			g.ifStmt(b, nil, c.atEnd(), func(b *block) {
+				g.emit(b, ret(p, c.errSyntax("unexpected end of JSON input")))
+			})
+			g.switchStmt(b, c.at(), func(sw *block) {
+				g.caseClause(sw, []ast.Expr{chr(',')}, func(b *block) {
+					g.emit(b, incr(p))
+				})
+				g.caseClause(sw, []ast.Expr{chr('}')}, func(b *block) {
+					if c.strict {
+						g.emit(b, expr(callRT("EndUnknownNames", cacheExpr(c), unknown, umark)))
+					}
+					g.emit(b, ret(bin(p, token.ADD, num(1)), nilV))
+				})
+				g.defaultClause(sw, func(b *block) {
+					g.emit(b, ret(p, c.errSyntax("after object key:value pair")))
 				})
 			})
-		})
-		g.emit(b, c.skipSpace())
-		g.ifStmt(b, nil, c.atEnd(), func(b *block) {
-			g.emit(b, ret(p, c.errSyntax("unexpected end of JSON input")))
-		})
-		g.switchStmt(b, c.at(), func(sw *block) {
-			g.caseClause(sw, []ast.Expr{chr(',')}, func(b *block) {
-				g.emit(b, incr(p))
-			})
-			g.caseClause(sw, []ast.Expr{chr('}')}, func(b *block) {
-				if c.strict {
-					g.emit(b, expr(callRT("EndUnknownNames", cacheExpr(c), unknown, umark)))
-				}
-				g.emit(b, ret(bin(p, token.ADD, num(1)), nilV))
-			})
-			g.defaultClause(sw, func(b *block) {
-				g.emit(b, ret(p, c.errSyntax("after object key:value pair")))
-			})
-		})
+		}
+		if len(s.Fields) > 0 {
+			g.labeledBlock(b, next, sep)
+		} else {
+			sep(b)
+		}
 	})
 }
 
@@ -264,11 +273,11 @@ func (g *generator) decodeStruct(b *block, s *analyzer.StructInfo, c ctx) {
 // A wide struct with a shared prefix (profile_sidebar_fill_color,
 // profile_sidebar_border_color, ...) would otherwise compare its way down
 // a list of a dozen names, each a call to memequal.
-func (g *generator) rawKeys(b *block, s *analyzer.StructInfo, c ctx) {
+func (g *generator) rawKeys(b *block, s *analyzer.StructInfo, c ctx, labels []string) {
 	var cands []rawCand
 	for i, f := range s.Fields {
 		if rawKeyable(f.JSONName) {
-			cands = append(cands, rawCand{i, `"` + f.JSONName + `"`})
+			cands = append(cands, rawCand{i, `"` + f.JSONName + `"`, labels[i]})
 		}
 	}
 	if len(cands) == 0 {
@@ -288,6 +297,8 @@ const rawCompareChunk = 16
 type rawCand struct {
 	idx    int
 	quoted string
+	// label is the value code the match jumps to.
+	label string
 }
 
 // rawKeyTree emits the matcher for cands. known is the length rest has
@@ -316,9 +327,20 @@ func (g *generator) rawKeyTree(b *block, cands []rawCand, c ctx, known int, used
 		}
 		g.ifStmt(b, nil, and(conds...), func(b *block) {
 			// The name itself is not kept: the one place that needs it,
-			// the duplicate error, reads it back from kp.
-			g.emit(b, assignN(token.ASSIGN, []ast.Expr{idx, p},
-				num(int64(k.idx)), bin(p, token.ADD, num(l))))
+			// the duplicate error, reads it back from kp. AfterName
+			// settles the colon and the value's first byte, or the one
+			// space between them, inline; anything else (more whitespace,
+			// or an error) is AfterKey's call. The general path's key
+			// parser consumes the colon itself, so this is the leaf's.
+			g.emit(b, assignN(token.ADD_ASSIGN, []ast.Expr{p}, num(l)))
+			np := id("np")
+			s1 := g.ifStmt(b, define(np, callRT("AfterName", data, p)), bin(np, token.GTR, num(0)), func(b *block) {
+				g.emit(b, assign(p, np))
+			})
+			g.elseIf(s1, assignN(token.ASSIGN, []ast.Expr{p, errV}, callRT("AfterKey", data, p)), bin(errV, token.NEQ, nilV), func(b *block) {
+				g.emit(b, ret(p, errV))
+			})
+			g.emit(b, gotoStmt(k.label))
 		})
 		return
 	}
