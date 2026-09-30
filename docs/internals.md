@@ -18,81 +18,81 @@ These are the absolute figures the README's chart is drawn from — `bench/gen`
 against `bench/plain`, `bench/easyjson` and `bench/gojay`, **medians of ten
 runs** on an AMD Ryzen 9 7950X, Linux, Go 1.27.1, every odjson row within
 ±3% per `benchstat` and the other rows too but the ones noted under
-"Measurement notes". The tree is `main` at `8962683` (2026-09-29) with
-`goccy/go-json` raised from v0.10.6 to **v0.11.1**, the release that
-rewrote its decoder; every row in these tables, the baselines included,
-comes from that one sitting. `encoding/json` v1's rows are here rather than in the
-chart, which is about the `json/v2` story.
+"Measurement notes". The tree is the fifth decode round's (`perf/decode-round5`
+at `ea59374`, 2026-09-30), with `goccy/go-json` at **v0.11.1**, the release
+that rewrote its decoder; every row in these tables, the baselines
+included, comes from that one sitting. `encoding/json` v1's rows are here
+rather than in the chart, which is about the `json/v2` story.
 
 | Marshal `twitter` | on its own | with odjson | change |
 | --- | --- | --- | --- |
-| **encoding/json/v2** | 385 µs | **97 µs** | **3.97× faster** |
-| **encoding/json** | 408 µs | **120 µs** | **3.40× faster** |
-| sonic | 116 µs | — | |
-| go-json | 190 µs | — | |
+| **encoding/json/v2** | 385 µs | **97 µs** | **3.95× faster** |
+| **encoding/json** | 400 µs | **115 µs** | **3.46× faster** |
+| sonic | 113 µs | — | |
+| go-json | 194 µs | — | |
 | json-iterator | 424 µs | — | |
-| segmentio | 225 µs | — | |
-| jettison | 320 µs | — | |
-| easyjson | 440 µs | — | |
-| gojay | 413 µs | — | |
+| segmentio | 222 µs | — | |
+| jettison | 321 µs | — | |
+| easyjson | 426 µs | — | |
+| gojay | 395 µs | — | |
 
 | Marshal `medium` | on its own | with odjson | change |
 | --- | --- | --- | --- |
-| **encoding/json/v2** | 12.12 µs | **2.62 µs** | **4.63× faster** |
-| **encoding/json** | 11.92 µs | **3.22 µs** | **3.70× faster** |
-| sonic | 3.42 µs | — | |
-| go-json | 3.53 µs | — | |
-| json-iterator | 9.24 µs | — | |
-| segmentio | 4.90 µs | — | |
-| jettison | 8.51 µs | — | |
-| easyjson | 9.53 µs | — | |
-| gojay | 18.58 µs | — | |
+| **encoding/json/v2** | 11.81 µs | **2.79 µs** | **4.23× faster** |
+| **encoding/json** | 11.93 µs | **3.18 µs** | **3.75× faster** |
+| sonic | 3.31 µs | — | |
+| go-json | 3.46 µs | — | |
+| json-iterator | 9.17 µs | — | |
+| segmentio | 4.86 µs | — | |
+| jettison | 8.38 µs | — | |
+| easyjson | 9.56 µs | — | |
+| gojay | 17.25 µs | — | |
 
 | Marshal `small` | on its own | with odjson | change |
 | --- | --- | --- | --- |
-| **encoding/json/v2** | 1.018 µs | **256 ns** | **3.97× faster** |
-| **encoding/json** | 1.014 µs | **278 ns** | **3.65× faster** |
-| sonic | 300 ns | — | |
-| go-json | 371 ns | — | |
-| json-iterator | 575 ns | — | |
-| segmentio | 405 ns | — | |
-| jettison | 468 ns | — | |
-| easyjson | 669 ns | — | |
-| gojay | 647 ns | — | |
+| **encoding/json/v2** | 1.001 µs | **273 ns** | **3.67× faster** |
+| **encoding/json** | 998 ns | **273 ns** | **3.66× faster** |
+| sonic | 292 ns | — | |
+| go-json | 373 ns | — | |
+| json-iterator | 584 ns | — | |
+| segmentio | 391 ns | — | |
+| jettison | 473 ns | — | |
+| easyjson | 661 ns | — | |
+| gojay | 627 ns | — | |
 
 | Unmarshal `twitter` | on its own | with odjson | change |
 | --- | --- | --- | --- |
-| **encoding/json/v2** | 1.127 ms | **394 µs** | **2.86× faster** |
-| **encoding/json** | 1.502 ms | **1.138 ms** | **1.32× faster** |
-| sonic | 527 µs | — | |
-| go-json | 407 µs | — | |
-| json-iterator | 1.100 ms | — | |
-| segmentio | 919 µs | — | |
-| simdjson-go | 610 µs | — | |
-| easyjson | 1.078 ms | — | |
-| gojay | 2.579 ms | — | |
+| **encoding/json/v2** | 1.090 ms | **390 µs** | **2.79× faster** |
+| **encoding/json** | 1.501 ms | **1.131 ms** | **1.33× faster** |
+| sonic | 523 µs | — | |
+| go-json | 403 µs | — | |
+| json-iterator | 1.091 ms | — | |
+| segmentio | 874 µs | — | |
+| simdjson-go | 599 µs | — | |
+| easyjson | 1.069 ms | — | |
+| gojay | 2.531 ms | — | |
 
 | Unmarshal `medium` | on its own | with odjson | change |
 | --- | --- | --- | --- |
-| **encoding/json/v2** | 22.15 µs | **8.60 µs** | **2.57× faster** |
-| **encoding/json** | 29.56 µs | **24.24 µs** | **1.22× faster** |
-| sonic | 14.85 µs | — | |
-| go-json | 8.98 µs | — | |
-| json-iterator | 22.45 µs | — | |
-| segmentio | 17.66 µs | — | |
-| simdjson-go | 29.87 µs | — | |
-| easyjson | 18.17 µs | — | |
-| gojay | 25.46 µs | — | |
+| **encoding/json/v2** | 22.12 µs | **9.18 µs** | **2.41× faster** |
+| **encoding/json** | 28.68 µs | **24.34 µs** | **1.18× faster** |
+| sonic | 14.75 µs | — | |
+| go-json | 8.84 µs | — | |
+| json-iterator | 22.39 µs | — | |
+| segmentio | 17.41 µs | — | |
+| simdjson-go | 29.82 µs | — | |
+| easyjson | 18.10 µs | — | |
+| gojay | 24.80 µs | — | |
 
 | Unmarshal `small` | on its own | with odjson | change |
 | --- | --- | --- | --- |
-| **encoding/json/v2** | 1.881 µs | **586 ns** | **3.21× faster** |
-| **encoding/json** | 2.338 µs | **1.444 µs** | **1.62× faster** |
-| sonic | 1.041 µs | — | |
-| go-json | 548 ns | — | |
-| json-iterator | 1.111 µs | — | |
-| segmentio | 1.160 µs | — | |
-| simdjson-go | 1.625 µs | — | |
+| **encoding/json/v2** | 1.903 µs | **581 ns** | **3.27× faster** |
+| **encoding/json** | 2.337 µs | **1.454 µs** | **1.61× faster** |
+| sonic | 993 ns | — | |
+| go-json | 544 ns | — | |
+| json-iterator | 1.120 µs | — | |
+| segmentio | 1.163 µs | — | |
+| simdjson-go | 1.619 µs | — | |
 
 
 The last five rows of each table — json-iterator (as
@@ -110,7 +110,7 @@ shapes the `small` rows nor the throughput that shapes the `twitter` rows
 dominates on its own, and its ratios land between the two: the `json/v2`
 encode is the widest of the three, the `json/v2` decode the narrowest, and
 the `encoding/json` decode, which stays on the public API path, is the
-narrowest margin on this page at 1.22×.
+narrowest margin on this page at 1.18×.
 
 `encoding/json/v2` gains on all six, and the generated file is the only thing
 that changed. `encoding/json` gains on all six too: its encodes on the direct
@@ -118,118 +118,117 @@ path, which learned that library's flag word (see "The direct path"), its
 decodes through the public API path (see "What the decode side pays"), and
 that is the whole of the difference between the two standard library columns.
 
-Against the run quoted here before — the same machine, `main` at `97c4e84`,
-2026-09-14 — the `json/v2` column reads 95 → 97 µs, 2.79 → 2.62 µs,
-255 → 256 ns, 376 → 394 µs, 8.26 → 8.60 µs and 547 → 586 ns, and reflection
-401 → 385 µs, 12.26 → 12.12 µs, 1.033 → 1.018 µs, 1.100 → 1.127 ms,
-22.22 → 22.15 µs and 1.853 → 1.881 µs. None of those differences is itself a
-measurement. The `small` decode, the largest of them, was checked: the
-generated decoder built from `97c4e84` and from this tree, run interleaved
-twelve times each on the same afternoon, read 580 and 582 ns (p = 0.93), so
-the 7% is the machine's rather than the code's. Read the **ratios** rather
-than the differences across runs everywhere on this page, because the
-baselines move with them.
+Against the run quoted here before — the same machine, `main` at `8962683`
+with go-json v0.11.1, 2026-09-29, the tree before the fifth decode round —
+the `json/v2` column reads 97 → 97 µs, 2.62 → 2.79 µs, 256 → 273 ns,
+394 → 390 µs, 8.60 → 9.18 µs and 586 → 581 ns, and reflection
+385 → 385 µs, 12.12 → 11.81 µs, 1.018 → 1.001 µs, 1.127 → 1.090 ms,
+22.15 → 22.12 µs and 1.881 → 1.903 µs. None of those differences is itself
+a measurement. The round's own interleaved A/B of `bench/gen` against the
+tree before it, four `-randlayout` builds a side, reads the six `json/v2`
+rows within 1.5% of each other but the `small` encode, which a regenerated
+file moves by a few percent without touching its path (see "Measurement
+notes"); the `medium` encode is the row the two-binary drift has always
+been widest on (2.79 µs in the suite, 2.63 in `bench/ab`'s process). Read
+the **ratios** rather than the differences across runs everywhere on this
+page, because the baselines move with them.
 
 Against the libraries people leave the standard library for, that puts
 `encoding/json/v2` + odjson:
 
 | | vs go-json | vs sonic |
 | --- | --- | --- |
-| Marshal `twitter` | **1.96× faster** (97 vs 190 µs) | **1.20× faster** (97 vs 116 µs) |
-| Marshal `medium` | **1.35× faster** (2.62 vs 3.53 µs) | **1.31× faster** (2.62 vs 3.42 µs) |
-| Marshal `small` | **1.45× faster** (256 vs 371 ns) | **1.17× faster** (256 vs 300 ns) |
-| Unmarshal `twitter` | 1.03× faster (394 vs 407 µs) | **1.34× faster** (394 vs 527 µs) |
-| Unmarshal `medium` | 1.04× faster (8.60 vs 8.98 µs) | **1.73× faster** (8.60 vs 14.85 µs) |
-| Unmarshal `small` | **0.93×, go-json ahead** (586 vs 548 ns) | **1.78× faster** (586 vs 1.041 µs) |
+| Marshal `twitter` | **2.00× faster** (97 vs 194 µs) | **1.16× faster** (97 vs 113 µs) |
+| Marshal `medium` | **1.24× faster** (2.79 vs 3.46 µs) | **1.19× faster** (2.79 vs 3.31 µs) |
+| Marshal `small` | **1.37× faster** (273 vs 373 ns) | 1.07× faster (273 vs 292 ns) |
+| Unmarshal `twitter` | 1.03× faster (390 vs 403 µs) | **1.34× faster** (390 vs 523 µs) |
+| Unmarshal `medium` | 0.96×, level (9.18 vs 8.84 µs) | **1.61× faster** (9.18 vs 14.75 µs) |
+| Unmarshal `small` | **0.94×, go-json ahead** (581 vs 544 ns) | **1.71× faster** (581 vs 993 ns) |
 
 **go-json v0.11.1 is level with odjson on decode.** Its decoder was
 rewritten in that release — the structure of a block is found with AVX2
 (`internal/decoder/scan_amd64.s`, a word-at-a-time fallback elsewhere) and
 numbers are parsed in the one pass that reads their digits — and against
-v0.10.6 it moved 662 → 407 µs, 14.99 → 8.98 µs and 788 → 548 ns on these
-three decodes — roughly 1.6× / 1.7× / 1.4× in one release, read across two
-sittings — and 251 → 190 µs,
-4.57 → 3.53 µs and 402 → 371 ns on the encodes. On `twitter` and `medium`
-odjson is still ahead, by 3% and 4%, and `benchstat` calls both significant
-(p ≤ 0.002 here; `bench/ab`, in one process, 1.03× and 1.05× at p = 0.008),
-but a margin that size is inside the drift between two runs of this suite, so
-the honest word for them is *level*. On `small` go-json is **ahead**: 1.07×
-in the tables, level (p = 0.84) in `bench/ab`'s process. The encodes are
-still odjson's by 1.35×–1.96× (`bench/ab`: 2.05×, 1.55×, 1.48×), and the
-narrowest, `medium`, is the one where go-json's encoder gained the most.
-Before this release the same table read 1.44×–2.64× on all six.
+v0.10.6 it moved 662 → 403 µs, 14.99 → 8.84 µs and 788 → 544 ns on these
+three decodes, roughly 1.6× / 1.7× / 1.4× in one release, read across
+sittings. In `bench/ab`, one process, odjson's decodes read 1.05×, 1.00×
+and 0.98× against go-json's own path: `twitter` ahead by a margin inside
+this suite's drift, `medium` and `small` level, and the tables put go-json
+6% ahead on `small` and 4% on `medium`. So the honest word for all three is
+*level*, with go-json a few percent ahead on the two smaller documents
+where the tables are the reading. The encodes are still odjson's by
+1.24×–2.00× (`bench/ab`: 2.00×, 1.51×, 1.42×). The fifth decode round (see
+"Measured and rejected") took go-json's lead on most of the shapes it had
+led on, but not on these three payloads, where the two decoders spend
+their time on the same things; before v0.11.1 the same table read
+1.44×–2.64× on all six.
 
 Ahead of sonic on all six. `bench/ab`, in one process, puts the encodes at
-1.19×, 1.48× and 1.13× and the decodes at 1.44×, 1.76× and 1.84×. The two
+1.16×, 1.46× and 1.09× and the decodes at 1.46×, 1.77× and 1.76×. The two
 methods disagree on the encodes by where the two binaries put each side's
-rows: sonic's `twitter` and `small` encodes read 4% and 3% faster in `ab`'s
-process than in the suite (111 vs 116 µs, 292 vs 300 ns) and its `medium`
-encode 15% slower (3.93 vs 3.42 µs), while odjson's three move by 1–4%
-(93 vs 97 µs, 2.65 vs 2.62 µs, 259 vs 256 ns). That is the drift between two
-builds rather than anything odjson did. So the honest statement of the
-encode side is the weaker method on each row: **at least 1.19× on
-`twitter`, at least 1.31× on `medium` and at least 1.13× on `small`**,
-against a suite whose two runs can differ by ±5%; the `small` encode, which
-read at least 1.23× in the previous sitting, is the margin this one moved
-most.
+rows, as they always have (see the previous sittings in "Measurement
+notes"), and the honest statement of the encode side is the weaker method
+on each row: **at least 1.16× on `twitter`, at least 1.19× on `medium` and
+at least 1.07× on `small`** — the `small` encode is the narrowest margin
+over sonic on the page, and within what two runs of this suite disagree by.
 
 `sonic.Marshal`'s default configuration neither escapes HTML nor validates
 UTF-8, so its encode rows are not doing equal work; `sonic.ConfigStd`, which
-does both, measures 139 µs, 3.84 µs and 371 ns, and its `twitter` decode 660 µs.
+does both, measures 136 µs, 3.70 µs and 375 ns, and its `twitter` decode 648 µs.
 
 Against the six baselines, in the same run:
 
 | `twitter` / `medium` / `small` | Marshal | Unmarshal |
 | --- | --- | --- |
-| vs json-iterator | 4.38× / 3.53× / 2.25× | 2.79× / 2.61× / 1.89× |
-| vs segmentio/encoding | 2.32× / 1.87× / **1.58×** | 2.33× / 2.05× / 1.98× |
-| vs jettison | 3.30× / 3.25× / 1.83× | — |
-| vs simdjson-go | — | **1.55×** / 3.47× / 2.77× |
-| vs easyjson | 4.55× / 3.64× / 2.61× | 2.73× / 2.11× / 2.00× |
-| vs gojay | 4.26× / 7.10× / 2.53× | 6.54× / 2.96× / 1.83× |
+| vs json-iterator | 4.35× / 3.28× / 2.14× | 2.79× / 2.44× / 1.93× |
+| vs segmentio/encoding | 2.28× / 1.74× / **1.43×** | 2.24× / 1.90× / 2.00× |
+| vs jettison | 3.29× / 3.00× / 1.73× | — |
+| vs simdjson-go | — | **1.53×** / 3.25× / 2.79× |
+| vs easyjson | 4.38× / 3.42× / 2.42× | 2.74× / 1.97× / 2.01× |
+| vs gojay | 4.05× / 6.17× / 2.30× | 6.48× / 2.70× / 1.80× |
 
-Ahead on every row, the narrowest being simdjson-go's `twitter` decode and
-segmentio's `small` encode. Two of these deserve a word. easyjson is the
+Ahead on every row, the narrowest being segmentio's `small` encode and
+simdjson-go's `twitter` decode. Two of these deserve a word. easyjson is the
 comparison that is like for like — a code generator attaching dedicated
 methods to the same types — and it lands at or behind `encoding/json/v2`'s
-reflection on this toolchain (440 vs 385 µs on the `twitter` encode, with
+reflection on this toolchain (426 vs 385 µs on the `twitter` encode, with
 3,117 allocations to json/v2's 466, since its writer grows a chunk list),
 which is a statement about how far json/v2's reflection has come rather than
 about easyjson. simdjson-go's SIMD front end is the fastest way to find the
 structure of `twitter.json`, but the row has to build the struct too, and the
 walk from its tape — string materialisation, `interface{}` conversion for the
-untyped members — costs more than the parse saves: 610 µs against odjson's
-394, and on `small`, where there is no structure to find, the per-call cost
-of a tape puts it last at 1.63 µs. go-json v0.11.1 is the counterexample
+untyped members — costs more than the parse saves: 599 µs against odjson's
+390, and on `small`, where there is no structure to find, the per-call cost
+of a tape puts it last at 1.62 µs. go-json v0.11.1 is the counterexample
 worth setting beside it: SIMD used to find the structure *while* decoding
 into the struct, with no tape in between, is what took it level. gojay's
-`twitter` decode, 2.58 ms, is what its `interface{}` handling costs — it
+`twitter` decode, 2.53 ms, is what its `interface{}` handling costs — it
 hands each such member to `encoding/json` — and the fourteen such fields in
 these types are the document's `null`s and its `user_mentions` objects.
 
 One more library is measured and, on purpose, not drawn:
 `sugawarayuuta/sonnet`, a drop-in for `encoding/json` written without
 `unsafe`, at its latest commit (2023-10; it has no tagged release). In the
-same run it encodes `twitter` / `medium` / `small` in 222 µs / 6.09 µs /
-700 ns and decodes them in 722 µs / 17.0 µs / 1.19 µs: between go-json and
+same run it encodes `twitter` / `medium` / `small` in 225 µs / 6.13 µs /
+713 ns and decodes them in 716 µs / 16.7 µs / 1.18 µs: between go-json and
 segmentio on the large encode, last among the encoders on the small one,
 between simdjson-go and segmentio on the large decode, behind easyjson and
-segmentio on the small one. odjson is 2.29× / 2.33× / 2.73× ahead on the
-encodes and 1.83× / 1.98× / 2.02× on the decodes, inside the range the six
+segmentio on the small one. odjson is 2.31× / 2.19× / 2.61× ahead on the
+encodes and 1.83× / 1.82× / 2.03× on the decodes, inside the range the six
 rows above already span, which is why it stays out of the chart. As a host
 it compacts a marshaler's output the way segmentio does, so `bench/ab` reads
 its encodes over generated types 1.4–1.7× slower (and its `medium` encode
-6×, the `SizeHint` artefact described under "The two third-party
-libraries"), its `twitter` decode 1.14× slower, its `medium` decode level
-and its `small` decode 1.31× faster.
+6.6×, the `SizeHint` artefact described under "The two third-party
+libraries"), its `twitter` decode 1.13× slower, its `medium` decode level
+and its `small` decode 1.32× faster.
 
 **On sonic's decodes next to go-json's**: since v0.11.1 go-json decodes
-faster than sonic on all three payloads — 407 vs 527 µs, 8.98 vs 14.85 µs,
-548 ns vs 1.041 µs — where before it was ahead only on `small`. sonic
-v1.15.3 on Go 1.27 amd64 uses its JIT decoder (`internal/decoder/jitdec`;
-the `compat` fallback is gated on `go1.28` and `optdec` on an env var), and
-its per-call floor is 45 ns on `{}`, so the `small` gap is not a
-measurement artefact; the `twitter` one is go-json's new scanner.
+faster than sonic on all three payloads — 403 vs 523 µs, 8.84 vs 14.75 µs,
+544 vs 993 ns — where before it was ahead only on `small`. sonic v1.15.3 on
+Go 1.27 amd64 uses its JIT decoder (`internal/decoder/jitdec`; the `compat`
+fallback is gated on `go1.28` and `optdec` on an env var), and its per-call
+floor is 45 ns on `{}`, so the `small` gap is not a measurement artefact;
+the `twitter` one is go-json's new scanner.
 
 ## The public API ceiling
 
@@ -331,10 +330,11 @@ object at every depth for a repeated name, with a 256 bit filter per open
 object settling most names without a scan. That skip is a quarter of the
 decode and runs at 1.8 GB/s; the typed part runs at about 1 GB/s including
 the allocations the target type asks for. On the fully typed `small` payload
-odjson is 1.78× ahead of sonic, and on `twitter` 1.34× ahead of it as well.
+odjson is 1.71× ahead of sonic, and on `twitter` 1.34× ahead of it as well.
 go-json v0.11.1, whose rewritten decoder finds structure with AVX2, is the
-exception: level on `twitter` (1.03×) and 1.07× ahead of odjson on `small`
-(see "The measured tables"); against v0.10.6 odjson was 1.46× ahead there.
+exception: level on `twitter` (1.03×) and `medium`, and 1.06× ahead of
+odjson on `small` in the tables, level in `bench/ab` (see "The measured
+tables"); against v0.10.6 odjson was 1.46× ahead there.
 
 ## What the drop-in path costs, and what was removed
 
@@ -545,7 +545,7 @@ plain in one process. The first run, on 2026-09-11 against the tree as it was
 described after the table.
 
 The table below is kept from a run on 2026-09-13 against `main` at
-`7d57f14` — the tree after the canada round. The 2026-09-29 sitting that
+`7d57f14` — the tree after the canada round. The 2026-09-30 sitting that
 re-measured the rest of this page did not replace it: it has no column for
 any third-party library, and the paragraphs after it compare it cell by
 cell against the tables before it (see "Measurement notes"). Same machine as ever (Ryzen 9 7950X,
@@ -712,23 +712,22 @@ What did not hold, and what was done about it:
   than 93% of them, which is where `small`'s encode went from 290 to 272 ns.
 
 sonic and go-json behave as the floor predicts on every shape. In the
-2026-09-29 run (the shapes sitting described under "The other libraries on
+2026-09-30 run (the shapes sitting described under "The other libraries on
 the shapes", `lib=sonic|go-json`, gen over plain), the generated codec is
-slower on all 25 encode rows on sonic (0.15–0.79×) and on 24 of 25 on
-go-json (0.21–0.87×, `sparse` the single exception at 1.07×), and on most
-decode rows. On sonic the decode exceptions are the ones the README already
-names, `small` (1.14×), and shapes of the same kind, `dense` (1.51×) and
-`sparse` (1.34×), where the document is mostly member names and the
-skip-and-validate pass it makes before calling `UnmarshalJSON` is cheap
-relative to its own decode; it sits level on the three `page-*` sizes,
-`array-pages`, `citm` and `skip` (0.98–1.02×). go-json v0.11.1 moved the
-other way: `small`, `dense` and `sparse`, which it used to gain on, are now
-losses, and its only gains are the four non-ASCII `text-*` rows
-(1.20–1.25×) and `canada` (1.25×), with `text-emoji` and `floats` level —
-the rows where its own new decoder is still slow rather than the rows where
-its floor is cheap. Both remain far behind what the same decoder does under
+slower on all 26 encode rows on sonic (0.14–0.79×) and on 25 of 26 on
+go-json (0.21–0.88×, `sparse` the single exception at 1.05×), and on most
+decode rows. On sonic the decode exceptions are the ones the README
+already names, `small` (1.14×), and shapes of the same kind, `dense`
+(1.46×) and `sparse` (1.32×), where the document is mostly member names
+and the skip-and-validate pass it makes before calling `UnmarshalJSON` is
+cheap relative to its own decode; since the fifth decode round the
+`page-*` sizes, `array-pages` and `numbers` join them (1.08–1.13×), and it
+sits level on `page-12k-indented`, `map-items-in`, `citm` and `skip`.
+go-json v0.11.1 gains on `canada` alone (1.24×), where its own float
+parsing is the slow part, and is level on `page-12k`, `page-100k` and
+`floats`. Both remain far behind what the same decoder does under
 `json/v2`, which is the point of the floor section: on `twitter` their
-decode rows read 0.82× and 0.66× against 2.86× in the same run (2.97× in
+decode rows read 0.82× and 0.67× against 2.90× in the same run (2.97× in
 the 2026-09-13 table above).
 
 A parallel audit the same day measured the same top-level-only scope from the
@@ -754,87 +753,84 @@ since it generates for struct types. Every other pair runs, and `TestShapes`
 holds each library to `encoding/json`'s reading of the plain value on each
 shape, which all of them pass, `numbers` included.
 
-The run: 2026-09-29, the whole suite in one process at `-count 6`, on
-`main` at `8962683` with go-json v0.11.1 — the same sitting as the tables at
-the top of this page — plus a second process for `canada` and `citm` with
-`ODJSON_BENCH_CORPUS` set; the 2026-09-13 gen-against-plain table above is
-`7d57f14`, before the text round (PR #44). Same machine (Ryzen 9 7950X,
-Linux, Go 1.27.1). The ratio is the library's own time over odjson's under
-`json/v2` (`lib=json-v2/side=gen`), both medians of the six, so 2× means
-odjson takes half the time and anything under 1× means the library is
-faster. Eighteen rows had a spread (max − min over the median) above 10%,
-the doc shapes' and the characteristic shapes' together — odjson's own
-`small` and `text-ascii-short` encodes, `json/v2`'s `sparse` encode, and
-fifteen third-party rows — and each was re-run with odjson's row in the same
-process at `-count 20`. All but two came back within 7% spread — segmentio's
-`empties` decode (±17%) and `sonic.ConfigStd`'s `text-cjk-short` decode
-(13%) stayed wide at `-count 20` too — and all but four within 5% of the
-suite's ratio: default sonic's `text-emoji` encode 0.37× → 0.33×,
-`sonic.ConfigStd`'s `text-latin` encode 0.58× → 0.54× and `page-3k`
-decode 1.53× → 1.62×, and segmentio's `empties` decode 23.05× → 18.70×.
-The re-run figures are the ones in the tables. A
-ratio between 0.95× and 1.05× is read as level.
+The run: 2026-09-30, the whole suite in one process at `-count 6` with
+`ODJSON_BENCH_CORPUS` set, on `perf/decode-round5` at `ea59374` with
+go-json v0.11.1 — the same sitting as the tables at the top of this page;
+the 2026-09-13 gen-against-plain table above is `7d57f14`, before the text
+round (PR #44). Same machine (Ryzen 9 7950X, Linux, Go 1.27.1). The ratio
+is the library's own time over odjson's under `json/v2`
+(`lib=json-v2/side=gen`), both medians of the six, so 2× means odjson takes
+half the time and anything under 1× means the library is faster. Seven rows,
+the doc shapes' and the characteristic shapes' together, had a spread (max
+− min over the median) above 10%, and each was re-run with odjson's row in
+the same process at `-count 20`: every one came back within 5% spread and
+within 2% of the suite's ratio, and the re-run figures are the ones in the
+tables. `map-items-in` is new in this sitting: the `map-items` map behind a
+struct member, where the generated decoder reads the map itself. A ratio
+between 0.95× and 1.05× is read as level.
 
 **Marshal**, library over odjson (json/v2):
 
 | shape | `encoding/json` | `json/v2` | sonic | sonic-std | go-json | json-iterator | segmentio | jettison | sonnet | simdjson-go | easyjson | gojay |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `twitter` | 4.69× | 4.63× | 1.15× | 1.39× | 2.13× | 4.70× | 2.55× | 3.43× | 2.45× | — | 4.78× | 3.74× |
-| `small` | 4.04× | 4.07× | 1.06× | 1.41× | 1.37× | 2.27× | 1.50× | 1.82× | 2.76× | — | 2.15× | 2.25× |
-| `twitter-compact` | 4.67× | 4.48× | 1.18× | 1.37× | 2.12× | 4.60× | 2.46× | 3.41× | 2.40× | — | 4.68× | 3.72× |
-| `page-3k` | 2.95× | 2.67× | 0.98× | 1.29× | 1.04× | 2.48× | 1.10× | 1.59× | 1.60× | — | 1.11× | — |
-| `page-12k` | 3.19× | 2.89× | 1.08× | 1.39× | 1.14× | 2.70× | 1.24× | 1.81× | 1.70× | — | 1.19× | — |
-| `page-100k` | 3.18× | 2.89× | 1.12× | 1.42× | 1.15× | 2.73× | 1.28× | 1.81× | 1.69× | — | 1.18× | — |
-| `page-12k-indented` | 3.10× | 2.78× | 1.04× | 1.36× | 1.11× | 2.64× | 1.20× | 1.76× | 1.66× | — | 1.16× | — |
-| `array-items` | 2.72× | 2.48× | 0.99× | 1.23× | 1.01× | 2.29× | 1.07× | 1.51× | 1.47× | — | — | — |
-| `array-pages` | 3.06× | 2.77× | 1.05× | 1.34× | 1.12× | 2.66× | 1.22× | 1.71× | 1.66× | — | — | — |
-| `map-items` | 2.51× | 2.06× | 0.77× | 1.01× | 0.94× | 2.21× | 1.23× | 1.38× | 1.34× | — | — | — |
-| `generic` | 2.70× | 1.97× | 1.66× | 1.95× | 2.06× | 6.24× | 2.44× | 3.51× | 1.90× | — | 2.93× | — |
-| `text-ascii` | 2.44× | 2.52× | 0.62× | 0.76× | 0.84× | 2.28× | 1.12× | 3.18× | 1.46× | — | 1.89× | — |
-| `text-latin` | 2.18× | 2.19× | 0.42× | 0.54× | 2.13× | 2.23× | 2.30× | 2.28× | 2.66× | — | 1.98× | — |
-| `text-cyrillic` | 3.35× | 3.36× | 0.43× | 0.60× | 3.46× | 3.71× | 3.84× | 3.43× | 2.74× | — | 3.31× | — |
-| `text-cjk` | 1.83× | 1.84× | 0.31× | 0.40× | 1.90× | 1.93× | 2.02× | 1.87× | 1.62× | — | 1.74× | — |
-| `text-hangul` | 1.61× | 1.61× | 0.28× | 0.37× | 1.75× | 1.83× | 1.82× | 1.66× | 1.43× | — | 1.54× | — |
-| `text-emoji` | 1.60× | 1.60× | 0.33× | 0.49× | 1.56× | 1.61× | 1.66× | 1.62× | 1.83× | — | 1.37× | — |
-| `text-escaped` | 3.13× | 2.21× | 0.88× | 1.84× | 1.44× | 3.34× | 3.62× | 3.37× | 3.75× | — | 3.37× | — |
-| `unique-strings` | 2.66× | 2.65× | 0.76× | 0.83× | 1.04× | 2.17× | 1.33× | 3.18× | 1.68× | — | 2.07× | — |
-| `numbers` | 1.50× | 1.50× | 0.65× | 0.68× | 1.35× | 1.28× | 1.23× | 1.23× | 1.38× | — | 1.37× | — |
-| `floats` | 1.55× | 1.56× | 1.09× | 1.28× | 1.36× | 1.37× | 1.31× | 1.34× | 1.39× | — | 1.30× | — |
-| `dense` | 5.33× | 5.40× | 1.16× | 1.23× | 1.95× | 3.68× | 2.27× | 2.95× | 2.88× | — | 2.60× | — |
-| `sparse` | 10.18× | 11.36× | 1.54× | 1.64× | 2.72× | 5.68× | 3.51× | 5.05× | 6.40× | — | 2.34× | — |
-| `canada` | 1.27× | 1.28× | 0.93× | 1.01× | 1.10× | 1.04× | 1.03× | 1.07× | 1.14× | — | 1.07× | — |
-| `citm` | 4.36× | 4.33× | 1.20× | 1.32× | 1.54× | 2.81× | 1.80× | 2.16× | 2.15× | — | 1.83× | — |
+| `twitter` | 4.76× | 4.60× | 1.17× | 1.40× | 2.19× | 4.82× | 2.56× | 3.45× | 2.50× | — | 4.85× | 3.77× |
+| `small` | 4.10× | 4.18× | 1.05× | 1.38× | 1.41× | 2.35× | 1.50× | 1.82× | 2.80× | — | 2.16× | 2.29× |
+| `twitter-compact` | 4.80× | 4.64× | 1.17× | 1.43× | 2.21× | 4.91× | 2.58× | 3.51× | 2.52× | — | 4.89× | 3.83× |
+| `page-3k` | 2.93× | 2.62× | 0.99× | 1.30× | 1.06× | 2.48× | 1.13× | 1.68× | 1.62× | — | 1.13× | — |
+| `page-12k` | 3.09× | 2.78× | 1.04× | 1.34× | 1.11× | 2.62× | 1.21× | 1.77× | 1.66× | — | 1.13× | — |
+| `page-100k` | 3.18× | 2.86× | 1.10× | 1.41× | 1.16× | 2.68× | 1.28× | 1.82× | 1.70× | — | 1.17× | — |
+| `page-12k-indented` | 3.08× | 2.78× | 1.03× | 1.33× | 1.10× | 2.58× | 1.19× | 1.71× | 1.65× | — | 1.13× | — |
+| `array-items` | 2.69× | 2.41× | 0.93× | 1.19× | 0.97× | 2.27× | 1.06× | 1.52× | 1.46× | — | — | — |
+| `array-pages` | 3.09× | 2.83× | 1.03× | 1.33× | 1.12× | 2.62× | 1.21× | 1.73× | 1.67× | — | — | — |
+| `map-items` | 2.51× | 2.05× | 0.76× | 1.01× | 0.91× | 2.15× | 1.23× | 1.41× | 1.32× | — | — | — |
+| `map-items-in` | 3.30× | 2.68× | 0.98× | 1.30× | 1.17× | 2.83× | 1.58× | 1.88× | 1.70× | — | 1.10× | — |
+| `generic` | 2.75× | 2.01× | 1.69× | 2.00× | 2.08× | 6.46× | 2.49× | 3.64× | 1.96× | — | 2.94× | — |
+| `text-ascii` | 3.03× | 3.01× | 0.73× | 0.85× | 0.86× | 2.75× | 1.36× | 3.91× | 1.72× | — | 2.32× | — |
+| `text-latin` | 2.17× | 2.17× | 0.39× | 0.52× | 2.12× | 2.26× | 2.25× | 2.15× | 2.63× | — | 1.98× | — |
+| `text-cyrillic` | 3.25× | 3.23× | 0.40× | 0.54× | 3.41× | 3.55× | 3.79× | 3.42× | 2.74× | — | 3.18× | — |
+| `text-cjk` | 1.80× | 1.75× | 0.29× | 0.38× | 1.87× | 1.95× | 1.93× | 1.82× | 1.56× | — | 1.69× | — |
+| `text-hangul` | 1.62× | 1.56× | 0.26× | 0.35× | 1.83× | 1.78× | 1.80× | 1.68× | 1.41× | — | 1.58× | — |
+| `text-emoji` | 1.61× | 1.63× | 0.34× | 0.48× | 1.58× | 1.59× | 1.67× | 1.65× | 1.87× | — | 1.40× | — |
+| `text-escaped` | 3.34× | 2.20× | 0.84× | 1.98× | 1.51× | 3.47× | 3.77× | 3.52× | 4.00× | — | 3.63× | — |
+| `unique-strings` | 2.95× | 2.95× | 0.79× | 0.89× | 1.14× | 2.44× | 1.45× | 3.49× | 1.74× | — | 2.18× | — |
+| `numbers` | 1.49× | 1.51× | 0.65× | 0.67× | 1.35× | 1.28× | 1.22× | 1.22× | 1.36× | — | 1.36× | — |
+| `floats` | 1.55× | 1.55× | 1.12× | 1.20× | 1.34× | 1.30× | 1.25× | 1.29× | 1.39× | — | 1.31× | — |
+| `dense` | 5.36× | 5.43× | 1.18× | 1.25× | 1.98× | 3.72× | 2.29× | 2.97× | 2.89× | — | 2.64× | — |
+| `sparse` | 9.96× | 11.14× | 1.53× | 1.61× | 2.67× | 5.64× | 3.46× | 5.00× | 6.28× | — | 2.37× | — |
+| `canada` | 1.27× | 1.27× | 0.96× | 1.04× | 1.09× | 1.05× | 1.02× | 1.07× | 1.14× | — | 1.07× | — |
+| `citm` | 4.58× | 4.55× | 1.26× | 1.42× | 1.63× | 2.98× | 1.90× | 2.30× | 2.24× | — | 1.92× | — |
 
 **Unmarshal**, library over odjson (json/v2):
 
 | shape | `encoding/json` | `json/v2` | sonic | sonic-std | go-json | json-iterator | segmentio | jettison | sonnet | simdjson-go | easyjson | gojay |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `twitter` | 3.91× | 2.86× | 1.36× | 1.62× | 1.05× | 2.90× | 2.33× | — | 1.95× | 1.64× | 2.68× | 6.81× |
-| `small` | 4.23× | 3.50× | 1.82× | 2.05× | 0.95× | 2.10× | 2.11× | — | 2.11× | 2.92× | 2.02× | 1.75× |
-| `twitter-compact` | 3.88× | 2.89× | 1.21× | 1.48× | 0.93× | 2.83× | 2.19× | — | 1.70× | 1.72× | 2.30× | 5.46× |
-| `page-3k` | 2.91× | 2.54× | 1.24× | 1.62× | 0.98× | 1.90× | 2.34× | — | 1.60× | — | 1.57× | — |
-| `page-12k` | 3.03× | 2.66× | 1.20× | 1.50× | 1.01× | 1.95× | 2.39× | — | 1.63× | — | 1.58× | — |
-| `page-100k` | 3.07× | 2.68× | 1.17× | 1.48× | 1.04× | 1.92× | 2.45× | — | 1.63× | — | 1.56× | — |
-| `page-12k-indented` | 2.94× | 2.52× | 1.21× | 1.48× | 1.04× | 1.94× | 2.42× | — | 1.68× | — | 1.65× | — |
-| `array-items` | 2.68× | 2.33× | 1.07× | 1.35× | 0.90× | 1.72× | 2.18× | — | 1.45× | — | — | — |
-| `array-pages` | 2.93× | 2.55× | 1.19× | 1.49× | 0.97× | 1.86× | 2.23× | — | 1.55× | — | — | — |
-| `map-items` | 2.27× | 2.00× | 0.87× | 1.12× | 0.80× | 1.48× | 1.83× | — | 1.29× | — | — | — |
-| `generic` | 3.19× | 1.49× | 0.86× | 1.11× | 0.66× | 1.42× | 1.74× | — | 1.00× | — | 1.24× | — |
-| `text-ascii` | 3.73× | 2.39× | 0.92× | 1.67× | 1.33× | 2.58× | 1.47× | — | 2.11× | — | 1.43× | — |
-| `text-latin` | 2.72× | 1.65× | 0.44× | 0.84× | 1.63× | 1.26× | 5.16× | — | 2.76× | — | 0.69× | — |
-| `text-cyrillic` | 4.39× | 2.39× | 0.40× | 0.78× | 1.30× | 1.15× | 4.55× | — | 2.44× | — | 0.63× | — |
-| `text-cjk` | 3.60× | 1.96× | 0.44× | 0.82× | 1.25× | 1.21× | 4.15× | — | 1.90× | — | 0.66× | — |
-| `text-hangul` | 3.00× | 1.62× | 0.35× | 0.68× | 1.04× | 1.01× | 3.48× | — | 1.58× | — | 0.55× | — |
-| `text-emoji` | 2.02× | 1.25× | 0.40× | 0.76× | 1.07× | 1.13× | 4.03× | — | 2.00× | — | 0.62× | — |
-| `text-escaped` | 1.94× | 1.46× | 0.47× | 0.48× | 0.63× | 1.55× | 2.23× | — | 1.09× | — | 1.03× | — |
-| `unique-strings` | 2.79× | 2.06× | 0.73× | 1.23× | 0.91× | 1.63× | 1.18× | — | 1.39× | — | 1.30× | — |
-| `numbers` | 2.50× | 1.92× | 0.93× | 0.94× | 0.71× | 1.94× | 1.35× | — | 0.97× | — | 1.77× | — |
-| `floats` | 5.38× | 4.52× | 1.42× | 1.43× | 1.65× | 5.05× | 3.86× | — | 2.73× | — | 3.18× | — |
-| `dense` | 4.70× | 3.86× | 2.92× | 2.99× | 1.01× | 3.25× | 1.91× | — | 2.09× | — | 2.71× | — |
-| `sparse` | 3.27× | 2.86× | 1.77× | 1.96× | 0.78× | 2.05× | 1.59× | — | 1.68× | — | 1.88× | — |
-| `canada` | 5.36× | 4.65× | 1.33× | 1.32× | 1.94× | 5.42× | 4.03× | — | 2.92× | — | 3.10× | — |
-| `citm` | 4.88× | 3.78× | 1.95× | 2.09× | 1.79× | 3.40× | 2.28× | — | 2.62× | — | 4.10× | — |
-| `skip` | 2.15× | 1.95× | 0.87× | 1.02× | 0.56× | 1.46× | 1.39× | — | 0.97× | — | 1.11× | — |
+| `twitter` | 4.02× | 2.90× | 1.38× | 1.66× | 1.07× | 2.97× | 2.37× | — | 2.00× | 1.68× | 2.74× | 6.91× |
+| `small` | 4.12× | 3.42× | 1.80× | 1.97× | 0.93× | 2.07× | 2.04× | — | 2.08× | 2.88× | 1.99× | 1.68× |
+| `twitter-compact` | 4.02× | 2.99× | 1.25× | 1.54× | 0.95× | 2.94× | 2.29× | — | 1.76× | 1.80× | 2.37× | 5.62× |
+| `page-3k` | 3.20× | 2.80× | 1.43× | 1.76× | 1.08× | 2.10× | 2.57× | — | 1.77× | — | 1.73× | — |
+| `page-12k` | 3.52× | 3.08× | 1.44× | 1.81× | 1.18× | 2.23× | 2.79× | — | 1.89× | — | 1.83× | — |
+| `page-100k` | 3.57× | 3.13× | 1.42× | 1.79× | 1.20× | 2.26× | 2.84× | — | 1.91× | — | 1.83× | — |
+| `page-12k-indented` | 3.31× | 2.85× | 1.41× | 1.76× | 1.17× | 2.19× | 2.75× | — | 1.91× | — | 1.85× | — |
+| `array-items` | 3.03× | 2.65× | 1.18× | 1.51× | 1.02× | 1.93× | 2.43× | — | 1.62× | — | — | — |
+| `array-pages` | 3.44× | 2.98× | 1.45× | 1.81× | 1.12× | 2.19× | 2.63× | — | 1.81× | — | — | — |
+| `map-items` | 2.48× | 2.17× | 1.00× | 1.28× | 0.88× | 1.63× | 1.99× | — | 1.41× | — | — | — |
+| `map-items-in` | 3.12× | 2.72× | 1.30× | 1.65× | 1.11× | 2.07× | 2.51× | — | 1.77× | — | 1.58× | — |
+| `generic` | 4.41× | 2.06× | 1.16× | 1.52× | 0.90× | 1.98× | 2.41× | — | 1.37× | — | 1.71× | — |
+| `text-ascii` | 3.16× | 2.04× | 0.80× | 1.38× | 1.11× | 2.18× | 1.23× | — | 1.79× | — | 1.19× | — |
+| `text-latin` | 2.58× | 1.55× | 0.43× | 0.78× | 1.51× | 1.18× | 4.92× | — | 2.68× | — | 0.65× | — |
+| `text-cyrillic` | 4.47× | 2.46× | 0.42× | 0.77× | 1.32× | 1.17× | 4.63× | — | 2.46× | — | 0.63× | — |
+| `text-cjk` | 3.55× | 1.94× | 0.42× | 0.78× | 1.24× | 1.18× | 4.18× | — | 1.86× | — | 0.63× | — |
+| `text-hangul` | 3.03× | 1.64× | 0.36× | 0.66× | 1.04× | 1.00× | 3.55× | — | 1.58× | — | 0.54× | — |
+| `text-emoji` | 2.10× | 1.29× | 0.41× | 0.74× | 1.07× | 1.10× | 3.94× | — | 2.01× | — | 0.61× | — |
+| `text-escaped` | 4.33× | 3.25× | 1.06× | 1.07× | 1.40× | 3.53× | 4.93× | — | 2.44× | — | 2.27× | — |
+| `unique-strings` | 3.32× | 2.44× | 0.85× | 1.43× | 1.08× | 1.93× | 1.40× | — | 1.65× | — | 1.54× | — |
+| `numbers` | 5.26× | 4.01× | 1.97× | 1.98× | 1.52× | 4.08× | 2.78× | — | 2.11× | — | 3.69× | — |
+| `floats` | 5.39× | 4.49× | 1.45× | 1.46× | 1.67× | 5.11× | 3.86× | — | 2.78× | — | 3.23× | — |
+| `dense` | 4.74× | 3.90× | 2.86× | 2.93× | 1.01× | 3.28× | 1.94× | — | 2.16× | — | 2.78× | — |
+| `sparse` | 3.18× | 2.77× | 1.71× | 1.88× | 0.79× | 1.95× | 1.49× | — | 1.63× | — | 1.80× | — |
+| `canada` | 5.52× | 4.75× | 1.32× | 1.35× | 2.02× | 5.62× | 3.92× | — | 3.02× | — | 3.22× | — |
+| `citm` | 4.92× | 3.79× | 2.06× | 2.22× | 1.80× | 3.42× | 2.30× | — | 2.65× | — | 4.07× | — |
+| `skip` | 2.96× | 2.70× | 1.23× | 1.42× | 0.77× | 2.01× | 1.84× | — | 1.33× | — | 1.53× | — |
 
 The same run as absolute times, each library on its own declaration — the
 reflection libraries and `sonic.ConfigStd` on `plain`, easyjson and gojay on
@@ -852,150 +848,150 @@ without the unknown members.
 
 | shape | odjson | `encoding/json` | `json/v2` | sonic | sonic-std | go-json | json-iterator | segmentio | jettison | sonnet | simdjson-go | easyjson | gojay |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `twitter` | 85.1 µs | 399 µs | 394 µs | 98.1 µs | 118 µs | 182 µs | 400 µs | 217 µs | 292 µs | 209 µs | — | 407 µs | 318 µs |
-| `small` | 244 ns | 999 ns | 1.01 µs | 262 ns | 349 ns | 340 ns | 561 ns | 372 ns | 451 ns | 682 ns | — | 534 ns | 556 ns |
-| `twitter-compact` | 86.8 µs | 406 µs | 389 µs | 103 µs | 119 µs | 184 µs | 399 µs | 214 µs | 296 µs | 208 µs | — | 406 µs | 323 µs |
-| `page-3k` | 4.23 µs | 12.5 µs | 11.3 µs | 4.16 µs | 5.44 µs | 4.39 µs | 10.5 µs | 4.66 µs | 6.74 µs | 6.78 µs | — | 4.71 µs | — |
-| `page-12k` | 15.9 µs | 50.8 µs | 46.0 µs | 17.2 µs | 22.1 µs | 18.2 µs | 42.9 µs | 19.7 µs | 28.7 µs | 27.1 µs | — | 18.9 µs | — |
-| `page-100k` | 126 µs | 401 µs | 364 µs | 141 µs | 179 µs | 145 µs | 344 µs | 162 µs | 229 µs | 213 µs | — | 149 µs | — |
-| `page-12k-indented` | 16.3 µs | 50.6 µs | 45.3 µs | 16.9 µs | 22.1 µs | 18.0 µs | 42.9 µs | 19.6 µs | 28.7 µs | 27.0 µs | — | 18.8 µs | — |
-| `array-items` | 18.1 µs | 49.2 µs | 44.8 µs | 18.0 µs | 22.3 µs | 18.3 µs | 41.4 µs | 19.4 µs | 27.3 µs | 26.7 µs | — | — | — |
-| `array-pages` | 20.0 µs | 61.0 µs | 55.3 µs | 20.9 µs | 26.7 µs | 22.4 µs | 53.1 µs | 24.3 µs | 34.1 µs | 33.1 µs | — | — | — |
-| `map-items` | 23.9 µs | 60.1 µs | 49.3 µs | 18.4 µs | 24.2 µs | 22.4 µs | 52.7 µs | 29.3 µs | 33.0 µs | 32.1 µs | — | — | — |
-| `generic` | 21.0 µs | 56.6 µs | 41.4 µs | 34.8 µs | 40.9 µs | 43.1 µs | 131 µs | 51.1 µs | 73.6 µs | 39.9 µs | — | 61.4 µs | — |
-| `text-ascii` | 2.87 µs | 7.01 µs | 7.22 µs | 1.78 µs | 1.89 µs | 2.40 µs | 6.55 µs | 3.22 µs | 9.14 µs | 4.20 µs | — | 5.42 µs | — |
-| `text-latin` | 4.40 µs | 9.57 µs | 9.65 µs | 1.85 µs | 2.25 µs | 9.39 µs | 9.82 µs | 10.1 µs | 10.0 µs | 11.7 µs | — | 8.71 µs | — |
-| `text-cyrillic` | 4.39 µs | 14.7 µs | 14.7 µs | 1.87 µs | 2.62 µs | 15.2 µs | 16.3 µs | 16.9 µs | 15.0 µs | 12.0 µs | — | 14.5 µs | — |
-| `text-cjk` | 6.01 µs | 11.0 µs | 11.1 µs | 1.84 µs | 2.42 µs | 11.4 µs | 11.4 µs | 12.1 µs | 11.1 µs | 9.77 µs | — | 10.5 µs | — |
-| `text-hangul` | 6.56 µs | 10.6 µs | 10.5 µs | 1.83 µs | 2.45 µs | 11.5 µs | 12.0 µs | 11.9 µs | 10.9 µs | 9.36 µs | — | 10.1 µs | — |
-| `text-emoji` | 5.04 µs | 8.04 µs | 8.08 µs | 1.63 µs | 2.46 µs | 7.85 µs | 8.10 µs | 8.38 µs | 8.19 µs | 9.21 µs | — | 6.92 µs | — |
-| `text-escaped` | 4.30 µs | 13.5 µs | 9.53 µs | 3.80 µs | 7.94 µs | 6.19 µs | 14.4 µs | 15.6 µs | 14.5 µs | 16.1 µs | — | 14.5 µs | — |
-| `unique-strings` | 6.61 µs | 17.5 µs | 17.5 µs | 5.02 µs | 5.49 µs | 6.89 µs | 14.3 µs | 8.76 µs | 21.0 µs | 11.1 µs | — | 13.7 µs | — |
-| `numbers` | 46.5 µs | 69.6 µs | 69.6 µs | 30.2 µs | 31.4 µs | 63.0 µs | 59.7 µs | 57.1 µs | 57.4 µs | 64.2 µs | — | 63.6 µs | — |
-| `floats` | 1.59 ms | 2.47 ms | 2.48 ms | 1.71 ms | 2.04 ms | 2.16 ms | 2.19 ms | 2.09 ms | 2.14 ms | 2.21 ms | — | 2.08 ms | — |
-| `dense` | 11.6 µs | 61.8 µs | 62.7 µs | 13.4 µs | 14.2 µs | 22.6 µs | 42.7 µs | 26.4 µs | 34.3 µs | 33.4 µs | — | 30.2 µs | — |
-| `sparse` | 3.10 µs | 31.6 µs | 35.7 µs | 4.77 µs | 5.08 µs | 8.45 µs | 17.6 µs | 10.9 µs | 15.7 µs | 19.8 µs | — | 7.26 µs | — |
-| `canada` | 4.07 ms | 5.18 ms | 5.19 ms | 3.78 ms | 4.13 ms | 4.46 ms | 4.25 ms | 4.17 ms | 4.34 ms | 4.65 ms | — | 4.35 ms | — |
-| `citm` | 203 µs | 883 µs | 877 µs | 243 µs | 268 µs | 312 µs | 569 µs | 364 µs | 439 µs | 435 µs | — | 371 µs | — |
+| `twitter` | 83.1 µs | 396 µs | 382 µs | 97.1 µs | 116 µs | 182 µs | 401 µs | 213 µs | 286 µs | 207 µs | — | 403 µs | 313 µs |
+| `small` | 241 ns | 991 ns | 1.01 µs | 252 ns | 334 ns | 339 ns | 568 ns | 363 ns | 440 ns | 677 ns | — | 522 ns | 552 ns |
+| `twitter-compact` | 82.7 µs | 397 µs | 383 µs | 97.0 µs | 119 µs | 183 µs | 406 µs | 213 µs | 290 µs | 209 µs | — | 404 µs | 316 µs |
+| `page-3k` | 4.14 µs | 12.1 µs | 10.8 µs | 4.11 µs | 5.37 µs | 4.37 µs | 10.3 µs | 4.68 µs | 6.95 µs | 6.71 µs | — | 4.67 µs | — |
+| `page-12k` | 16.1 µs | 49.9 µs | 44.9 µs | 16.7 µs | 21.5 µs | 17.9 µs | 42.3 µs | 19.5 µs | 28.5 µs | 26.8 µs | — | 18.3 µs | — |
+| `page-100k` | 124 µs | 396 µs | 356 µs | 137 µs | 176 µs | 144 µs | 334 µs | 159 µs | 227 µs | 212 µs | — | 146 µs | — |
+| `page-12k-indented` | 16.2 µs | 49.9 µs | 45.1 µs | 16.7 µs | 21.6 µs | 17.9 µs | 41.8 µs | 19.3 µs | 27.7 µs | 26.8 µs | — | 18.3 µs | — |
+| `array-items` | 18.1 µs | 48.7 µs | 43.7 µs | 16.8 µs | 21.6 µs | 17.5 µs | 41.2 µs | 19.2 µs | 27.6 µs | 26.4 µs | — | — | — |
+| `array-pages` | 19.4 µs | 59.9 µs | 54.8 µs | 20.0 µs | 25.8 µs | 21.6 µs | 50.8 µs | 23.4 µs | 33.5 µs | 32.4 µs | — | — | — |
+| `map-items` | 23.1 µs | 58.0 µs | 47.5 µs | 17.6 µs | 23.4 µs | 21.1 µs | 49.8 µs | 28.5 µs | 32.7 µs | 30.4 µs | — | — | — |
+| `map-items-in` | 18.2 µs | 59.9 µs | 48.7 µs | 17.7 µs | 23.6 µs | 21.2 µs | 51.5 µs | 28.6 µs | 34.1 µs | 30.8 µs | — | 19.9 µs | — |
+| `generic` | 20.1 µs | 56.0 µs | 40.5 µs | 34.0 µs | 40.2 µs | 42.0 µs | 130 µs | 50.1 µs | 73.4 µs | 39.4 µs | — | 59.2 µs | — |
+| `text-ascii` | 2.27 µs | 6.90 µs | 6.85 µs | 1.66 µs | 1.94 µs | 1.97 µs | 6.25 µs | 3.10 µs | 8.90 µs | 3.91 µs | — | 5.28 µs | — |
+| `text-latin` | 4.33 µs | 9.37 µs | 9.36 µs | 1.67 µs | 2.26 µs | 9.15 µs | 9.77 µs | 9.74 µs | 9.29 µs | 11.4 µs | — | 8.55 µs | — |
+| `text-cyrillic` | 4.34 µs | 14.1 µs | 14.0 µs | 1.72 µs | 2.33 µs | 14.8 µs | 15.4 µs | 16.4 µs | 14.9 µs | 11.9 µs | — | 13.8 µs | — |
+| `text-cjk` | 6.11 µs | 11.0 µs | 10.7 µs | 1.74 µs | 2.33 µs | 11.4 µs | 11.9 µs | 11.8 µs | 11.1 µs | 9.53 µs | — | 10.3 µs | — |
+| `text-hangul` | 6.59 µs | 10.7 µs | 10.3 µs | 1.71 µs | 2.32 µs | 12.1 µs | 11.7 µs | 11.9 µs | 11.1 µs | 9.30 µs | — | 10.4 µs | — |
+| `text-emoji` | 4.92 µs | 7.95 µs | 8.03 µs | 1.66 µs | 2.38 µs | 7.78 µs | 7.82 µs | 8.21 µs | 8.13 µs | 9.21 µs | — | 6.87 µs | — |
+| `text-escaped` | 4.21 µs | 14.1 µs | 9.25 µs | 3.52 µs | 8.34 µs | 6.37 µs | 14.6 µs | 15.8 µs | 14.8 µs | 16.8 µs | — | 15.3 µs | — |
+| `unique-strings` | 5.89 µs | 17.4 µs | 17.4 µs | 4.65 µs | 5.26 µs | 6.71 µs | 14.4 µs | 8.53 µs | 20.6 µs | 10.3 µs | — | 12.9 µs | — |
+| `numbers` | 46.4 µs | 69.2 µs | 70.1 µs | 30.1 µs | 31.3 µs | 62.5 µs | 59.3 µs | 56.4 µs | 56.7 µs | 63.2 µs | — | 63.2 µs | — |
+| `floats` | 1.59 ms | 2.47 ms | 2.47 ms | 1.78 ms | 1.91 ms | 2.13 ms | 2.06 ms | 1.99 ms | 2.05 ms | 2.21 ms | — | 2.08 ms | — |
+| `dense` | 11.4 µs | 61.3 µs | 62.0 µs | 13.5 µs | 14.2 µs | 22.7 µs | 42.5 µs | 26.2 µs | 33.9 µs | 33.0 µs | — | 30.1 µs | — |
+| `sparse` | 3.20 µs | 31.9 µs | 35.7 µs | 4.90 µs | 5.17 µs | 8.56 µs | 18.1 µs | 11.1 µs | 16.0 µs | 20.1 µs | — | 7.58 µs | — |
+| `canada` | 4.05 ms | 5.16 ms | 5.16 ms | 3.88 ms | 4.20 ms | 4.44 ms | 4.27 ms | 4.13 ms | 4.32 ms | 4.61 ms | — | 4.34 ms | — |
+| `citm` | 193 µs | 886 µs | 880 µs | 244 µs | 274 µs | 314 µs | 576 µs | 367 µs | 445 µs | 432 µs | — | 372 µs | — |
 
 **Unmarshal**, time per operation:
 
 | shape | odjson | `encoding/json` | `json/v2` | sonic | sonic-std | go-json | json-iterator | segmentio | jettison | sonnet | simdjson-go | easyjson | gojay |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `twitter` | 366 µs | 1.43 ms | 1.04 ms | 498 µs | 591 µs | 385 µs | 1.06 ms | 851 µs | — | 713 µs | 601 µs | 978 µs | 2.49 ms |
-| `small` | 541 ns | 2.29 µs | 1.89 µs | 985 ns | 1.11 µs | 516 ns | 1.14 µs | 1.14 µs | — | 1.14 µs | 1.58 µs | 1.09 µs | 947 ns |
-| `twitter-compact` | 345 µs | 1.34 ms | 999 µs | 419 µs | 510 µs | 320 µs | 977 µs | 757 µs | — | 586 µs | 593 µs | 793 µs | 1.88 ms |
-| `page-3k` | 7.21 µs | 21.0 µs | 18.3 µs | 8.97 µs | 11.7 µs | 7.10 µs | 13.7 µs | 16.9 µs | — | 11.5 µs | — | 11.3 µs | — |
-| `page-12k` | 29.3 µs | 88.8 µs | 77.9 µs | 35.2 µs | 43.9 µs | 29.6 µs | 57.1 µs | 70.2 µs | — | 47.8 µs | — | 46.4 µs | — |
-| `page-100k` | 232 µs | 713 µs | 623 µs | 272 µs | 344 µs | 240 µs | 445 µs | 569 µs | — | 379 µs | — | 363 µs | — |
-| `page-12k-indented` | 32.5 µs | 95.7 µs | 81.8 µs | 39.3 µs | 48.2 µs | 33.7 µs | 63.1 µs | 78.8 µs | — | 54.7 µs | — | 53.8 µs | — |
-| `array-items` | 32.3 µs | 86.7 µs | 75.5 µs | 34.7 µs | 43.8 µs | 29.2 µs | 55.5 µs | 70.4 µs | — | 46.9 µs | — | — | — |
-| `array-pages` | 37.6 µs | 110 µs | 95.8 µs | 44.6 µs | 56.0 µs | 36.3 µs | 70.1 µs | 83.9 µs | — | 58.1 µs | — | — | — |
-| `map-items` | 42.0 µs | 95.2 µs | 84.2 µs | 36.4 µs | 47.1 µs | 33.8 µs | 62.0 µs | 76.9 µs | — | 54.4 µs | — | — | — |
-| `generic` | 63.4 µs | 203 µs | 94.7 µs | 54.8 µs | 70.3 µs | 41.6 µs | 90.0 µs | 111 µs | — | 63.1 µs | — | 78.9 µs | — |
-| `text-ascii` | 3.06 µs | 11.4 µs | 7.31 µs | 2.82 µs | 5.12 µs | 4.08 µs | 7.89 µs | 4.49 µs | — | 6.46 µs | — | 4.36 µs | — |
-| `text-latin` | 6.34 µs | 17.3 µs | 10.5 µs | 2.81 µs | 5.36 µs | 10.3 µs | 8.00 µs | 32.7 µs | — | 17.5 µs | — | 4.36 µs | — |
-| `text-cyrillic` | 7.04 µs | 30.9 µs | 16.8 µs | 2.84 µs | 5.47 µs | 9.15 µs | 8.08 µs | 32.0 µs | — | 17.2 µs | — | 4.43 µs | — |
-| `text-cjk` | 6.67 µs | 24.0 µs | 13.0 µs | 2.92 µs | 5.47 µs | 8.37 µs | 8.07 µs | 27.7 µs | — | 12.7 µs | — | 4.40 µs | — |
-| `text-hangul` | 7.97 µs | 23.9 µs | 12.9 µs | 2.81 µs | 5.38 µs | 8.27 µs | 8.02 µs | 27.7 µs | — | 12.6 µs | — | 4.35 µs | — |
-| `text-emoji` | 7.00 µs | 14.2 µs | 8.72 µs | 2.82 µs | 5.35 µs | 7.52 µs | 7.89 µs | 28.2 µs | — | 14.0 µs | — | 4.33 µs | — |
-| `text-escaped` | 25.2 µs | 48.7 µs | 36.8 µs | 11.9 µs | 12.1 µs | 15.9 µs | 39.0 µs | 56.1 µs | — | 27.3 µs | — | 25.8 µs | — |
-| `unique-strings` | 12.9 µs | 36.1 µs | 26.6 µs | 9.50 µs | 15.9 µs | 11.8 µs | 21.1 µs | 15.3 µs | — | 18.0 µs | — | 16.8 µs | — |
-| `numbers` | 68.4 µs | 171 µs | 131 µs | 63.9 µs | 64.1 µs | 48.4 µs | 133 µs | 92.2 µs | — | 66.4 µs | — | 121 µs | — |
-| `floats` | 1.23 ms | 6.61 ms | 5.56 ms | 1.74 ms | 1.75 ms | 2.03 ms | 6.20 ms | 4.74 ms | — | 3.35 ms | — | 3.90 ms | — |
-| `dense` | 27.8 µs | 131 µs | 107 µs | 81.1 µs | 83.0 µs | 27.9 µs | 90.1 µs | 52.9 µs | — | 57.7 µs | — | 75.2 µs | — |
-| `sparse` | 18.0 µs | 58.7 µs | 51.4 µs | 31.8 µs | 35.2 µs | 14.1 µs | 36.9 µs | 28.6 µs | — | 30.3 µs | — | 33.8 µs | — |
-| `canada` | 2.56 ms | 13.72 ms | 11.90 ms | 3.41 ms | 3.39 ms | 4.97 ms | 13.86 ms | 9.61 ms | — | 7.49 ms | — | 7.94 ms | — |
-| `citm` | 598 µs | 2.92 ms | 2.26 ms | 1.17 ms | 1.25 ms | 1.07 ms | 2.03 ms | 1.36 ms | — | 1.57 ms | — | 2.45 ms | — |
-| `skip` | 77.7 µs | 167 µs | 151 µs | 68.0 µs | 78.9 µs | 43.6 µs | 114 µs | 108 µs | — | 75.5 µs | — | 86.1 µs | — |
+| `twitter` | 358 µs | 1.44 ms | 1.04 ms | 492 µs | 594 µs | 382 µs | 1.06 ms | 849 µs | — | 715 µs | 602 µs | 980 µs | 2.47 ms |
+| `small` | 552 ns | 2.27 µs | 1.89 µs | 992 ns | 1.09 µs | 514 ns | 1.14 µs | 1.12 µs | — | 1.15 µs | 1.59 µs | 1.10 µs | 926 ns |
+| `twitter-compact` | 333 µs | 1.34 ms | 994 µs | 414 µs | 511 µs | 317 µs | 976 µs | 762 µs | — | 586 µs | 598 µs | 787 µs | 1.87 ms |
+| `page-3k` | 6.51 µs | 20.8 µs | 18.2 µs | 9.29 µs | 11.5 µs | 7.05 µs | 13.6 µs | 16.7 µs | — | 11.6 µs | — | 11.2 µs | — |
+| `page-12k` | 25.1 µs | 88.5 µs | 77.3 µs | 36.1 µs | 45.4 µs | 29.6 µs | 56.1 µs | 70.2 µs | — | 47.5 µs | — | 45.9 µs | — |
+| `page-100k` | 198 µs | 705 µs | 618 µs | 280 µs | 353 µs | 237 µs | 446 µs | 561 µs | — | 377 µs | — | 361 µs | — |
+| `page-12k-indented` | 28.7 µs | 94.9 µs | 81.7 µs | 40.6 µs | 50.5 µs | 33.6 µs | 62.8 µs | 78.9 µs | — | 54.7 µs | — | 53.1 µs | — |
+| `array-items` | 28.5 µs | 86.2 µs | 75.4 µs | 33.5 µs | 43.0 µs | 29.0 µs | 55.0 µs | 69.1 µs | — | 46.2 µs | — | — | — |
+| `array-pages` | 32.0 µs | 110 µs | 95.6 µs | 46.5 µs | 57.8 µs | 35.8 µs | 70.1 µs | 84.1 µs | — | 58.0 µs | — | — | — |
+| `map-items` | 38.3 µs | 95.1 µs | 83.2 µs | 38.1 µs | 49.0 µs | 33.5 µs | 62.3 µs | 76.2 µs | — | 54.0 µs | — | — | — |
+| `map-items-in` | 30.8 µs | 96.2 µs | 83.9 µs | 40.1 µs | 50.7 µs | 34.1 µs | 63.8 µs | 77.5 µs | — | 54.7 µs | — | 48.8 µs | — |
+| `generic` | 45.5 µs | 201 µs | 93.5 µs | 53.0 µs | 68.9 µs | 40.8 µs | 90.0 µs | 110 µs | — | 62.5 µs | — | 77.5 µs | — |
+| `text-ascii` | 3.61 µs | 11.4 µs | 7.34 µs | 2.88 µs | 4.97 µs | 3.99 µs | 7.87 µs | 4.42 µs | — | 6.44 µs | — | 4.28 µs | — |
+| `text-latin` | 6.67 µs | 17.2 µs | 10.4 µs | 2.89 µs | 5.20 µs | 10.0 µs | 7.84 µs | 32.8 µs | — | 17.9 µs | — | 4.32 µs | — |
+| `text-cyrillic` | 6.93 µs | 31.0 µs | 17.0 µs | 2.88 µs | 5.34 µs | 9.14 µs | 8.11 µs | 32.0 µs | — | 17.1 µs | — | 4.37 µs | — |
+| `text-cjk` | 6.83 µs | 24.3 µs | 13.2 µs | 2.89 µs | 5.34 µs | 8.45 µs | 8.07 µs | 28.5 µs | — | 12.7 µs | — | 4.29 µs | — |
+| `text-hangul` | 7.94 µs | 24.0 µs | 13.0 µs | 2.88 µs | 5.22 µs | 8.27 µs | 7.94 µs | 28.2 µs | — | 12.6 µs | — | 4.28 µs | — |
+| `text-emoji` | 7.05 µs | 14.8 µs | 9.10 µs | 2.87 µs | 5.18 µs | 7.51 µs | 7.78 µs | 27.8 µs | — | 14.1 µs | — | 4.31 µs | — |
+| `text-escaped` | 11.5 µs | 49.6 µs | 37.3 µs | 12.1 µs | 12.3 µs | 16.0 µs | 40.4 µs | 56.5 µs | — | 27.9 µs | — | 26.0 µs | — |
+| `unique-strings` | 10.8 µs | 36.0 µs | 26.5 µs | 9.20 µs | 15.5 µs | 11.7 µs | 20.9 µs | 15.2 µs | — | 17.8 µs | — | 16.7 µs | — |
+| `numbers` | 32.0 µs | 168 µs | 128 µs | 63.1 µs | 63.2 µs | 48.6 µs | 130 µs | 89.0 µs | — | 67.5 µs | — | 118 µs | — |
+| `floats` | 1.21 ms | 6.55 ms | 5.45 ms | 1.76 ms | 1.77 ms | 2.02 ms | 6.20 ms | 4.68 ms | — | 3.38 ms | — | 3.92 ms | — |
+| `dense` | 27.5 µs | 130 µs | 107 µs | 78.7 µs | 80.4 µs | 27.9 µs | 90.0 µs | 53.2 µs | — | 59.2 µs | — | 76.3 µs | — |
+| `sparse` | 18.8 µs | 59.6 µs | 51.9 µs | 32.1 µs | 35.2 µs | 14.8 µs | 36.7 µs | 28.0 µs | — | 30.7 µs | — | 33.9 µs | — |
+| `canada` | 2.48 ms | 13.67 ms | 11.78 ms | 3.28 ms | 3.34 ms | 5.00 ms | 13.93 ms | 9.71 ms | — | 7.48 ms | — | 7.97 ms | — |
+| `citm` | 598 µs | 2.95 ms | 2.27 ms | 1.23 ms | 1.33 ms | 1.08 ms | 2.03 ms | 1.38 ms | — | 1.58 ms | — | 2.44 ms | — |
+| `skip` | 55.2 µs | 163 µs | 149 µs | 67.8 µs | 78.4 µs | 42.4 µs | 111 µs | 101 µs | — | 73.4 µs | — | 84.3 µs | — |
 
 What the tables say, beyond the three payloads:
 
 - **Every reflection library is behind on every encode row but `canada`.**
-  json-iterator (1.28–6.24×), segmentio (1.07–3.84×), jettison (1.07–5.05×),
-  sonnet (1.14–6.40×), and `encoding/json` and `json/v2` themselves
-  (1.27–11.36×) are behind odjson on all 25, json-iterator and segmentio
-  apart from a level `canada` (1.04×, 1.03×); so are the two generators,
-  easyjson (1.07–4.78×) and gojay (2.25–3.74× on its three rows). The
-  narrow cells are the float corpora, where every library is formatting
-  the same coordinate pairs (111k in `canada`, 23k in `floats`) and the
-  codec around them is a small part of the row: `canada` reads 1.01–1.28×
-  against every library but sonic, which is ahead (0.93×), and `floats`
-  1.09–1.56×. The next narrowest are segmentio's `array-items` (1.07×) and
-  `page-3k` (1.10×) and easyjson's `page-*` cells (1.11–1.19×): `Item`
-  carries a `time.Time` and a `map[string]string`, which the generated
-  codec hands to the runtime, and those rows are where odjson's own margin
-  over `json/v2` is the narrowest of the object shapes (2.48–2.89×).
-- **go-json v0.11.1's encoder closed in on the object shapes.** It is behind
-  on 20 of the 25 encode rows (1.10× on `canada` to 3.46× on
-  `text-cyrillic`: its non-ASCII text encode is no faster than reflection's),
-  level on `page-3k`, `array-items` and `unique-strings` (1.01–1.04×) and
-  ahead on `text-ascii` (0.84×) and `map-items` (0.94×); under v0.10.6 it was
-  behind on all 25.
+  json-iterator (1.05–6.46×), segmentio (1.06–3.79×, level on `canada`),
+  jettison (1.07–5.00×), sonnet (1.14–6.28×), and `encoding/json` and
+  `json/v2` themselves (1.27–11.14×) are behind odjson on all 26; so are
+  the two generators, easyjson (1.07–4.89×) and gojay (2.29–3.83× on its
+  three rows). The narrow cells are the float corpora, where every library
+  is formatting the same coordinate pairs (111k in `canada`, 23k in
+  `floats`) and the codec around them is a small part of the row: `canada`
+  reads 1.02–1.27× against every library but sonic, which is level
+  (0.96×), and `floats` 1.12–1.55×. The next narrowest are segmentio's
+  `array-items` (1.06×) and `page-3k` (1.13×) and easyjson's `page-*` cells
+  (1.13–1.17×): `Item` carries a `time.Time` and a `map[string]string`,
+  which the generated codec hands to the runtime, and those rows are where
+  odjson's own margin over `json/v2` is the narrowest of the object shapes
+  (2.41–2.86×).
+- **go-json v0.11.1's encoder is behind on the object shapes.** It is
+  behind on 23 of the 26 encode rows (1.06× on `page-3k` to 3.41× on
+  `text-cyrillic`: its non-ASCII text encode is no faster than
+  reflection's), level on `array-items` (0.97×) and ahead on `text-ascii`
+  (0.86×) and on the top-level `map-items` (0.91×), which is `json/v2`'s own
+  map encoding around the generated `Item`; behind the same map inside a
+  struct, `map-items-in`, it is 1.17×.
 - **sonic's encode is what the floor section says it is.** Default sonic is
-  ahead on 11 of the 25 encode rows — the six `text-*` rows without
-  escapes at 0.28–0.62×, `text-escaped` 0.88×, `map-items` 0.77×,
-  `numbers` 0.65×, `unique-strings` 0.76× and `canada` 0.93× — level on
-  four (`page-3k`, `page-12k-indented`, `array-items`, `array-pages`) and
-  behind on ten (`small` 1.06×, `page-12k` 1.08×, `floats` 1.09×,
-  `page-100k` 1.12×, `twitter` 1.15×, `dense` 1.16×, `twitter-compact`
-  1.18×, `citm` 1.20×, `sparse` 1.54×, `generic` 1.66×). `ConfigStd`, which
-  escapes HTML and validates UTF-8 as odjson does, is ahead on eight (the
-  `text-*` rows but `escaped`, `unique-strings`, `numbers`), level on two
-  and behind on fifteen. The text rows are the cost of the encode round's
-  fused non-ASCII copy measured against a SIMD encoder rather than against
-  reflection: on `text-cjk` odjson writes 6.0 µs to sonic's 1.8 µs, while on
-  `text-ascii` it is 2.9 µs to 1.8 µs.
-- **On decode, three reflection libraries are behind everywhere or level.**
-  json-iterator is behind on 25 of 26 rows (1.13× on `text-emoji` to 5.42×
-  on `canada`) and level on `text-hangul` (1.01×), segmentio on all 26
-  (1.18× on `unique-strings` to 5.16× on `text-latin`: its decoder is
-  slowest on non-ASCII text, 28–33 µs against odjson's 6.3–8.0), sonnet on
-  23, level on `generic`, `numbers` and `skip` (0.97–1.00×). simdjson-go's
-  three rows read 1.64×, 2.92× and 1.72× and gojay's 6.81×, 1.75× and 5.46×.
+  ahead on 11 of the 26 encode rows — the six `text-*` rows without
+  escapes at 0.26–0.73×, `text-escaped` 0.84×, `map-items` 0.76×,
+  `numbers` 0.65×, `unique-strings` 0.79× and `array-items` 0.93× — level
+  on seven (`small`, `page-3k`, `page-12k`, `page-12k-indented`,
+  `array-pages`, `map-items-in`, `canada`) and behind on eight
+  (`page-100k` 1.10×, `floats` 1.12×, `twitter` and `twitter-compact`
+  1.17×, `dense` 1.18×, `citm` 1.26×, `sparse` 1.53×, `generic` 1.69×).
+  `ConfigStd`, which escapes HTML and validates UTF-8 as odjson does, is
+  ahead on eight (the `text-*` rows but `escaped`, `unique-strings`,
+  `numbers`), level on two and behind on sixteen. The text rows are the
+  cost of the encode round's fused non-ASCII copy measured against a SIMD
+  encoder rather than against reflection: on `text-cjk` odjson writes 6.1 µs
+  to sonic's 1.7 µs, while on `text-ascii` it is 2.3 µs to 1.7 µs.
+- **On decode, the reflection libraries are behind everywhere.**
+  json-iterator is behind on 26 of 27 rows (1.10× on `text-emoji` to
+  5.62× on `canada`) and level on `text-hangul` (1.00×), segmentio on all
+  27 (1.23× on `text-ascii` to 4.93× on `text-escaped`: its decoder is
+  slowest on non-ASCII text, 28–33 µs against odjson's 6.7–7.9), sonnet on
+  all 27 (1.33× on `skip` to 3.02× on `canada`). simdjson-go's three rows
+  read 1.68×, 2.88× and 1.80× and gojay's 6.91×, 1.68× and 5.62×.
 - **easyjson decodes dense non-ASCII text faster than odjson, because it
-  does not validate it.** easyjson is behind on 17 of its 23 decode rows
-  (1.11× on `skip` to 4.10× on `citm`), level on `text-escaped` (1.03×), and
-  ahead on the five `text-*` rows whose strings are non-ASCII: `text-latin`
-  0.69×, `text-cyrillic` 0.63×, `text-cjk` 0.66×, `text-hangul` 0.55×,
-  `text-emoji` 0.62×. Its time on those rows is the 4.3–4.4 µs it takes on
-  `text-ascii`, where odjson reads 3.1 µs; odjson's grows with the non-ASCII
-  share, to 6.3–8.0 µs. easyjson's lexer takes a string without escapes as
-  its raw bytes — checked on the 2026-09-14 tree: `ej.Unmarshal` accepts
-  `"ab\xffcd"` and a lone `\ud800` without error, where `json/v2` and the
-  generated `UnmarshalJSONFrom` refuse both — so the row is not doing the
-  same job. Default sonic, which does not validate either, reads 2.8–2.9 µs
-  on every text row; `ConfigStd`, which does, reads 5.4–5.5 µs on the five
-  and is still ahead of odjson on each (0.68–0.84×). That is the
-  measurement to start the next decode round from: a validating decoder
-  holds 5.4 µs flat across scripts where odjson's cost climbs from 3.1 to
-  8.0 µs.
+  does not validate it.** easyjson is behind on 19 of its 24 decode rows
+  (1.19× on `text-ascii` to 4.07× on `citm`) and ahead on the five `text-*`
+  rows whose strings are non-ASCII: `text-latin` 0.65×, `text-cyrillic`
+  0.63×, `text-cjk` 0.63×, `text-hangul` 0.54×, `text-emoji` 0.61×. Its time
+  on those rows is the 4.3 µs it takes on `text-ascii`, where odjson reads
+  3.6 µs; odjson's grows with the non-ASCII share, to 6.7–7.9 µs. easyjson's
+  lexer takes a string without escapes as its raw bytes — checked on the
+  2026-09-14 tree: `ej.Unmarshal` accepts `"ab\xffcd"` and a lone `\ud800`
+  without error, where `json/v2` and the generated `UnmarshalJSONFrom`
+  refuse both — so the row is not doing the same job. Default sonic, which
+  does not validate either, reads 2.9 µs on every text row; `ConfigStd`,
+  which does, reads 5.2–5.3 µs on the five and is still ahead of odjson on
+  each (0.66–0.78×). That is the measurement to start the next decode
+  round from: a validating decoder holds 5.2 µs flat across scripts where
+  odjson's cost climbs from 3.6 to 7.9 µs.
 - **sonic's decode rows are the floor section's, seen per shape.** It is
-  ahead on the six non-ASCII/escaped `text-*` rows (0.35–0.47×),
-  `unique-strings` (0.73×), `generic` (0.86×), `map-items` and `skip`
-  (0.87×), `text-ascii` (0.92×) and `numbers` (0.93×), and behind on the
-  other 14, by 1.07× (`array-items`) to 2.92× (`dense`).
+  ahead on the five non-ASCII `text-*` rows (0.36–0.43×), `text-ascii`
+  (0.80×) and `unique-strings` (0.85×), level on `map-items`, and behind on
+  the other 19, by 1.06× (`text-escaped`) to 2.86× (`dense`).
 - **go-json v0.11.1 is the one library here that decodes level with odjson
-  across the board** — as of this sitting; the fifth decode round, which
-  followed it and is described under "Measured and rejected", moved the
-  rows it was furthest ahead on (`numbers`, `text-escaped`, `skip`,
-  `generic`, and `int-large`, `uint-large` and `float32` below) by 17–73%
-  and is quoted there against this table. It is ahead on nine rows — `skip` 0.56×,
-  `text-escaped` 0.63×, `generic` 0.66×, `numbers` 0.71×, `sparse` 0.78×,
-  `map-items` 0.80×, `array-items` 0.90×, `unique-strings` 0.91×,
-  `twitter-compact` 0.93× — level on eight (`small`, the four `page-*`,
-  `array-pages`, `text-hangul`, `dense`) and behind on nine, by 1.05×
-  (`twitter`) to 1.94× (`canada`, where odjson's one-pass float parser is
-  the difference). Under v0.10.6 the same column was behind on 22 of 26.
-  Its rows cluster where the document is structure the decoder can skip or
-  find in bulk — unknown members, member names, `any` values — which is what
-  an AVX2 structure scan is for; odjson keeps its lead where the work is in
-  the values themselves (floats, non-ASCII text, `citm`'s integers).
+  across the board.** It is ahead on five rows — `skip` 0.77×, `sparse`
+  0.79×, `map-items` 0.88× (top-level, `json/v2`'s map around the generated
+  `Item`), `generic` 0.90×, `small` 0.93× — level on four
+  (`twitter-compact`, `array-items`, `text-hangul`, `dense`) and behind on
+  the other 18, by 1.07× (`twitter`, `text-emoji`) to 2.02× (`canada`).
+  Before the fifth decode round the same column was ahead on nine and
+  behind on nine, and under v0.10.6 behind on 22 of 26. Its lead is where
+  the document is structure the decoder can skip or find in bulk — unknown
+  members, member names, `any` values — which is what an AVX2 structure
+  scan is for, together with the duplicate-name checks json/v2 requires and
+  `encoding/json`'s semantics do not; odjson's is where the work is in the
+  values themselves (numbers, floats, text, `citm`'s integers) and behind
+  a struct (`page-*`, `map-items-in`).
 
 **The two-binary gap, seen from a third binary.** This run's reference rows
-put sonic's encode at 1.15× on `twitter` and 1.06× on `small`, where the
-tables at the top of this page read 1.20× / 1.17× and `bench/ab` 1.19× /
-1.13×: the pattern the 2026-09-14 run found, narrower. In that run the
+put sonic's encode at 1.17× on `twitter` and 1.05× on `small`, where the
+tables at the top of this page read 1.16× / 1.07× and `bench/ab` 1.16× /
+1.09×: on this sitting the three binaries agree, and the `small` encode
+over sonic is level-to-narrow in all of them. On 2026-09-14 they did not. In that run the
 reference rows put sonic's encode at 1.15× on `twitter` and level on `small` (1.01×), where
 the tables then read 1.23× / 1.27× and `bench/ab` 1.19×
 / 1.23×. To see which side moved, the same rows were run at `-count 20`
@@ -1034,150 +1030,139 @@ form in each, so a row is attributable. `numbers` remains the mixed
 document, which is what a real payload looks like and what no measurement
 can be attributed to.
 
-The run: the 2026-09-29 `bench/shapes` sitting described under "The other
-libraries on the shapes" — one process at `-count 6`, `main` at `8962683`
-with go-json v0.11.1, `int-18` in the same binary as the rest, the rows
-whose spread passed 10% re-run at `-count 20` beside odjson's. Medians of
-the six; the ratio is the library's own time over odjson's under `json/v2`
-(`lib=json-v2/side=gen`), so anything under 1× means the library is
-faster. The reference rows are the ones that section quotes: `twitter`
-encode 1.15× over sonic and decode 1.36×, `small` encode 1.06× and decode
-1.82×.
+The run: the 2026-09-30 `bench/shapes` sitting described under "The other
+libraries on the shapes" — one process at `-count 6`, `perf/decode-round5`
+at `ea59374` with go-json v0.11.1, the rows whose spread passed 10% re-run
+at `-count 20` beside odjson's. Medians of the six; the ratio is the
+library's own time over odjson's under `json/v2` (`lib=json-v2/side=gen`),
+so anything under 1× means the library is faster. The reference rows are
+the ones that section quotes: `twitter` encode 1.17× over sonic and decode
+1.38×, `small` encode level (1.05×) and decode 1.80×.
 
 **Marshal**, library over odjson (json/v2):
 
 | shape | odjson, absolute | encoding/json | json/v2 | sonic | sonic-std | go-json | json-iterator | segmentio | jettison | sonnet | easyjson |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `int-small` | 5.33 µs | 1.99× | 1.99× | 0.64× | 0.67× | 1.42× | 0.90× | 1.21× | 1.53× | 1.54× | 1.77× |
-| `int-18` | 12.42 µs | 1.53× | 1.54× | 0.47× | 0.51× | 1.36× | 1.23× | 1.14× | 1.25× | 1.30× | 1.38× |
-| `int-large` | 12.60 µs | 1.62× | 1.62× | 0.50× | 0.54× | 1.58× | 1.45× | 1.33× | 1.26× | 1.54× | 1.39× |
-| `uint-large` | 11.64 µs | 1.70× | 1.72× | 0.58× | 0.63× | 1.54× | 1.54× | 1.32× | 1.35× | 1.51× | 1.49× |
-| `float-short` | 12.53 µs | 2.88× | 2.89× | 1.39× | 1.42× | 2.76× | 2.70× | 2.59× | 2.57× | 2.89× | 2.84× |
-| `float-full` | 28.52 µs | 1.53× | 1.53× | 0.79× | 0.81× | 1.42× | 1.40× | 1.38× | 1.37× | 1.52× | 1.48× |
-| `float32` | 29.39 µs | 1.15× | 1.15× | 0.53× | 0.54× | 1.05× | 1.01× | 0.94× | 0.95× | 1.11× | 1.08× |
-| `float-exp` | 28.62 µs | 1.36× | 1.37× | 0.73× | 0.75× | 1.24× | 1.25× | 1.17× | 1.18× | 1.35× | 1.30× |
-| `text-ascii-short` | 6.84 µs | 3.31× | 3.61× | 1.04× | 1.14× | 1.55× | 2.01× | 1.30× | 2.54× | 1.74× | 2.13× |
-| `text-cjk-short` | 20.05 µs | 1.65× | 1.65× | 0.42× | 0.46× | 1.52× | 1.29× | 1.34× | 1.24× | 1.27× | 1.24× |
-| `bool-array` | 1.76 µs | 7.99× | 8.00× | 0.98× | 1.10× | 2.11× | 1.77× | 1.45× | 1.58× | 3.38× | 2.84× |
-| `null-array` | 3.75 µs | 4.72× | 4.66× | 1.13× | 1.17× | 1.79× | 1.40× | 2.11× | 1.82× | 3.13× | 2.25× |
-| `array-nested` | 6.10 µs | 2.11× | 2.11× | 0.62× | 0.66× | 1.37× | 0.89× | 1.13× | 1.43× | 1.56× | 1.61× |
-| `obj-record` | 13.93 µs | 5.69× | 5.64× | 1.38× | 1.49× | 1.58× | 3.66× | 2.18× | 4.03× | 2.90× | 2.80× |
-| `obj-map` | 111.20 µs | 1.96× | 1.29× | 0.56× | 0.86× | 0.79× | 2.03× | 1.31× | 1.43× | 1.30× | 0.61× |
-| `obj-long-names` | 18.51 µs | 4.48× | 4.51× | 1.29× | 1.43× | 1.40× | 4.09× | 1.96× | 3.26× | 2.41× | 2.33× |
-| `map-string-1k` | 105.57 µs | 1.59× | 0.82× | 0.25× | 0.71× | 0.80× | 1.87× | 1.28× | 1.55× | 1.22× | 0.47× |
-| `map-int-1k` | 104.18 µs | 1.40× | 0.67× | 0.22× | 0.67× | 0.79× | 1.72× | 1.80× | 1.41× | 1.13× | 0.42× |
-| `deep-nest` | 7.48 µs | 9.41× | 9.84× | 2.16× | 2.23× | 2.87× | 4.86× | 4.07× | 4.51× | 3.88× | 2.46× |
-| `empties` | 12.67 µs | 2.87× | 2.81× | 0.43× | 0.45× | 1.67× | 8.21× | 1.76× | 1.12× | 2.70× | 1.56× |
+| `int-small` | 5.42 µs | 1.95× | 1.95× | 0.63× | 0.66× | 1.41× | 0.88× | 1.20× | 1.50× | 1.52× | 1.66× |
+| `int-18` | 12.39 µs | 1.52× | 1.55× | 0.46× | 0.50× | 1.33× | 1.21× | 1.17× | 1.24× | 1.30× | 1.36× |
+| `int-large` | 12.32 µs | 1.64× | 1.64× | 0.49× | 0.54× | 1.59× | 1.44× | 1.35× | 1.27× | 1.56× | 1.39× |
+| `uint-large` | 11.81 µs | 1.67× | 1.68× | 0.55× | 0.60× | 1.51× | 1.50× | 1.30× | 1.31× | 1.49× | 1.42× |
+| `float-short` | 12.50 µs | 2.91× | 2.91× | 1.38× | 1.42× | 2.78× | 2.72× | 2.60× | 2.60× | 2.95× | 2.86× |
+| `float-full` | 28.37 µs | 1.53× | 1.54× | 0.79× | 0.81× | 1.43× | 1.40× | 1.37× | 1.35× | 1.52× | 1.49× |
+| `float32` | 28.96 µs | 1.17× | 1.16× | 0.54× | 0.55× | 1.07× | 1.03× | 0.96× | 0.96× | 1.12× | 1.09× |
+| `float-exp` | 28.40 µs | 1.35× | 1.37× | 0.73× | 0.76× | 1.25× | 1.25× | 1.17× | 1.18× | 1.35× | 1.30× |
+| `text-ascii-short` | 6.59 µs | 3.65× | 3.66× | 1.14× | 1.19× | 1.58× | 2.11× | 1.38× | 2.82× | 1.90× | 2.30× |
+| `text-cjk-short` | 20.10 µs | 1.65× | 1.64× | 0.39× | 0.44× | 1.51× | 1.29× | 1.31× | 1.21× | 1.26× | 1.22× |
+| `bool-array` | 1.72 µs | 8.10× | 8.07× | 1.00× | 1.11× | 2.09× | 1.81× | 1.45× | 1.61× | 3.46× | 2.95× |
+| `null-array` | 3.63 µs | 4.80× | 4.81× | 1.12× | 1.17× | 1.84× | 1.41× | 2.10× | 1.79× | 3.22× | 2.25× |
+| `array-nested` | 6.05 µs | 2.12× | 2.12× | 0.63× | 0.67× | 1.40× | 0.92× | 1.13× | 1.44× | 1.56× | 1.55× |
+| `obj-record` | 13.99 µs | 5.60× | 5.55× | 1.37× | 1.45× | 1.55× | 3.66× | 2.17× | 3.99× | 2.88× | 2.77× |
+| `obj-map` | 72.07 µs | 2.97× | 1.99× | 0.85× | 1.30× | 1.23× | 3.11× | 1.97× | 2.20× | 1.94× | 0.93× |
+| `obj-long-names` | 18.42 µs | 4.53× | 4.51× | 1.26× | 1.39× | 1.37× | 4.09× | 1.94× | 3.27× | 2.43× | 2.35× |
+| `map-string-1k` | 41.20 µs | 3.97× | 2.03× | 0.65× | 1.78× | 2.03× | 4.84× | 3.28× | 3.97× | 3.11× | 1.18× |
+| `map-int-1k` | 38.51 µs | 3.77× | 1.81× | 0.59× | 1.79× | 2.09× | 4.61× | 4.87× | 3.80× | 3.06× | 1.09× |
+| `deep-nest` | 7.29 µs | 9.67× | 10.04× | 2.18× | 2.24× | 2.94× | 4.94× | 4.20× | 4.68× | 3.99× | 2.51× |
+| `empties` | 10.62 µs | 3.42× | 3.33× | 0.51× | 0.54× | 1.97× | 9.48× | 2.08× | 1.32× | 3.23× | 1.85× |
 
 **Unmarshal**, library over odjson (json/v2):
 
 | shape | odjson, absolute | encoding/json | json/v2 | sonic | sonic-std | go-json | json-iterator | segmentio | sonnet | easyjson |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `int-small` | 6.38 µs | 4.81× | 3.92× | 1.45× | 1.46× | 1.20× | 2.13× | 1.67× | 2.44× | 3.62× |
-| `int-18` | 12.33 µs | 3.86× | 2.96× | 1.54× | 1.56× | 1.41× | 1.89× | 1.47× | 1.45× | 3.49× |
-| `int-large` | 51.35 µs | 1.13× | 0.83× | 0.43× | 0.43× | 0.38× | 0.52× | 0.44× | 0.41× | 0.95× |
-| `uint-large` | 57.09 µs | 0.92× | 0.68× | 0.45× | 0.45× | 0.38× | 0.47× | 0.40× | 0.36× | 0.84× |
-| `float-short` | 9.26 µs | 6.53× | 5.20× | 1.50× | 1.50× | 1.20× | 1.96× | 3.25× | 2.52× | 3.84× |
-| `float-full` | 12.23 µs | 7.89× | 6.13× | 2.14× | 2.12× | 1.96× | 8.95× | 4.60× | 2.85× | 5.23× |
-| `float32` | 27.20 µs | 2.47× | 1.92× | 0.56× | 0.56× | 0.46× | 0.73× | 1.27× | 0.99× | 1.47× |
-| `float-exp` | 15.53 µs | 6.49× | 5.13× | 1.86× | 1.87× | 2.16× | 7.72× | 4.04× | 2.36× | 4.47× |
-| `float-exp-input` | 11.48 µs | 6.09× | 4.85× | 1.63× | 1.63× | 1.31× | 5.67× | 3.33× | 2.84× | 4.00× |
-| `text-ascii-short` | 19.34 µs | 3.06× | 2.45× | 0.91× | 1.52× | 0.79× | 1.66× | 1.35× | 1.35× | 1.80× |
-| `text-cjk-short` | 26.70 µs | 2.94× | 1.97× | 0.67× | 1.14× | 1.04× | 1.26× | 2.51× | 1.72× | 1.31× |
-| `bool-array` | 2.44 µs | 9.71× | 7.38× | 1.82× | 1.84× | 2.08× | 5.68× | 1.79× | 3.94× | 4.58× |
-| `null-array` | 9.94 µs | 4.73× | 4.07× | 1.62× | 1.63× | 1.31× | 2.25× | 2.11× | 2.75× | 2.63× |
-| `array-nested` | 7.86 µs | 5.55× | 4.67× | 1.87× | 1.87× | 1.47× | 2.72× | 2.27× | 2.95× | 3.08× |
-| `obj-record` | 48.99 µs | 3.67× | 2.92× | 1.79× | 2.55× | 0.86× | 2.43× | 1.51× | 1.69× | 2.05× |
-| `obj-map` | 184.77 µs | 1.82× | 1.62× | 0.72× | 1.01× | 0.62× | 1.41× | 0.91× | 1.32× | 1.13× |
-| `obj-long-names` | 49.88 µs | 4.17× | 3.21× | 1.90× | 2.69× | 1.11× | 2.91× | 1.68× | 2.48× | 2.15× |
-| `map-string-1k` | 116.22 µs | 1.74× | 1.50× | 0.65× | 0.92× | 0.87× | 1.33× | 0.87× | 1.20× | 0.98× |
-| `map-int-1k` | 92.55 µs | 1.79× | 1.57× | 0.75× | 0.92× | 0.95× | 1.34× | 1.14× | 1.29× | 1.07× |
-| `deep-nest` | 23.03 µs | 6.16× | 5.21× | 2.25× | 2.27× | 1.86× | 2.63× | 2.38× | 2.70× | 2.84× |
-| `empties` | 35.84 µs | 4.70× | 4.39× | 1.71× | 1.89× | 1.40× | 2.00× | 18.70× | 2.90× | 2.24× |
+| `int-small` | 6.89 µs | 4.38× | 3.60× | 1.33× | 1.34× | 1.12× | 2.01× | 1.57× | 2.27× | 3.31× |
+| `int-18` | 12.77 µs | 3.72× | 2.87× | 1.50× | 1.51× | 1.36× | 1.83× | 1.43× | 1.40× | 3.36× |
+| `int-large` | 14.33 µs | 3.95× | 2.95× | 1.52× | 1.56× | 1.36× | 1.88× | 1.62× | 1.49× | 3.40× |
+| `uint-large` | 15.88 µs | 3.30× | 2.42× | 1.61× | 1.62× | 1.33× | 1.67× | 1.42× | 1.31× | 2.86× |
+| `float-short` | 9.24 µs | 6.45× | 5.15× | 1.51× | 1.51× | 1.21× | 1.97× | 3.25× | 2.53× | 3.80× |
+| `float-full` | 12.18 µs | 7.92× | 6.14× | 2.15× | 2.15× | 1.98× | 9.09× | 4.60× | 2.82× | 5.23× |
+| `float32` | 10.67 µs | 6.20× | 4.90× | 1.43× | 1.43× | 1.16× | 1.84× | 3.24× | 2.53× | 3.68× |
+| `float-exp` | 15.27 µs | 6.57× | 5.20× | 1.88× | 1.90× | 2.17× | 7.96× | 4.12× | 2.41× | 4.51× |
+| `float-exp-input` | 11.13 µs | 6.31× | 5.00× | 1.68× | 1.69× | 1.35× | 5.89× | 3.45× | 2.95× | 4.10× |
+| `text-ascii-short` | 14.81 µs | 4.09× | 3.12× | 1.20× | 1.92× | 1.01× | 2.17× | 1.76× | 1.75× | 2.35× |
+| `text-cjk-short` | 24.49 µs | 3.18× | 2.15× | 0.74× | 1.25× | 1.14× | 1.36× | 2.75× | 1.89× | 1.44× |
+| `bool-array` | 2.24 µs | 10.58× | 7.99× | 1.97× | 2.00× | 2.31× | 6.16× | 1.98× | 4.29× | 5.00× |
+| `null-array` | 9.54 µs | 4.99× | 4.31× | 1.66× | 1.64× | 1.32× | 2.31× | 2.14× | 2.75× | 2.68× |
+| `array-nested` | 7.68 µs | 5.70× | 4.85× | 1.93× | 1.94× | 1.49× | 2.85× | 2.34× | 3.02× | 3.11× |
+| `obj-record` | 42.06 µs | 4.26× | 3.41× | 2.05× | 2.99× | 1.00× | 2.85× | 1.73× | 1.96× | 2.36× |
+| `obj-map` | 152.63 µs | 2.20× | 1.96× | 0.86× | 1.22× | 0.75× | 1.73× | 1.09× | 1.59× | 1.37× |
+| `obj-long-names` | 40.23 µs | 5.15× | 3.97× | 2.28× | 3.20× | 1.37× | 3.62× | 2.10× | 3.00× | 2.69× |
+| `map-string-1k` | 100.82 µs | 2.00× | 1.73× | 0.74× | 1.07× | 1.00× | 1.53× | 1.00× | 1.37× | 1.13× |
+| `map-int-1k` | 85.38 µs | 1.93× | 1.69× | 0.81× | 0.98× | 1.03× | 1.46× | 1.23× | 1.39× | 1.16× |
+| `deep-nest` | 22.52 µs | 6.25× | 5.30× | 2.39× | 2.42× | 1.89× | 2.74× | 2.46× | 2.75× | 2.91× |
+| `empties` | 32.89 µs | 4.97× | 4.67× | 1.73× | 1.79× | 1.40× | 2.09× | 20.03× | 3.11× | 2.29× |
 
 jettison encodes only and simdjson-go has no walk for these types, so
 neither has a column.
 
-#### The nineteenth digit is a cliff
+#### The nineteenth digit was a cliff
 
-`odjsonrt.ParseDecimal` accumulates an integer literal in one pass while it
-scans for the end, and declines at **more than eighteen digits**, where the
-accumulator could overflow; `parseIntSlow` then re-scans with
-`numberLiteral` and hands the bytes to `strconv.ParseInt`. That boundary is
-measurable to the digit, with an `int-18` shape of exactly eighteen digit
-values beside the others:
+`odjsonrt.ParseDecimal` accumulated an integer literal in one pass while it
+scanned for the end, and declined at **more than eighteen digits**, where the
+value could exceed an `int64`; `parseIntSlow` then re-scanned with
+`numberLiteral` and handed the bytes to `strconv.ParseInt`. Nineteen digits
+read 4.2× slower than eighteen and put odjson behind nearly every library,
+the `json/v2` reflection it is built on included (0.83× / 0.68× on
+`int-large` / `uint-large`, in the 2026-09-29 sitting). The cliff was not a
+semantic requirement but a width the accumulator was cut at, and nineteen
+digits cannot overflow a `uint64` accumulator. **The fifth decode round took
+it** (see "The fifth decode round" under "Measured and rejected"):
+`ParseDecimal` accumulates nineteen digits and tests the value against the
+type once at the end, and `ParseUnsigned` takes the twentieth digit a
+`uint64` has room for with a check on that digit alone. Per value, now:
 
-| shape | digits | odjson | fastest library |
+| shape | digits | odjson | next library |
 | --- | --- | --- | --- |
-| `int-small` | 1–3 | **6.2 ns/value** | odjson (next: go-json 7.5) |
-| `int-18` | 18 | **12.0 ns/value** | odjson (next: go-json 16.9) |
-| `int-large` | 19 + sign | 50.1 ns/value | go-json 18.8 |
-| `uint-large` | 20 | 55.8 ns/value | sonnet 20.2 |
+| `int-small` | 1–3 | **6.7 ns/value** | go-json 7.6 |
+| `int-18` | 18 | **12.5 ns/value** | go-json 17.0 |
+| `int-large` | 19 + sign | **14.0 ns/value** | go-json 19.1 |
+| `uint-large` | 20 | **15.5 ns/value** | sonnet 20.3 |
 
-Eighteen digits was the fastest decode of any library measured; nineteen
-was 4.2× slower than eighteen and put odjson behind nearly every one of
-them, including the `json/v2` reflection it is built on (0.83× / 0.68× on
-`int-large` / `uint-large`). The cliff was not a semantic requirement — a
-nineteen digit literal still fits an `int64` more often than not — but a
-width the one-pass accumulator was cut at, where the *accumulator* could
-not overflow but the *value* could exceed the type; and nineteen digits
-cannot overflow a `uint64` either. **The fifth decode round took it** (see
-"The fifth decode round" under "Measured and rejected"): `ParseDecimal`
-accumulates nineteen digits and tests the value against the type once at
-the end, and `ParseUnsigned` takes the twentieth digit a `uint64` has room
-for with a check on that digit alone. In that round's A/B, one binary a
-side, n=6, `int-large` reads **−73%** (51.7 → 14.0 µs, 13.6 ns/value) and
-`uint-large` **−71%** (57.2 → 16.4 µs), and the table's 0.38× against
-go-json becomes roughly 1.4× the other way — roughly, because the two
-figures are from different sittings. The encode side was never affected
-(1.62× / 1.72× over `json/v2`, since `AppendInt` is width-driven and has no
-such boundary), and neither were `int64` fields whose values are ordinary —
-timestamps in milliseconds are thirteen digits, Snowflake IDs nineteen.
+The fastest decode of any library on all four; nineteen digits cost what
+eighteen do. The encode side was never affected (1.64× / 1.68× over
+`json/v2`, since `AppendInt` is width-driven and has no such boundary).
 
-#### Floats: the short decimal and the exponent are odjson's, `float32` is not
+#### Floats: the short decimal and the exponent are odjson's, and now `float32`
 
 The float rows are where the canada round (PR #42) and the short decimal
 path show up as the largest margins in this file. Decoding, odjson is ahead
-of every library on `float-short` (1.50× over sonic, 5.20× over `json/v2`),
-`float-full` (2.14× / 6.13×), `float-exp` (1.86× / 5.13×) and
-`float-exp-input` (1.63× / 4.85×) — the last being a document no encoder
+of every library on `float-short` (1.51× over sonic, 5.15× over `json/v2`),
+`float-full` (2.15× / 6.14×), `float-exp` (1.88× / 5.20×) and
+`float-exp-input` (1.68× / 5.00×) — the last being a document no encoder
 here produces, spelled by hand as `1.234567e+02`, which confirms the
 one-pass Eisel-Lemire parser is not tuned only to the spellings odjson
-itself writes. Encoding, only `float-short` beats sonic (1.39×); full
+itself writes. Encoding, only `float-short` beats sonic (1.38×); full
 precision and exponents go to sonic by 0.79× and 0.73×.
 
-`float32` was the exception in both directions: 0.53× encoding and 0.56×
-decoding against sonic, and behind go-json (0.46×) and json-iterator (0.73×)
-on decode, level with sonnet (0.99×). `ParseSimpleFloat` took the `float32`
-branch only when the mantissa was below `1<<24` and the fraction within
-`pow10f32`, and declined an exponent outright at that bit size; a value
-needing nine significant digits exceeds the first, so most of these
-literals reached the general path, and `strconv` cost them the row. **The
-fifth decode round took the decode side**: the same two steps the float64
-arm takes, at 24 bits — one exact float32 operation when both parts are
-exact, and otherwise the Eisel-Lemire product cut at 25 bits, with the
-same declines — so the result is what `strconv.ParseFloat(s, 32)` returns,
-rounded once to the nearest float32 and never through a float64 (a float64
-rounded again to float32 is the double-rounding trap). `float32` decode
-reads **−60%** in that round's A/B (27.3 → 10.8 µs, n=6), and `numbers`,
-which carries the float32 and the nineteen digit integers together,
-**−54%**. The encode side stays sonic's.
+`float32` was the exception in both directions until the fifth decode
+round: `ParseSimpleFloat` took the `float32` branch only when the mantissa
+was below `1<<24` and the fraction within `pow10f32`, and declined an
+exponent outright, so a value needing nine significant digits went to
+`strconv`, and the decode read 0.56× against sonic and 0.46× against
+go-json. It now takes the same two steps the float64 arm takes, at 24 bits
+— one exact float32 operation when both parts are exact, and otherwise the
+Eisel-Lemire product cut at 25 bits, with the same declines — so the
+result is what `strconv.ParseFloat(s, 32)` returns, rounded once to the
+nearest float32 and never through a float64 (a float64 rounded again to
+float32 is the double-rounding trap). The decode now reads 1.43× over
+sonic, 1.16× over go-json and 1.84× over json-iterator. The encode side
+stays sonic's (0.54×).
 
 #### Strings: per byte against per string
 
 The `text-*` rows at 80 bytes a line and the two `-short` rows at ~8 bytes
 separate the two costs. On long ASCII lines sonic's copy wins (odjson
-0.62×); on short ones it does not (level, 1.04×), because what odjson removed is
-the per-string overhead and what sonic has is a wider copy. Multibyte
-encoding is sonic's throughout — `text-cjk` 0.31×, 0.40× against
-`sonic-std` — which the `twitter` row (1.15× odjson) does not contradict:
+0.73×, from 0.62× before the fifth round judged a long string before
+copying it); on short ones odjson is ahead (1.14×), because what odjson
+removed is the per-string overhead and what sonic has is a wider copy.
+Multibyte encoding is sonic's throughout — `text-cjk` 0.29×, 0.38× against
+`sonic-std` — which the `twitter` row (1.17× odjson) does not contradict:
 twitter is 616 KiB of structure and ASCII around its Japanese text, and the
 `text-*` documents are nothing but the text.
 
-Decoding, the default `sonic` row wins the two short text shapes (0.91× and
-0.67×) but `sonic.ConfigStd`, which validates UTF-8 the way the generated
-decoder must, is 1.52× and 1.14×. Where a text row and its `sonic-std`
-counterpart disagree by that much, the difference is validation, not speed.
+Decoding, the default `sonic` row wins `text-cjk-short` (0.74×) and loses
+`text-ascii-short` (1.20×), and `sonic.ConfigStd`, which validates UTF-8 the
+way the generated decoder must, is 1.92× and 1.25×. Where a text row and its
+`sonic-std` counterpart disagree by that much, the difference is
+validation, not speed.
 
 #### Struct against map, on identical bytes
 
@@ -1188,110 +1173,91 @@ member names at compile time, and this pair prices that knowledge:
 
 | | encode | decode |
 | --- | --- | --- |
-| `obj-record` (struct) | 13.93 µs | 48.99 µs |
-| `obj-map` (map) | 111.20 µs | 184.77 µs |
-| the map's cost | **8.0×** | **3.8×** |
+| `obj-record` (struct) | 13.99 µs | 42.06 µs |
+| `obj-map` (map) | 72.07 µs | 152.63 µs |
+| the map's cost | **5.2×** | **3.6×** |
 
-The generated codec's margin goes with it. On `obj-record` odjson is 5.64×
-over `json/v2` encoding and 2.92× decoding; on `obj-map` it is 1.29× and
-1.62×, and on a document that is nothing but a dictionary
-(`map-string-1k`, `map-int-1k`) the encode side is *behind* plain `json/v2`
-(0.82× and 0.67×), behind easyjson (0.47× / 0.42×) and behind sonic (0.25×
-/ 0.22×), while the decode side holds its 1.5× margin (1.50× / 1.57×).
+The generated codec's margin goes with it. On `obj-record` odjson is 5.55×
+over `json/v2` encoding and 3.41× decoding; on `obj-map` it is 1.99× and
+1.96×. On a document that is nothing but a dictionary (`map-string-1k`,
+`map-int-1k`) it is ahead of plain `json/v2` on both sides (2.03× / 1.81×
+encoding, 1.73× / 1.69× decoding), ahead of easyjson (1.18× / 1.09×) and of
+`sonic.ConfigStd` (1.78× / 1.79×), and behind default sonic on the encode
+(0.65× / 0.59×), which neither sorts nor validates.
 
-#### The generated map encoder sorts, and the sort is the whole deficit
+#### The generated map encoder sorted, and the sort was the whole deficit
 
-That encode loss has a single cause, and it is not the map itself.
-`internal/codegen`'s `KindMap` arm emits `slices.Sort` over the keys
-unconditionally, in both modes, where the runtime's own `appendAny` branches
-on `m.V2()` and skips it — with the comment that `encoding/json/v2` writes
-members in map iteration order and only `encoding/json` sorts them. So a
-generated `MarshalJSONTo` orders a map where the interface it implements
-does not, and pays for it.
+Until the fifth decode round the dictionary encodes were *behind* plain
+`json/v2` (0.82× / 0.67× in the 2026-09-29 sitting), and the loss had a
+single cause: `internal/codegen`'s `KindMap` arm emitted `slices.Sort` over
+the keys in every mode, where `encoding/json/v2` writes members in map
+iteration order unless asked for `Deterministic` output. Sorting
+`map-string-1k`'s 1024 UUID-shaped keys cost **28.9 µs** on this machine
+(28.2 ns/key; measured on 2026-09-15), against an 18.9 µs deficit to
+`json/v2` on that row — the whole of it — and a generated `MarshalJSONTo`
+was behaving as though `jsonv2.Deterministic(true)` were always in force,
+where the semantics table below says it follows `encoding/json/v2`'s rules.
 
-The bill is the entire gap. Sorting `map-string-1k`'s 1024 UUID-shaped keys
-costs **28.9 µs** on this machine (28.2 ns/key; the same sort over 16 keys
-is 142 ns, 8.9 ns/key; measured on 2026-09-15), against an 18.9 µs deficit
-to `json/v2` on that row in the 2026-09-29 run (105.57 µs against 86.67). Take the sort away and the generated encoder is
-ahead rather than behind. The per entry figures say the same thing from the
-other side: odjson spends 54.3 ns on an entry of `obj-map`, whose maps hold
-sixteen keys, and 103.1 ns on an entry of `map-string-1k`, whose one map
-holds 1024 — while `json/v2`, which sorts neither, goes 69.9 → 84.6 ns.
+**The fifth decode round's encode sitting made the change**: the generated
+encoder sorts unless the mode is `ModeV2`, a plain json/v2 Marshal on the
+direct path, whose options are known not to ask for Deterministic output;
+`ModeV2HTML`, encoding/json's Marshal, carries that flag and keeps the
+sort, and so does the public path, which cannot see the options.
+`map-string-1k` **−61%**, `obj-map` **−34%**, `map-items-in` −9% in that
+round's A/B (n=6); the dictionary encode now reads 41.2 µs against
+`json/v2`'s 83.6. The runtime's `appendAny`, which encodes an `any`-held
+map, was made to sort under `ModeV2HTML` in the same commit and put back:
+`ModeV2HTML` is what encoding/json's Marshal makes of the public path's
+output, which writes those members in iteration order, and the sort cost
+encoding/json's `twitter` encode 12% on `user_mentions`.
 
-The sort does not account for the other libraries' margins, only for the
-one against `json/v2`. sonic and easyjson skip it too, which is part of
-their 0.25× and 0.47×, but `sonic.ConfigStd` sorts and is still 0.71× —
-so even with the sort removed odjson would not reach sonic on a dictionary,
-and `map[string]T` would stay the shape where the generator has least to
-offer.
-
-Two things followed, and only the first was about speed. Dropping the
-sort under `ModeV2` would take the two dictionary encodes from 0.82× /
-0.67× to somewhere above 1.3×, and cost `obj-map` its 16% too.
-Independently of any of that, a generated `MarshalJSONTo` was behaving as
-though `jsonv2.Deterministic(true)` were always in force, whatever the
-caller passed, where the semantics table below says it follows
-`encoding/json/v2`'s rules; the runtime path in the same binary did not. A
-sorted object is valid JSON and every parity fixture compares canonically,
-so nothing caught it. **The fifth decode round's encode sitting made the
-change**: the generated encoder sorts unless the mode is `ModeV2`, a plain
-json/v2 Marshal on the direct path, whose options are known not to ask for
-Deterministic output; `ModeV2HTML`, encoding/json's Marshal, carries that
-flag and keeps the sort, and so does the public path, which cannot see the
-options. `map-string-1k` **−61%**, `obj-map` **−34%**, `map-items-in` −9%
-(n=6). The runtime's `appendAny`, which encodes an `any`-held map, was made
-to sort under `ModeV2HTML` in the same commit and put back: `ModeV2HTML`
-is what encoding/json's Marshal makes of the public path's output, which
-writes those members in iteration order, and the sort cost encoding/json's
-`twitter` encode 12% on `user_mentions`.
-
-The practical reading for a caller is unchanged by either: `map[string]T`
-in a hot type gives up most of what odjson is for, and the one place it
-costs nothing to fix is the type declaration.
+A `map[string]T` in a hot type still gives up most of what odjson is for
+against a struct — the 5.2× and 3.6× above — and the one place that costs
+nothing to fix is the type declaration.
 
 Member *name length*, by contrast, is nearly free: `obj-long-names` carries
 the same values under 24 byte names, doubling the document to 83 KB. That
-costs odjson 33% more to encode (18.51 µs against 13.93) and nothing at all
-to decode — 49.88 µs against `obj-record`'s 48.99, level within the run's
+costs odjson 32% more to encode (18.42 µs against 13.99) and nothing at all
+to decode — 40.23 µs against `obj-record`'s 42.06, level within the run's
 spread, because the name decision tree reaches its verdict on the first
 bytes either way. Every other library pays for the longer names on both
-sides: relative to odjson, sonic goes 1.38× → 1.29× encoding but 1.79× →
-1.90× decoding, `sonic-std` 2.55× → 2.69×, json-iterator 2.43× → 2.91×,
-`json/v2` 2.92× → 3.21×.
+sides: relative to odjson, sonic goes 1.37× → 1.26× encoding but 2.05× →
+2.28× decoding, `sonic-std` 2.99× → 3.20×, json-iterator 2.85× → 3.62×,
+`json/v2` 3.41× → 3.97×.
 
 #### The remaining data forms
 
 - **Depth is odjson's best structural row.** `deep-nest`, 32 chains of 32
-  nested objects, is 9.84× over `json/v2` encoding and 5.21× decoding,
-  2.16× and 2.25× over sonic. A nested object is a generated call in a
+  nested objects, is 10.04× over `json/v2` encoding and 5.30× decoding,
+  2.18× and 2.39× over sonic. A nested object is a generated call in a
   generated call, where a reflection encoder re-enters its dispatch.
-- **Keywords are nearly free to write.** `bool-array` encodes 8.00× faster
-  than `json/v2` and level with sonic (0.98×), which is the codegen fusion
+- **Keywords are nearly free to write.** `bool-array` encodes 8.07× faster
+  than `json/v2` and level with sonic (1.00×), which is the codegen fusion
   of bool members (the second encode round) on a document that is all bool.
-  `null-array` is 4.66× and 1.13×.
+  `null-array` is 4.81× and 1.12×.
 - **Nesting an array costs about as much as the values in it.** The same
-  1024 short integers cost 5.33 µs flat (`int-small`) and 6.10 µs in 128
-  rows of 8 (`array-nested`) to encode, 6.38 µs and 7.86 µs to decode: a
-  bracket pair and a slice per row is roughly 15–23%.
+  1024 short integers cost 5.42 µs flat (`int-small`) and 6.05 µs in 128
+  rows of 8 (`array-nested`) to encode, 6.89 µs and 7.68 µs to decode: a
+  bracket pair and a slice per row is roughly 11–12%.
 - **Two outliers belong to other libraries, not to odjson.** json-iterator
-  encodes `empties` at 8.21× with 4098 allocations — one per empty value —
-  and segmentio decodes it at 18.70×, 644 µs for a 9 KB document (the one
-  row that stayed wide, ±17%, at `-count 20`). Neither
+  encodes `empties` at 9.48× with 4098 allocations — one per empty value —
+  and segmentio decodes it at 20.0×, 659 µs for a 9 KB document. Neither
   is a shape the tables at the top of this page would have found.
 - **odjson under sonic and go-json is mostly a loss**, as "The two
   third-party libraries" says. The exceptions are where odjson's own codec
   is far ahead of theirs: under sonic, the `obj-long-names`, `deep-nest`,
-  `obj-record`, `empties` and `float-exp` decodes (1.09–1.32×); under
-  go-json v0.11.1, the `float-short` and `deep-nest` encodes (1.61×, 1.10×)
-  and the `deep-nest`, `empties`, `text-cjk-short` and `array-nested`
-  decodes (1.06–1.36×). The worst is sonic+odjson on the `empties` encode,
-  5.6× sonic's own time, and go-json+odjson on the `int-large` decode,
-  3.3× go-json's.
+  `obj-record`, `empties`, `float-exp` and `float-full` decodes
+  (1.06–1.45×); under go-json v0.11.1, the `float-short` and `deep-nest`
+  encodes (1.61×, 1.10×) and the `deep-nest` and `empties` decodes (1.38×,
+  1.16×). The worst is sonic+odjson on the `map-int-1k` encode, 5.6×
+  sonic's own time, and go-json+odjson on the `float32` decode, 1.9×
+  go-json's.
 
 The raw output of the run is not committed; it was produced with the
 `bench/shapes` command in [`bench/README.md`](../bench/README.md#shapes),
 filtered to these shapes, and pivoted on the median rather than benchstat's
 centre.
+
 ## Which semantics a generated method follows
 
 Each method follows the rules of the interface it implements, rather than
@@ -1560,15 +1526,15 @@ The same holds for the three hosts added on 2026-09-14. json-iterator,
 segmentio/encoding and jettison honour the v1 interfaces, so
 `TestGeneratedMatchesReflection` in `bench/gen` proves the generated bytes
 reach them unchanged, and `bench/ab` measures each with and without the
-generated methods in one process (`-count 5`, the 2026-09-29 run):
-json-iterator's `twitter` encode is 2.41× faster with odjson attached (173 vs
-418 µs — it writes a marshaler's bytes without re-scanning them) and its
-`small` encode 1.72×, but its decodes are 1.15–1.2× slower on all three
-payloads; segmentio's decodes are 1.23× / 1.18× / 1.35× faster with odjson
-and its encodes 2.9×–3.1× slower on `twitter` and `small`, since it re-parses
-what a marshaler returns; jettison's encodes are 2.3×–2.8× slower for the
+generated methods in one process (`-count 5`, the 2026-09-30 run):
+json-iterator's `twitter` encode is 2.37× faster with odjson attached (175 vs
+415 µs — it writes a marshaler's bytes without re-scanning them) and its
+`small` encode 1.68×, but its decodes are 1.15–1.2× slower on all three
+payloads; segmentio's decodes are 1.23× / 1.18× / 1.36× faster with odjson
+and its encodes 3.0×–3.1× slower on `twitter` and `small`, since it re-parses
+what a marshaler returns; jettison's encodes are 2.5×–2.8× slower for the
 same reason. Their `medium` encodes over generated types read worse still
-(3.5×, 10.7× and 6.4×), and
+(3.1×, 10.6× and 6.6×), and
 that is an artefact worth knowing about: `bench/ab` runs `twitter` before
 `medium` in one process, and `odjsonrt.SizeHint` remembers the largest
 encoding a type has produced, so every `medium` `MarshalJSON` after that
@@ -1583,12 +1549,12 @@ unmarshaler discards its input, so the codec behind the interface costs
 
 | `twitter` / `small` | interface floor | the library's own path | room left for a codec | odjson's codec through it |
 | --- | --- | --- | --- | --- |
-| sonic Marshal | 113 µs / 400 ns | 116 µs / 300 ns | 3 µs / **none** | 140 µs / 238 ns |
-| go-json Marshal | 379 µs / 711 ns | 190 µs / 371 ns | **none** / **none** | 132 µs / 293 ns |
-| sonic Unmarshal | 287 µs / 378 ns | 527 µs / 1041 ns | 241 µs / **663 ns** | 415 µs / **533 ns** |
-| go-json Unmarshal | 252 µs / 254 ns | 407 µs / 548 ns | 155 µs / 294 ns | 407 µs / 484 ns |
+| sonic Marshal | 105 µs / 395 ns | 113 µs / 292 ns | 8 µs / **none** | 145 µs / 274 ns |
+| go-json Marshal | 379 µs / 702 ns | 194 µs / 373 ns | **none** / **none** | 145 µs / 294 ns |
+| sonic Unmarshal | 277 µs / 378 ns | 523 µs / 993 ns | 246 µs / **615 ns** | 401 µs / **561 ns** |
+| go-json Unmarshal | 245 µs / 253 ns | 403 µs / 544 ns | 158 µs / 291 ns | 392 µs / 507 ns |
 
-(go-json's rows are v0.11.1's, measured 2026-09-29 with everything else in
+(go-json's rows are v0.11.1's, measured 2026-09-30 with everything else in
 this table; under v0.10.6 its unmarshal floor was 497 µs / 322 ns against its
 own 657 µs / 775 ns, and odjson's decoder fitted the `small` room.)
 
@@ -1601,27 +1567,27 @@ go-json cost without it: a `MarshalJSON` that costs literally zero still
 loses, because the library has to make an interface call and then re-scan and
 copy bytes it did not produce itself (sonic validates the bytes unless told
 not to; go-json compacts them unconditionally). No amount of code generation
-changes that, and the 3 µs sonic leaves on `twitter` is 3% of what its own
+changes that, and the 8 µs sonic leaves on `twitter` is 7% of what its own
 JIT encoder spends.
 
 Decoding is the one place sonic gains, and only on small documents: on
 `small` odjson's decoder fits inside the room sonic leaves, and `bench/ab`
-confirms it in one process — sonic 1067 → 945 ns. go-json no longer gains
+confirms it in one process — sonic 1019 → 935 ns. go-json no longer gains
 anywhere: v0.11.1 halved its unmarshal floor, but its own decoder got faster
-by more, so the `small` room (294 ns) is now smaller than odjson's share
-through it (484 ns), and `bench/ab` reads go-json 579 → 774 ns. On `twitter`
-the decoder would have to be 1.7× and 2.6× faster than it is through those
-hosts; fitting sonic's 241 µs of room means decoding the document 2.2× faster
-than sonic's own JIT-compiled SIMD decoder does, and go-json's 155 µs 2.6×
+by more, so the `small` room (291 ns) is now smaller than odjson's share
+through it (507 ns), and `bench/ab` reads go-json 568 → 764 ns. On `twitter`
+the decoder would have to be 1.6× and 2.5× faster than it is through those
+hosts; fitting sonic's 246 µs of room means decoding the document 2.1× faster
+than sonic's own JIT-compiled SIMD decoder does, and go-json's 158 µs 2.6×
 faster than go-json's. That is not a tuning target for a pure Go decoder,
 even one that is already 1.34× ahead of sonic under `json/v2`, where it reads
 the bytes out of the coder's buffer instead of being handed them twice.
 
 The model is not a guess: `library + odjson = odjson's own codec + floor`
 holds on every row, to within the drift between the two processes each row is
-built from. sonic's marshal of `twitter` measures 252 µs against a floor of
-113 µs; go-json's 511 µs against 379 µs; sonic's unmarshal 701 µs against
-287 µs. The floor is real, and it is additive.
+built from. sonic's marshal of `twitter` measures 249 µs against a floor of
+105 µs; go-json's 524 µs against 379 µs; sonic's unmarshal 678 µs against
+277 µs. The floor is real, and it is additive.
 
 So if you are on sonic or go-json, this is the honest summary: odjson has
 nothing to offer you but a small-document decode on sonic, and nothing at all
@@ -1642,10 +1608,10 @@ var api = sonic.Config{
 
 | sonic over generated types | default config | trusting config |
 | --- | --- | --- |
-| Marshal `twitter` | 252 µs | **205 µs** |
-| Marshal `small` | 638 ns | **354 ns** |
-| Unmarshal `twitter` | 701 µs | **503 µs** |
-| Unmarshal `small` | 911 ns | **600 ns** |
+| Marshal `twitter` | 249 µs | **190 µs** |
+| Marshal `small` | 669 ns | **352 ns** |
+| Unmarshal `twitter` | 678 µs | **503 µs** |
+| Unmarshal `small` | 939 ns | **633 ns** |
 
 Do **not** also set `CompactMarshaler`: it sounds right for odjson's
 always-compact output, but it measures 1.7× *slower* than sonic's default and
@@ -2715,13 +2681,13 @@ sitting, before the items above): `generic`
 `array-items` −4%, `array-pages` −4.5%, `deep-nest` −4%, `int-18` −6.5%,
 `int-small` −4%; the rest within ±3% but the string rows the fused
 scan's first form had cost, which the pooled run above put back to level.
-Against the table above, go-json v0.11.1 is left ahead on decode only
-where the skip's strictness is the difference — `skip` (0.72×, from
-0.56×), `generic` (0.85×, from 0.66×) — and on the rows without a direct
-path, `map-items` and `array-items`, where `json/v2` decodes the top-level
-map or slice and the ceiling is its; and behind on `numbers`,
-`text-escaped`, `int-large`, `uint-large` and `float32`, where it was
-ahead by 1.4–2.6×.
+In the re-measured shapes tables above (2026-09-30, the round's tree),
+go-json v0.11.1 is left ahead on five decode rows — `skip` 0.77× (from
+0.56×), `sparse` 0.79×, `map-items` 0.88× (top-level, `json/v2`'s map
+around the generated `Item`), `generic` 0.90× (from 0.66×) and `small`
+0.93× — level on four, and behind on the other 18, `numbers`,
+`text-escaped`, `int-large`, `uint-large` and `float32` among them, where
+it had been ahead by 1.4–2.6×.
 
 **Rejected, with numbers:**
 
@@ -2782,40 +2748,35 @@ chunks were.
 
 The measured tables, the ratio tables, the floor table and the shapes
 tables with a column per library on this page were re-measured on
-2026-09-29 on an AMD Ryzen 9 7950X, Linux, Go 1.27.1, on `main` at
-`8962683` with `goccy/go-json` raised to v0.11.1, in one sitting:
-`bench/plain`, `bench/gen`, `bench/easyjson` and `bench/gojay` at
-`-count=10`, `bench/ab` at `-count=5`, `bench/floor` at `-count=10` and
-`bench/shapes` at `-count=6`, each binary built once and run alone, one
-after another, on an otherwise idle machine. `canada` and `citm` ran in a
-second `bench/shapes` process straight after, with `ODJSON_BENCH_CORPUS`
-set, because the first had skipped them for want of it; each of their
-ratios is still between two rows of one process. Every row of the six
-libraries added on 2026-09-14 is from the same sitting, so no ratio on this
-page is computed across two runs any more.
+2026-09-30 on an AMD Ryzen 9 7950X, Linux, Go 1.27.1, on
+`perf/decode-round5` at `ea59374` — the fifth decode round, with
+`goccy/go-json` at v0.11.1 — in one sitting: `bench/plain`, `bench/gen`,
+`bench/easyjson` and `bench/gojay` at `-count=10`, `bench/ab` at
+`-count=5`, `bench/floor` at `-count=10` and `bench/shapes` at `-count=6`
+with `ODJSON_BENCH_CORPUS` set, so that `canada` and `citm` ran in the same
+process as the rest, each binary built once and run alone, one after
+another, on an otherwise idle machine. Every row of every library is from
+that sitting, so no ratio on this page is computed across two runs.
 
 Not re-run in that sitting, and so still the earlier figures: the
 `bench/shapes` gen-against-plain table under "What the other shapes say"
 (2026-09-13, `7d57f14`, with its own re-runs and the text round's cells —
 it has no column for any third-party library, and its paragraphs compare it
 cell by cell against the tables before it), and the `odjson_safe` figures
-below (from that 2026-09-13 sitting too). The percentages inside the round sections are
-each round's own interleaved A/B, taken on that round's tree; a percentage
-between two separately built binaries is not one this page trusts, and none
-is quoted.
+below (from that 2026-09-13 sitting too). The percentages inside the round
+sections are each round's own interleaved A/B, taken on that round's tree;
+a percentage between two separately built binaries is not one this page
+trusts, and none is quoted.
 
-The `bench/plain` / `bench/gen` tables are one run. Every odjson row, in
-`bench/gen`, is within ±3% by `benchstat`. The rows outside it are: in
-`bench/plain`, `json/v2`'s `twitter` encode
-(±4%), sonic's `medium` encode (±9%), json-iterator's and segmentio's
-`medium` encodes (±4%, ±5%), jettison's `small` encode (±6%) and
-simdjson-go's `twitter` decode (±5%); in `bench/easyjson`, its `medium`
-encode (±5%); in `bench/gojay`, its `medium` decode (±4%). The tables quote
-the medians because a re-run is a different measurement rather than a
-better one: the 2026-09-13 sitting re-ran its wide rows alone at
-`-count 20` and they came back 3–12% from the suite, about what two runs of
-the suite disagree with each other. The sonic encode margins above are
-stated as the weaker of the two methods for that reason.
+The `bench/plain` / `bench/gen` tables are one run. Every row quoted from
+them is within ±3% by `benchstat` but simdjson-go's `small` decode (±7%)
+in `bench/plain`; the ones outside it in `bench/gen` are the hosts' own
+rows over generated types (±4–6%), which the tables do not quote. The
+tables quote the medians because a re-run is a different measurement
+rather than a better one: the 2026-09-13 sitting re-ran its wide rows
+alone at `-count 20` and they came back 3–12% from the suite, about what
+two runs of the suite disagree with each other. The sonic encode margins
+above are stated as the weaker of the two methods for that reason.
 
 The `bench/plain` and `bench/gen` tables come from two separate processes,
 which is fine for the absolute figures but not for the small differences
@@ -2823,16 +2784,16 @@ between a generated row and its baseline: those are of the same order as the
 drift between two runs, and their sign moves with `GOMAXPROCS`. For that
 comparison use `bench/ab`, which measures both sides in a single process. Its
 verdict on this run (`-count 5`): odjson wins every marshal and unmarshal row
-on `encoding/json/v2` (4.15× / 4.63× / 3.98× on the encodes, 2.76× / 2.47× /
-3.15× on the decodes, `twitter` / `medium` / `small` throughout) and on
-`encoding/json` (3.53× / 3.74× / 3.60× and 1.31× / 1.19× / 1.58×), and
-sonic's `small` unmarshal row (1.13×); it loses sonic's `medium` unmarshal
-(0.95×), every go-json row (the `small` unmarshal 0.75×, where under
+on `encoding/json/v2` (4.04× / 4.66× / 3.86× on the encodes, 2.92× / 2.48× /
+3.19× on the decodes, `twitter` / `medium` / `small` throughout) and on
+`encoding/json` (3.50× / 3.75× / 3.60× and 1.34× / 1.20× / 1.56×), and
+sonic's `small` unmarshal row (1.09×); it loses sonic's `medium` unmarshal
+(0.95×), every go-json row (the `small` unmarshal 0.74×, where under
 v0.10.6 it won by 1.07×), the `twitter` unmarshal on sonic and all of both
-libraries' marshals. Against sonic's own path it is 1.19× / 1.48× / 1.13×
-faster on the marshals and 1.44× / 1.76× / 1.84× faster on the unmarshals,
-and against go-json's own path 2.05× / 1.55× / 1.48× and 1.03× / 1.05× /
-1.00× — the same signs the tables above report, with the margins moved by
+libraries' marshals. Against sonic's own path it is 1.16× / 1.46× / 1.09×
+faster on the marshals and 1.46× / 1.77× / 1.76× faster on the unmarshals,
+and against go-json's own path 2.00× / 1.51× / 1.42× and 1.05× / 1.00× /
+0.98× — the same signs the tables above report, with the margins moved by
 the distance between where the two binaries put each library's rows and
 odjson's.
 

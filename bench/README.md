@@ -305,7 +305,7 @@ cd bench && go test -bench . -count 5 ./ab/
 `ab` covers every host library — the two standard libraries, sonic, go-json,
 json-iterator, segmentio and (encode only) jettison; the sonic and go-json
 rows are what settle
-whether odjson wins sonic's small unmarshal (by 1.13x), how far behind it is
+whether odjson wins sonic's small unmarshal (by 1.09x), how far behind it is
 on sonic's medium unmarshal (0.95x), and that it loses everything else on
 them — every go-json row included, since go-json v0.11.1 (it does, by the
 floor).
@@ -325,6 +325,7 @@ the generated codec still pays for itself on that shape:
 | `twitter-compact`, `page-12k-indented` | whitespace |
 | `page-3k`, `page-12k`, `page-100k` | one top-level object at the sizes between the two fixtures |
 | `array-items`, `array-pages`, `map-items` | a top-level `[]T` / `map[string]T` of a generated type, so every generated value sits below the top level; the element size puts `array-items` under `odjsonrt.WholeValue`'s threshold and `array-pages` over it, which matters on the public path |
+| `map-items-in` | the `map-items` map as a member of a struct, where the generated decoder reads the map itself; `page-12k` is the same for `array-items` |
 | `generic` | the same document decoded into `any` |
 | `text-*` | strings of ASCII, Latin-1, Cyrillic, CJK, Hangul, emoji, and escape-heavy content, 96 lines of 80 bytes |
 | `text-ascii-short`, `text-cjk-short` | the same two scripts in 1024 strings of ~8 bytes, so the per string cost is read apart from the per byte one |

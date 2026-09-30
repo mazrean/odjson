@@ -68,22 +68,22 @@ pins exactly that, and pins `UnmarshalT` against `encoding/json/v2`'s
 `strict` argument breaks those oracles, which is the point of them.
 
 **Positioning** (measured, see `bench/`): the target is `encoding/json/v2`
-(2.6-4.6x faster on all six measurements: encode and decode of sonic's own
-`twitter`, `medium` and `small` inputs) and `encoding/json` (3.4-3.7x on
+(2.4-4.2x faster on all six measurements: encode and decode of sonic's own
+`twitter`, `medium` and `small` inputs) and `encoding/json` (3.5-3.8x on
 the three encodes, since the direct path learned v1's coder flags, and
 1.2-1.6x on the three decodes, which stay on the public API path because
 v1's flags allow what the strict parsers refuse). `github.com/bytedance/sonic` and
 `github.com/goccy/go-json` honour the v1 interfaces too and the generated code
 is correct under them, but odjson does **not** make them faster: it wins only
-sonic's small unmarshal row (1.13x in `bench/ab`; sonic's medium unmarshal
+sonic's small unmarshal row (1.09x in `bench/ab`; sonic's medium unmarshal
 is 0.95x) and none of go-json's since v0.11.1, and `bench/floor` proves why
 the rest cannot be won rather than asserting it: with a
-`MarshalJSON` that costs nothing, sonic still spends 113us on the twitter
-payload against 116us for its own path, and go-json 379us against 190us,
+`MarshalJSON` that costs nothing, sonic still spends 105us on the twitter
+payload against 113us for its own path, and go-json 379us against 194us,
 because sonic validates and go-json compacts whatever a marshaler returns.
 On the decode side the floor is the skip-and-validate pass they make before
-calling `UnmarshalJSON`: 287us and 252us on twitter, against their own 527us
-and 407us, so the generated decoder would have to decode that document 2.2x
+calling `UnmarshalJSON`: 277us and 245us on twitter, against their own 523us
+and 403us, so the generated decoder would have to decode that document 2.1x
 faster than sonic's JIT, or 2.6x faster than go-json, to break even there.
 Do not re-open either question without re-running `bench/floor` and
 `bench/ab`. In `README.md` those two
@@ -91,23 +91,23 @@ libraries are
 **comparison baselines only** — their "with odjson" columns stay out of the
 tables. **go-json v0.11.1 (September 2026) rewrote its decoder** — AVX2
 structure scan, one-pass numbers — and the claim that json/v2 + odjson beats
-it on all six no longer holds: the encodes are still 1.96x / 1.35x / 1.45x
-(twitter / medium / small; 2.05x / 1.55x / 1.48x in `bench/ab`), but the
-decodes read 1.03x / 1.04x / **0.93x** (1.03x / 1.05x / 1.00x in
-`bench/ab`), so state them as **level, with go-json ahead on the small
-decode**, and never again as a win. sonic is still beaten on all six. Its
-encode margins are two numbers rather than one: the tables read 1.20x /
-1.31x / 1.17x on the twitter / medium / small encodes, `bench/ab` reads
-1.19x / 1.48x / 1.13x, and the gap is where the two binaries put sonic's
-own rows (up to 15% apart on medium) and odjson's (1-4%), so state the
-encode side as **at least 1.19x on twitter, 1.31x on medium and 1.13x on
-small**, the weaker method per row. The decodes are 1.34x / 1.73x / 1.78x
-(1.44x / 1.76x / 1.84x in `bench/ab`). Tables, `bench/ab`, `bench/floor`
-and `bench/shapes` last re-measured 2026-09-29 on `main` at `8962683` with
-go-json v0.11.1, in one sitting — except `bench/shapes`' gen-against-plain
-table, which has no third-party column and stays at 2026-09-13 / `7d57f14`,
-and the `odjson_safe` figures, from the same 2026-09-13 run; re-measure
-before restating any of it.
+it on all six no longer holds: the encodes are still 2.00x / 1.24x / 1.37x
+(twitter / medium / small; 2.00x / 1.51x / 1.42x in `bench/ab`), but the
+decodes read 1.03x / 0.96x / **0.94x** (1.05x / 1.00x / 0.98x in
+`bench/ab`), so state them as **level, with go-json a few percent ahead
+on the two smaller documents**, and never again as a win. sonic is still
+beaten on all six. Its encode margins are two numbers rather than one: the
+tables read 1.16x / 1.19x / 1.07x on the twitter / medium / small encodes,
+`bench/ab` reads 1.16x / 1.46x / 1.09x, so state the encode side as **at
+least 1.16x on twitter, 1.19x on medium and 1.07x on small**, the weaker
+method per row — the small encode is inside the suite's run-to-run drift.
+The decodes are 1.34x / 1.61x / 1.71x (1.46x / 1.77x / 1.76x in
+`bench/ab`). Tables, `bench/ab`, `bench/floor` and `bench/shapes` last
+re-measured 2026-09-30 on `perf/decode-round5` at `ea59374` with go-json
+v0.11.1, in one sitting — except `bench/shapes`' gen-against-plain table,
+which has no third-party column and stays at 2026-09-13 / `7d57f14`, and
+the `odjson_safe` figures, from the same 2026-09-13 run; re-measure before
+restating any of it.
 
 Six more libraries sit in the tables and the chart as **baselines only**,
 added 2026-09-14: `json-iterator/go` (as
@@ -143,24 +143,21 @@ that reason rather than silently missing. easyjson also has no row for the
 two top-level collections (`array-items`, `map-items`): it generates for
 struct types. `TestShapes` holds every baseline to `encoding/json`'s reading
 of the plain value on every shape. The table is under "The other libraries
-on the shapes" in `docs/internals.md`, measured 2026-09-29 against `main`
-at `8962683` with go-json v0.11.1 (`canada` and `citm` need
-`ODJSON_BENCH_CORPUS`, or they skip); re-measure before restating any of
-it. That binary is a third reading of the sonic encode question above, and
-it puts the `small` margin lowest again: 1.15x on `twitter` and 1.06x on
-`small`, against 1.20x / 1.17x in the tables and 1.19x / 1.13x in
-`bench/ab` (on 2026-09-14 it read 1.19x / 1.03x). GC pacing is a
-first-order term for both (`GOGC=800` moves sonic's encodes -17..-21% and
-odjson's -13..-19%) but does not explain that binary on its own; treat the
-`small` encode over sonic as narrow, 1.06-1.17x depending on the binary. On
-decode, go-json v0.11.1 was ahead of odjson on nine of the 26 shapes and
-level on eight in that sitting; the fifth decode round that followed
-(`perf/decode-round5`, "The fifth decode round" in `docs/internals.md`)
-took back `numbers`, `text-escaped`, `int-large`, `uint-large` and
-`float32` (−54% to −73% on its own A/B) and left it ahead on `skip`,
-`generic` and the rows without a direct path. The shapes tables predate
-the round; say so rather than citing only the three payloads, and
-re-measure before restating them.
+on the shapes" in `docs/internals.md`, measured 2026-09-30 on
+`perf/decode-round5` at `ea59374` with go-json v0.11.1 (`canada` and `citm`
+need `ODJSON_BENCH_CORPUS`, or they skip); re-measure before restating any
+of it. That binary is a third reading of the sonic encode question above:
+1.17x on `twitter` and 1.05x on `small`, against 1.16x / 1.07x in the
+tables and 1.16x / 1.09x in `bench/ab` (on 2026-09-14 it read 1.19x /
+1.03x). GC pacing is a first-order term for both (`GOGC=800` moves sonic's
+encodes -17..-21% and odjson's -13..-19%); treat the `small` encode over
+sonic as level-to-narrow. On
+decode, go-json v0.11.1 is ahead of odjson on five of the 27 shapes
+(`skip`, `sparse`, the top-level `map-items`, `generic`, `small`), level on
+four and behind on 18, after the fifth decode round (`perf/decode-round5`,
+"The fifth decode round" in `docs/internals.md`) took back `numbers`,
+`text-escaped`, `int-large`, `uint-large` and `float32`; say so rather
+than citing only the three payloads.
 
 `-case-insensitive` defaults to **false**, matching json/v2; it only affects
 the v1 `UnmarshalJSON` path. The root and `embed` fixtures pass it explicitly,
