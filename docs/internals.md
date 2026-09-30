@@ -2860,7 +2860,19 @@ direct path, are unmoved.
 
 **Rejected:** the string carve from per-document chunks and the inline
 word-digit codegen above; the typed-chunk variants, none of which moved
-a row. **What is left**, by the `{}` measurement, is json/v2's entry —
+a row; and **a small nested struct's loop written into its parent's
+decoder** in place of the call (`Author` into `Book`, one level, eight
+members or fewer), taken up for the 6 ns an `Author` object's call and
+prologue looked like in the profile: the members' parse read **314 ns
+from 291**, the row 547 against 512 in one process and 529 against 522
+alone, pooled `small` **+2.9%** (p=0.000) with the `encoding/json`
+`twitter` and `medium` rows −4.7% / −3.3%, the placement effect above
+moving the other way. What the call costs is the loop's own machinery —
+the name list, the seen bits, the separator switch — which the fusion
+keeps, and what it adds is a parent four times the size (each nested
+loop written into both decoders, for the member and for the slice
+element) and its register pressure. **What is left**, by the `{}`
+measurement, is json/v2's entry —
 the 45 ns between its `Unmarshal` and go-json's, on a row of 530 — and
 it is the reason `-direct`'s `UnmarshalBook`, which pays 15, is the entry
 point that is clearly ahead on a document this small: 394 ns against
