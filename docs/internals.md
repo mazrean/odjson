@@ -2881,6 +2881,108 @@ row cannot read more than about 1.10× by the tables' method while that
 entry stands, and the tables' two processes disagree about go-json's own
 row by more than what remains.
 
+### What `encoding/json/v2`'s entry costs, line by line
+
+The 45 ns above were then priced exactly, and the question asked whether
+anything odjson does could shorten them the way the direct path
+shortens `jsontext`'s token API. It cannot: the direct path works because
+`UnmarshalJSONFrom` *is called*, and can reach into the decoder from
+inside that call; the entry cost is everything `Unmarshal` does on the
+way to that call and on the way back, in code odjson never executes.
+What follows is the measurement, and what a change to json/v2 itself
+would buy, so that the number is a fact rather than an estimate.
+Measured 2026-10-01 on `perf/decode-round5` at `61d99d9`, go1.27.1, in
+one `bench/ab` process with a fresh `new(gen.Book)` per call (the
+temporary benchmark is not kept); n=16 where a p-value is quoted.
+
+**Three entry points on `{}`.** A type whose `UnmarshalJSONFrom` costs
+only the direct path's begin and end (nothing of odjson's inside)
+prices json/v2's own entry at **57.8 ns**. With the generated `Book`
+method, `json.Unmarshal` reads 121.8, of which `new(Book)` is 46, so
+odjson's share of the method is **18 ns**: the `StringCache` pool's get
+and put (about 10), the direct path's checks (about 4) and the parse of
+the two bytes. go-json's `Unmarshal` on the same value reads 70, an
+entry of **23 ns**; `-direct`'s `UnmarshalBook` 64, the same 18 as the
+method. So the row's structural gap through `json.Unmarshal` is 57.8
+against 23: **35 ns of json/v2, plus odjson's 18 against go-json's 23**.
+
+**Where the 57.8 ns go**, from the profile of the no-op type (line
+level, `pprof -list`; a nanosecond is about 58 ms of the 3.39 s in
+`Unmarshal`):
+
+| Step | ns | What it is |
+| --- | ---: | --- |
+| `getBufferedDecoder` | 14 | `sync.Pool.Get` (2.5) and `decoderState.reset` (10): three stack resets, the `decodeBuffer` and `jsonopts.Struct` copies |
+| `lookupArshaler` | 11 | `sync.Map.Load` on the `reflect.Type`: `nilinterhash`, the `HashTrieMap` walk, `efaceeq` |
+| the method wrapper | 15 | `reflect.TypeAssert[UnmarshalerFrom]` (8: `getitab`, `itabTableType.find` — the generic assertion does not get the per-site cache a plain `x.(I)` gets), `Value.Addr` (4.5: `ptrTo` resolves the pointer type through `resolveTypeOff` every call), the depth and flag bookkeeping (2.5) |
+| `checkEOF` | 5 | `consumeWhitespace` reaching `fetch`, which returns `io.ErrUnexpectedEOF` because there is no reader |
+| `putBufferedDecoder` | 3.5 | `sync.Pool.Put` |
+| `Unmarshal` / `unmarshalDecode` | 5 | `reflect.ValueOf`, `Elem`, the kind checks, the calls |
+
+**What a change to json/v2 would buy** was measured by building the
+same benchmark with `-overlay` over `GOROOT`'s `arshal.go`,
+`arshal_methods.go` and `jsontext/decode.go`, each change behind an
+environment switch so that one binary measures all of them. The
+overlay binary with every switch off reads 3–5% above the stock one on
+the json/v2 rows (57.7 against 55.1 ns on the no-op type, 518 against
+504 on `small`, interleaved, n=16) and 2% above it on go-json's: a
+different binary, the layout drift "Measurement notes" records, which
+is why every comparison in the table is within the overlay binary. On
+the no-op type, n=16:
+
+| Change | `{}`, no-op type | `{}`, `Book` | `small` |
+| --- | ---: | ---: | ---: |
+| stock | 57.8 ns | 121.8 ns | 504 ns |
+| **A** — a one-entry last-type cache in front of `lookupArshaler` | −7.6 ns (−13%) | −8.2 | −19 (−3.8%) |
+| **B** — `reset` stores its fields rather than copying two structs (B1), and skips the options join when there are none (B2) | −5.8 (−10%); B1 alone −3.2, B2 alone −3.6, in a second build | −7.4 | −6 (−1.2%) |
+| **C** — the wrapper asserts `va.Addr().Interface().(UnmarshalerFrom)` at a fixed site instead of `reflect.TypeAssert` | −3.6 (−6%) | −5.0 | −15 (−2.9%) |
+| **D** — `checkEOF` reads the buffer directly when there is no reader | −3.7 (−6%) | −2.8 | −4 (−0.8%) |
+| B + C + D | −11.8 (−20%) | −12.1 | −15 (−3.0%) |
+| A + B + C + D | **−19.0 (−33%)**, 38.8 ns | **−20.2**, 101.6 ns | **−39 (−7.7%)**, 465 ns |
+
+go-json's rows in the same binary stay within 2% of the switched-off
+run in every column, as they should. With all four, `small` in one process reads 465 against
+go-json's 567: 1.22× where the stock entry reads 1.12×.
+
+Two of the four are honest proposals and two are bounds. **C** keeps
+the allocation count (0 on the no-op type, 1 on `Book`); its cause is a
+runtime matter — `reflect.TypeAssert` to an interface goes through
+`getitab` on every call, where a type assertion at a fixed call site is
+cached per site since Go 1.22 — and json/v2 chose `TypeAssert` so that a
+non-pointer-shaped value does not allocate through `Interface()`, so a
+change there would be conditioned on the value being pointer shaped,
+which `va.Addr()` always is. **D** is equivalent only when the decoder
+has no reader, which is the gate. **B** changes no semantics (a join
+over no options is a no-op), and its two edits were measured apart in a
+second build: the field stores are 3.2 ns and the skipped join 3.6, 4.8
+together, so the 460 ms the profile put on the `decodeBuffer` line was
+partly that copy — the disassembly is a plain 80-byte copy through a
+stack temporary, with a write-barrier check — and partly skid from the
+call before it. **A** is a bound, not a proposal: with two types
+alternating it thrashes — +24% and an allocation per call for the
+cache entry — so what it says is that a perfect arshaler lookup is
+worth 7.6 ns, and a real one would be the `sync.Map` made cheaper for a
+pointer key, not a last-type slot.
+
+**What odjson's own 18 ns could become.** The cache pool's 10 ns is
+`sync.Pool`'s get and put, which in pure Go is the floor for a
+per-goroutine object: an atomic slot would cost two locked instructions
+against the pool's pinned local, which is an argument, not a measurement,
+and it was not measured; keeping the cache inside the pooled
+`jsontext.Decoder` (the true analogue of the direct path) would save
+those 10 ns, 2% of the row, and every slot it could ride in — the
+slices `state.reset` truncates and keeps — is one the token-driven
+fallback writes. Not built. The direct path's checks are four loads and
+a compare. So odjson's side stops at 18 against go-json's 23, and the
+row's remaining gap through `json.Unmarshal` is json/v2's 35 ns, of
+which about 19 are reachable by the four changes above and the rest —
+the decoder pool, `reflect.ValueOf` and `Elem`, `Value.Addr` — is what
+an `any` argument and a pooled decoder cost by construction. Through
+`json.Unmarshal` the row stays where the previous section left it;
+through `UnmarshalBook` it is 1.40×. The upstream write-up of A–D, with
+the overlay procedure, is not filed from here: whether to propose it is
+the maintainers' question to be asked, not this repository's to answer.
+
 ## Measurement notes
 
 The measured tables, the ratio tables, the floor table and the shapes

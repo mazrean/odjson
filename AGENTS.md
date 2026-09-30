@@ -98,11 +98,15 @@ the decodes read 1.07x / 1.04x / 1.04x in the tables and 1.10x / 1.08x /
 percent ahead on all three (8-12% in one process)**, never as a win by the
 tables' method. The `small` decode was 0.94x before the round's `small`
 sitting; what is left there is `encoding/json/v2`'s own entry point, some
-45 ns heavier than go-json's on a 530 ns row, which the generated code
-cannot reach (see "The small payload against go-json" in
-`docs/internals.md`), so the row cannot read more than about 1.10x by the
-tables' method while that entry stands, and `-direct`'s `UnmarshalT` is
-the entry point that is clearly ahead on it (394 vs 550 ns, 1.40x).
+50 ns heavier than go-json's on a 530 ns row (58 ns of json/v2 before and
+after the method, plus odjson's 18 against go-json's 23), which the
+generated code cannot reach (see "The small payload against go-json" and
+"What `encoding/json/v2`'s entry costs, line by line" in
+`docs/internals.md`: four changes to json/v2 itself, prototyped with
+`-overlay`, would take 19 of them), so the row cannot read more than about
+1.10x by the tables' method while that entry stands, and `-direct`'s
+`UnmarshalT` is the entry point that is clearly ahead on it (394 vs 550
+ns, 1.40x).
 sonic is still beaten on all six. Its encode margins are two numbers
 rather than one: the tables read 1.17x / 1.32x / 1.07x on the twitter /
 medium / small encodes, `bench/ab` reads 1.16x / 1.42x / 1.07x, so state
