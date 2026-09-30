@@ -9,6 +9,7 @@ import (
 	jsonv2 "encoding/json/v2"
 	"unicode/utf16"
 	"unicode/utf8"
+	"unsafe"
 )
 
 // Strict parsing.
@@ -466,8 +467,9 @@ func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) 
 		return "", p, ErrType(data, p, "string")
 	}
 	if uint(p+9) <= uint(len(data)) {
-		if end := shortString(load64(data, p+1), p); end > 0 {
-			return c.alloc(data[p+1 : end-1]), end, nil
+		w := load64(data, p+1)
+		if end := shortString(w, p); end > 0 {
+			return c.allocWord(data[p+1:p+9], end-2-p), end, nil
 		}
 	}
 	// A string with escapes is decoded in the scan's own pass, into the
@@ -851,6 +853,24 @@ func skipCompoundStrict(data []byte, p int) (int, error) {
 // otherwise. It is one body rather than a call to either, so that a string
 // on the direct path costs the generated decoder a single call.
 func ParseStringV2(data []byte, p int, c *StringCache, strict bool) (string, int, error) {
+	// A short string — the closing quote inside the word after the
+	// opening one, nothing to escape or validate before it — is the
+	// common case in a document of member values, and it is taken here,
+	// one call up, with the word it was found in stored as it is.
+	if uint(p+9) <= uint(len(data)) && data[p] == '"' {
+		if end := shortString(load64(data, p+1), p); end > 0 {
+			// allocWord, written out: the call would not inline here.
+			if c != nil {
+				if sl := c.slab; sl != nil && len(sl.free) >= 8 {
+					copy(sl.free[:8], data[p+1:p+9])
+					s := unsafe.String(unsafe.SliceData(sl.free), end-2-p)
+					sl.free = sl.free[end-2-p:]
+					return s, end, nil
+				}
+			}
+			return c.allocWordSlow(data[p+1:p+9], end-2-p), end, nil
+		}
+	}
 	if strict {
 		return ParseStringStrict(data, p, c)
 	}

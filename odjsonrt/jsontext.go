@@ -174,6 +174,43 @@ type slab struct {
 // it fits, allocated on its own otherwise, and "" for no bytes. A nil cache
 // allocates. The carved region is never written again: free only advances,
 // and a chunk that cannot hold b is left behind with its tail unused.
+// allocWord is alloc for the first n bytes of src, a short string whose
+// scan has already seen its eight bytes: those eight are copied whole,
+// which is one move rather than a memmove, and n of them handed out. The
+// bytes past n stay free, and nothing handed out lies beyond the tail for
+// the copy to reach. It is kept inlinable; the cases that need a chunk
+// are in allocWordSlow.
+func (c *StringCache) allocWord(src []byte, n int) string {
+	if c == nil {
+		return c.allocWordSlow(src, n)
+	}
+	sl := c.slab
+	if sl == nil || len(sl.free) < 8 {
+		return c.allocWordSlow(src, n)
+	}
+	copy(sl.free[:8], src[:8])
+	s := unsafe.String(unsafe.SliceData(sl.free), n)
+	sl.free = sl.free[n:]
+	return s
+}
+
+//go:noinline
+func (c *StringCache) allocWordSlow(src []byte, n int) string {
+	if c == nil {
+		return string(src[:n])
+	}
+	sl := c.slab
+	if sl == nil {
+		sl = new(slab)
+		c.slab = sl
+	}
+	sl.free = make([]byte, slabSize)
+	copy(sl.free[:8], src[:8])
+	s := unsafe.String(unsafe.SliceData(sl.free), n)
+	sl.free = sl.free[n:]
+	return s
+}
+
 func (c *StringCache) alloc(b []byte) string {
 	if len(b) == 0 {
 		return ""
@@ -460,8 +497,9 @@ func ParseStringWith(data []byte, p int, c *StringCache) (string, int, error) {
 		return "", p, ErrType(data, p, "string")
 	}
 	if uint(p+9) <= uint(len(data)) {
-		if end := shortString(load64(data, p+1), p); end > 0 {
-			return c.alloc(data[p+1 : end-1]), end, nil
+		w := load64(data, p+1)
+		if end := shortString(w, p); end > 0 {
+			return c.allocWord(data[p+1:p+9], end-2-p), end, nil
 		}
 	}
 	end, hasEscape, _, err := scanString(data, p)
