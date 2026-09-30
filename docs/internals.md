@@ -2989,6 +2989,20 @@ go-json's 570 in that pool. The patch and the write-up are not filed
 from here: whether to propose them is the maintainers' question to be
 asked, not this repository's to answer.
 
+**Two more places the row could have hidden something, and did not.**
+The members' parse into a *reused* `Book` reads 242 ns, into a fresh one
+376 (the same call, `bench/gen`, `GetStringCache` and `PutStringCache`
+around it), and `strict` is worth 4–11 ns of either, so json/v2's
+checks are not the premium. The 134 ns between them is `new(Book)` (48)
+and the collector: with `GOGC=off` the fresh parse reads 316 and the
+full `json/v2` row 459 from 511, and with `GOGC=800` `bench/ab`'s rows
+read **451 against go-json's 504** from 504 against 567 — both sides
+carry a collector's share of about 10%, and the ratio does not move
+(1.12× either way). What is left of the fresh premium after the
+allocation and the collector is about 33 ns: the five carves and the
+writes into a zeroed object. Neither is a lever that reaches "clearly
+ahead" through `json.Unmarshal`.
+
 ## Measurement notes
 
 The measured tables, the ratio tables, the floor table and the shapes
