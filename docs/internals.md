@@ -2979,9 +2979,15 @@ which about 19 are reachable by the four changes above and the rest —
 the decoder pool, `reflect.ValueOf` and `Elem`, `Value.Addr` — is what
 an `any` argument and a pooled decoder cost by construction. Through
 `json.Unmarshal` the row stays where the previous section left it;
-through `UnmarshalBook` it is 1.40×. The upstream write-up of A–D, with
-the overlay procedure, is not filed from here: whether to propose it is
-the maintainers' question to be asked, not this repository's to answer.
+through `UnmarshalBook` it is 1.40×. B, C and D were then written as one plain patch to
+`arshal_methods.go` and `jsontext/decode.go`, without switches, under
+which `encoding/json/...`'s own tests and this repository's whole suite
+pass; pooled over four `-randlayout` builds a side (n=24, three rounds,
+`bench/ab`'s rows), it moves the `json/v2` `small` decode **−4.8%**
+(530 → 504 ns) with go-json's rows unmoved (p=0.56 / 0.87), 1.13× over
+go-json's 570 in that pool. The patch and the write-up are not filed
+from here: whether to propose them is the maintainers' question to be
+asked, not this repository's to answer.
 
 ## Measurement notes
 
