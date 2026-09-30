@@ -279,9 +279,18 @@ func UnknownNames(c *StringCache) (names [][]byte, mark int) {
 		return nil, 0
 	}
 	if c.names == nil {
-		c.names = new([][]byte)
+		return unknownNamesInit(c)
 	}
 	return *c.names, len(*c.names)
+}
+
+// unknownNamesInit is the first call's allocation, out of line so that
+// every object's [UnknownNames] call inlines.
+//
+//go:noinline
+func unknownNamesInit(c *StringCache) ([][]byte, int) {
+	c.names = new([][]byte)
+	return nil, 0
 }
 
 // AddUnknownName appends name to the list an object took from
