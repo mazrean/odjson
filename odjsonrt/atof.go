@@ -53,8 +53,8 @@ var pow10f32 = [...]float32{1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e
 // exact floating point operation when the digits fit the mantissa, and
 // otherwise by the Eisel-Lemire product, which declines a literal that
 // lands exactly halfway between two floats or below the normal range; for
-// float32 by the exact operation alone. Everything else, including every
-// malformed literal, is declined and left to the general path.
+// float32 by the same two steps at 24 bits. Everything else, including
+// every malformed literal, is declined and left to the general path.
 func ParseSimpleFloat(data []byte, p int, bitSize int) (float64, int, bool) {
 	i := p
 	neg := uint(i) < uint(len(data)) && data[i] == '-'
@@ -119,9 +119,6 @@ func ParseSimpleFloat(data []byte, p int, bitSize int) (float64, int, bool) {
 	}
 	exp := 0
 	if uint(i) < uint(len(data)) && data[i]|0x20 == 'e' {
-		if bitSize == 32 {
-			return 0, p, false
-		}
 		i++
 		eneg := false
 		if uint(i) < uint(len(data)) && (data[i] == '+' || data[i] == '-') {
@@ -149,10 +146,62 @@ func ParseSimpleFloat(data []byte, p int, bitSize int) (float64, int, bool) {
 
 	var f float64
 	if bitSize == 32 {
-		if m >= 1<<24 || frac >= len(pow10f32) {
-			return 0, p, false
+		// The same two steps at 24 bits: one exact float32 operation when
+		// both parts are exact, and otherwise the Eisel-Lemire product
+		// cut at 25 bits, with the same declines (see the float64 arm
+		// below for the shape of it). strconv.ParseFloat(s, 32) rounds
+		// the decimal to the nearest float32 once, and so does this; a
+		// float64 rounded again to float32 would not.
+		q := exp - frac
+		switch {
+		case m == 0:
+		case m < 1<<24 && q >= -len(pow10f32)+1 && q <= len(pow10f32)-1:
+			g := float32(m)
+			if q < 0 {
+				g /= pow10f32[-q]
+			} else {
+				g *= pow10f32[q]
+			}
+			f = float64(g)
+		default:
+			if q < atofPow10Min || q > atofPow10Max {
+				return 0, p, false
+			}
+			clz := bits.LeadingZeros64(m)
+			w := m << uint(clz)
+			e2 := uint64((217706*q)>>16+64+127) - uint64(clz)
+
+			pow := atofPow10[q-atofPow10Min]
+			hi, lo := bits.Mul64(w, pow.hi)
+			if hi&0x3fffffffff == 0x3fffffffff && lo+w < w {
+				hi2, lo2 := bits.Mul64(w, pow.lo)
+				mergedHi, mergedLo := hi, lo+hi2
+				if mergedLo < lo {
+					mergedHi++
+				}
+				if mergedHi&0x3fffffffff == 0x3fffffffff && mergedLo+1 == 0 && lo2+w < w {
+					return 0, p, false
+				}
+				hi, lo = mergedHi, mergedLo
+			}
+
+			msb := hi >> 63
+			mant := hi >> (msb + 38)
+			e2 -= 1 ^ msb
+			if lo == 0 && hi&0x3fffffffff == 0 && mant&3 == 1 {
+				return 0, p, false
+			}
+			mant += mant & 1
+			mant >>= 1
+			if mant>>24 > 0 {
+				mant >>= 1
+				e2++
+			}
+			if e2-1 >= 0xff-1 {
+				return 0, p, false
+			}
+			f = float64(math.Float32frombits(uint32(e2<<23 | mant&(1<<23-1))))
 		}
-		f = float64(float32(m) / pow10f32[frac])
 	} else if exp == 0 && m < 1<<53 && frac < len(pow10) {
 		// The common shape, both parts exact: one correctly rounded
 		// division (Clinger's fast path).

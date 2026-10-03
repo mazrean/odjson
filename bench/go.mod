@@ -7,7 +7,7 @@ replace github.com/mazrean/odjson => ../
 require (
 	github.com/bytedance/sonic v1.15.4
 	github.com/francoispqt/gojay v1.2.13
-	github.com/goccy/go-json v0.10.6
+	github.com/goccy/go-json v0.11.1
 	github.com/json-iterator/go v1.1.12
 	github.com/mailru/easyjson v0.9.2
 	github.com/mazrean/odjson v0.0.0-00010101000000-000000000000

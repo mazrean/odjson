@@ -22,3 +22,15 @@ func SliceFrom[T Scalar](c *StringCache) []T { return make([]T, 0, sliceMin) }
 
 // SliceDone finishes a slice [SliceFrom] began.
 func SliceDone[T Scalar](c *StringCache, s []T) []T { return s }
+
+// CarveSlice returns an empty slice of T with room for n elements. See
+// slab.go for the build that carves it from a chunk.
+func CarveSlice[T Scalar](c *StringCache, n int) []T { return make([]T, 0, n) }
+
+// CarveStrings returns an empty []string with room for n. See slab.go for
+// the build that carves it from a chunk.
+func CarveStrings(c *StringCache, n int) []string { return make([]string, 0, n) }
+
+// CarveElems returns an empty []T with room for n. See slab.go for the
+// build that carves it from a chunk.
+func CarveElems[T any](c *StringCache, h *CapHint) []T { return make([]T, 0, CapFor[T](h)) }

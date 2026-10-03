@@ -87,14 +87,19 @@ func ErrKindFrom(dec *jsontext.Decoder, goType string) error {
 	return ErrKind(byte(k), goType)
 }
 
-// StringCache remembers recently decoded strings so that a value that occurs
-// many times in a document, or across documents, is allocated once, and
-// carves the strings it does allocate out of shared chunks.
+// StringCache carves the strings a decode produces out of shared chunks,
+// and remembers the member names it has made, so that a name that occurs
+// in every object of a document — a map's keys, an object's names read
+// into an any — is allocated once.
 //
 // encoding/json/v2 keeps the same kind of cache inside its decoder state, and
 // a decoder that lacks one allocates a string per member where json/v2 does
 // not. The cache is a direct mapped table keyed by a hash of the string's
-// first and last bytes, so a lookup costs the same for every length.
+// first and last bytes, so a lookup costs the same for every length. The
+// values are not interned: they repeat less than the names do, and the
+// table's hash, probe and compare on every one of them cost the rows
+// whose strings are unique up to a fifth (the obj-record shape), for a
+// few percent of memory on the documents whose values repeat.
 //
 // The any decoder's interface values are built the same way: the string and
 // slice headers and the floats they point to are carved from chunks of
@@ -158,12 +163,77 @@ type slab struct {
 	// boxes holds the header chunks the any decoder's interface values
 	// point into; see box.go.
 	boxes *boxes
+	// entries and anys are the any decoder's scratch for the members of
+	// the objects and the elements of the arrays it has open: each
+	// container is made once, sized, from what it pushed. See anyState.
+	entries []anyEntry
+	anys    []any
+	// strs is the chunk of string headers a struct field's []string is
+	// carved from (see CarveStrings). Unlike the any decoder's boxes it is
+	// kept from one document to the next: a header points at bytes and
+	// at nothing else, so a chunk holds no document but through the
+	// strings its headers name.
+	strs []string
+	// typed is one chunk per struct field of []T, for a T the collector
+	// has to scan, indexed by the field's CapHint (see CarveElems); the
+	// same rule as strs, since a chunk is typed and the collector scans
+	// it.
+	typed []typedChunk
+}
+
+// typedChunk is a chunk of T for one field: the chunk's first element,
+// how many elements have been handed out and how many the chunk holds.
+// The chunk itself is a []T from make, so its type is on the heap and the
+// collector scans what has been handed out and what has not alike. The
+// tail is kept as a count rather than a pointer so that no pointer past
+// the chunk's end is ever formed, which checkptr would refuse.
+type typedChunk struct {
+	base unsafe.Pointer
+	used int
+	size int
 }
 
 // alloc returns b as a string, carved from the cache's current chunk when
 // it fits, allocated on its own otherwise, and "" for no bytes. A nil cache
 // allocates. The carved region is never written again: free only advances,
 // and a chunk that cannot hold b is left behind with its tail unused.
+// allocWord is alloc for the first n bytes of src, a short string whose
+// scan has already seen its eight bytes: those eight are copied whole,
+// which is one move rather than a memmove, and n of them handed out. The
+// bytes past n stay free, and nothing handed out lies beyond the tail for
+// the copy to reach. It is kept inlinable; the cases that need a chunk
+// are in allocWordSlow.
+func (c *StringCache) allocWord(src []byte, n int) string {
+	if c == nil {
+		return c.allocWordSlow(src, n)
+	}
+	sl := c.slab
+	if sl == nil || len(sl.free) < 8 {
+		return c.allocWordSlow(src, n)
+	}
+	copy(sl.free[:8], src[:8])
+	s := unsafe.String(unsafe.SliceData(sl.free), n)
+	sl.free = sl.free[n:]
+	return s
+}
+
+//go:noinline
+func (c *StringCache) allocWordSlow(src []byte, n int) string {
+	if c == nil {
+		return string(src[:n])
+	}
+	sl := c.slab
+	if sl == nil {
+		sl = new(slab)
+		c.slab = sl
+	}
+	sl.free = make([]byte, slabSize)
+	copy(sl.free[:8], src[:8])
+	s := unsafe.String(unsafe.SliceData(sl.free), n)
+	sl.free = sl.free[n:]
+	return s
+}
+
 func (c *StringCache) alloc(b []byte) string {
 	if len(b) == 0 {
 		return ""
@@ -183,6 +253,17 @@ func (c *StringCache) alloc(b []byte) string {
 	s := unsafe.String(unsafe.SliceData(sl.free), n)
 	sl.free = sl.free[n:]
 	return s
+}
+
+// scratch returns the cache's unescaping buffer, empty, allocating the slab
+// on first use.
+func (c *StringCache) scratch() []byte {
+	sl := c.slab
+	if sl == nil {
+		sl = new(slab)
+		c.slab = sl
+	}
+	return sl.scratch[:0]
 }
 
 // unquoteString decodes the body of a string literal with escapes into a
@@ -221,9 +302,18 @@ func UnknownNames(c *StringCache) (names [][]byte, mark int) {
 		return nil, 0
 	}
 	if c.names == nil {
-		c.names = new([][]byte)
+		return unknownNamesInit(c)
 	}
 	return *c.names, len(*c.names)
+}
+
+// unknownNamesInit is the first call's allocation, out of line so that
+// every object's [UnknownNames] call inlines.
+//
+//go:noinline
+func unknownNamesInit(c *StringCache) ([][]byte, int) {
+	c.names = new([][]byte)
+	return nil, 0
 }
 
 // AddUnknownName appends name to the list an object took from
@@ -237,6 +327,32 @@ func AddUnknownName(c *StringCache, names [][]byte, name []byte) [][]byte {
 		*c.names = names
 	}
 	return names
+}
+
+// UnknownName is [AddUnknownName] with the duplicate check the strict
+// decoders make first: dup reports that the object, whose names start at
+// mark, already holds name, and nothing is added. filter is the object's
+// 64 bit filter over the names it has added, a smaller cousin of the one
+// [SkipValueStrict] keeps per level: a name whose bit is clear is known to
+// be new, so the scan of the list, which was every name against every
+// earlier one, is paid only on a hit, and an object with a dozen unknown
+// members takes one or two. One word, because every object zeroes it,
+// and most objects have no unknown member to put in it.
+func UnknownName(c *StringCache, names [][]byte, mark int, filter *uint64, name []byte) (out [][]byte, dup bool) {
+	bit := uint64(1) << (nameHash(name) >> 58)
+	if *filter&bit != 0 {
+		for _, n := range names[mark:] {
+			if string(n) == string(name) {
+				return names, true
+			}
+		}
+	}
+	*filter |= bit
+	names = append(names, name)
+	if c != nil {
+		*c.names = names
+	}
+	return names, false
 }
 
 // EndUnknownNames gives the list back once the object is closed, with this
@@ -273,6 +389,19 @@ func PutStringCache(c *StringCache) {
 		// they alias its document.
 		clear(*c.names)
 		*c.names = (*c.names)[:0]
+	}
+	if c.slab != nil && c.slab.boxes != nil {
+		// The header chunks are this document's: carried into the next
+		// they would keep it alive, and its predecessors through it (see
+		// box.go).
+		*c.slab.boxes = boxes{}
+	}
+	if c.slab != nil && (len(c.slab.entries) > 0 || len(c.slab.anys) > 0) {
+		// A decoder that failed inside a container left its members,
+		// which hold the values decoded so far.
+		clear(c.slab.entries)
+		clear(c.slab.anys)
+		c.slab.entries, c.slab.anys = c.slab.entries[:0], c.slab.anys[:0]
 	}
 	if c.slab != nil && cap(c.slab.scratch) > slabScratchMax {
 		// One document with a huge escaped string should not size the
@@ -382,7 +511,7 @@ func ParseStringValue(val []byte, c *StringCache) (string, error) {
 	}
 	body := val[1 : len(val)-1]
 	if bytes.IndexByte(body, '\\') < 0 {
-		return c.Make(body), nil
+		return c.alloc(body), nil
 	}
 	s, ok := c.unquoteString(body, false)
 	if !ok {
@@ -400,8 +529,9 @@ func ParseStringWith(data []byte, p int, c *StringCache) (string, int, error) {
 		return "", p, ErrType(data, p, "string")
 	}
 	if uint(p+9) <= uint(len(data)) {
-		if end := shortString(load64(data, p+1), p); end > 0 {
-			return c.Make(data[p+1 : end-1]), end, nil
+		w := load64(data, p+1)
+		if end := shortString(w, p); end > 0 {
+			return c.allocWord(data[p+1:p+9], end-2-p), end, nil
 		}
 	}
 	end, hasEscape, _, err := scanString(data, p)
@@ -410,7 +540,7 @@ func ParseStringWith(data []byte, p int, c *StringCache) (string, int, error) {
 	}
 	body := data[p+1 : end-1]
 	if !hasEscape {
-		return c.Make(body), end, nil
+		return c.alloc(body), end, nil
 	}
 	s, ok := c.unquoteString(body, false)
 	if !ok {

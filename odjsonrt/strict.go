@@ -9,6 +9,7 @@ import (
 	jsonv2 "encoding/json/v2"
 	"unicode/utf16"
 	"unicode/utf8"
+	"unsafe"
 )
 
 // Strict parsing.
@@ -105,19 +106,11 @@ func parseStringBytesStrict(data []byte, p int) (s []byte, aliased bool, next in
 	if end := shortName(data, p); end > 0 {
 		return data[p+1 : end-1], true, end, nil
 	}
-	end, hasEscape, _, err := scanStringStrict(data, p)
+	body, aliased, _, end, err := scanStringStrictInto(data, p, nil)
 	if err != nil {
 		return nil, false, end, err
 	}
-	body := data[p+1 : end-1]
-	if !hasEscape {
-		return body, true, end, nil
-	}
-	out, ok := unquote(body, true)
-	if !ok {
-		return nil, false, p, ErrSyntax(data, p, "invalid string literal")
-	}
-	return out, false, end, nil
+	return body, aliased, end, nil
 }
 
 // skipStringStrict scans the string literal at p under json/v2's rules
@@ -227,6 +220,209 @@ func scanStringStrict(data []byte, p int) (end int, hasEscape, nonASCII bool, er
 	return i, hasEscape, nonASCII, errUnexpectedEnd(i)
 }
 
+// hexVal maps a byte to the value of the hexadecimal digit it is, and to
+// 0xff for anything else, so that four lookups or-ed together say whether
+// all four were digits with one test.
+var hexVal = func() (t [256]uint8) {
+	for i := range t {
+		t[i] = 0xff
+	}
+	for c := '0'; c <= '9'; c++ {
+		t[c] = uint8(c - '0')
+	}
+	for c := 'a'; c <= 'f'; c++ {
+		t[c] = uint8(c-'a') + 10
+		t[c-'a'+'A'] = uint8(c-'a') + 10
+	}
+	return t
+}()
+
+// hex4 decodes the four hexadecimal digits at s[i:i+4], which must exist,
+// or reports the offset of the first byte that is not one.
+func hex4(s []byte, i int) (r rune, bad int) {
+	a, b, c, d := hexVal[s[i]], hexVal[s[i+1]], hexVal[s[i+2]], hexVal[s[i+3]]
+	if a|b|c|d > 0xf {
+		switch {
+		case a > 0xf:
+			return 0, i
+		case b > 0xf:
+			return 0, i + 1
+		case c > 0xf:
+			return 0, i + 2
+		default:
+			return 0, i + 3
+		}
+	}
+	return rune(a)<<12 | rune(b)<<8 | rune(c)<<4 | rune(d), -1
+}
+
+// scanStringStrictInto is [scanStringStrict] that also produces the string:
+// the body as a slice of data, aliased, when the literal has no escape, and
+// otherwise its decoded bytes, built in the cache's scratch from the first
+// escape on by unescapeStrictFrom, in the same pass that validates the
+// literal. A string with escapes used to be scanned once and unescaped by
+// a second walk that found each backslash again; here the scan is already
+// standing on it. The loop here is scanStringStrict's, with nothing more
+// in it: the copying loop lives in the function the first escape hands
+// over to, so that the strings without one, which are most, cost what
+// they did. The rules are json/v2's: the body must be UTF-8, every \u
+// escape must decode, and a surrogate must be one half of a pair. err is
+// at the byte it names.
+func scanStringStrictInto(data []byte, p int, cache *StringCache) (body []byte, aliased, nonASCII bool, end int, err error) {
+	i := p + 1
+	for uint(i) < uint(len(data)) {
+		for i+8 <= len(data) {
+			w := load64(data, i)
+			if m := swarStringStop(w) | w&swarHi; m != 0 {
+				i += swarIndex(m)
+				break
+			}
+			i += 8
+		}
+		if uint(i) >= uint(len(data)) {
+			break
+		}
+		switch c := data[i]; {
+		case c == '"':
+			return data[p+1 : i], true, nonASCII, i + 1, nil
+		case c == '\\':
+			return unescapeStrictFrom(data, p, i, nonASCII, cache)
+		case c < 0x20:
+			return nil, false, nonASCII, i, errChar(data, i, "in string literal")
+		case c >= utf8.RuneSelf:
+			nonASCII = true
+			if c-0xC2 < 0x1E && uint(i+1) < uint(len(data)) && data[i+1]&0xC0 == 0x80 {
+				i += 2
+				if uint(i) < uint(len(data)) && data[i] >= utf8.RuneSelf {
+					// A dense run: skipNonASCII takes it a word at a time.
+				} else {
+					for i+8 <= len(data) {
+						w := load64(data, i)
+						if w&swarHi == 0 || swarStringStop(w) != 0 || !swarLatin(w) {
+							break
+						}
+						i += 8
+					}
+					continue
+				}
+			}
+			if next := skipNonASCII(data, i); next >= 0 {
+				i = next
+			} else if bytes.IndexByte(data[i:], '"') < 0 {
+				return nil, false, nonASCII, len(data), errUnexpectedEnd(len(data))
+			} else {
+				return nil, false, nonASCII, p, errInvalidUTF8(data, p)
+			}
+		default:
+			i++
+		}
+	}
+	return nil, false, nonASCII, i, errUnexpectedEnd(i)
+}
+
+// unescapeStrictFrom continues scanStringStrictInto from i, the first
+// backslash of the literal at p: the bytes before it are copied to the
+// cache's scratch, and from there every run and every decoded escape is
+// appended as the scan passes it. Its result is the decoded body, in the
+// scratch's array, which the caller carves from the slab.
+//
+//go:noinline
+func unescapeStrictFrom(data []byte, p, i int, nonASCII bool, cache *StringCache) (body []byte, aliased, nonASCIIOut bool, end int, err error) {
+	var out []byte
+	if cache != nil {
+		out = cache.scratch()
+	}
+	out = append(out, data[p+1:i]...)
+	// run is where the bytes not yet copied to out start.
+	run := i
+	for uint(i) < uint(len(data)) {
+		for i+8 <= len(data) {
+			w := load64(data, i)
+			if m := swarStringStop(w) | w&swarHi; m != 0 {
+				i += swarIndex(m)
+				break
+			}
+			i += 8
+		}
+		if uint(i) >= uint(len(data)) {
+			break
+		}
+		switch c := data[i]; {
+		case c == '"':
+			return append(out, data[run:i]...), false, nonASCII, i + 1, nil
+		case c == '\\':
+			out = append(out, data[run:i]...)
+			i++
+			if uint(i) >= uint(len(data)) {
+				return nil, false, nonASCII, i, errUnexpectedEnd(i)
+			}
+			switch e := data[i]; e {
+			case '"', '\\', '/':
+				out = append(out, e)
+				i++
+			case 'b':
+				out = append(out, '\b')
+				i++
+			case 'f':
+				out = append(out, '\f')
+				i++
+			case 'n':
+				out = append(out, '\n')
+				i++
+			case 'r':
+				out = append(out, '\r')
+				i++
+			case 't':
+				out = append(out, '\t')
+				i++
+			case 'u':
+				if uint(i+4) >= uint(len(data)) {
+					return nil, false, nonASCII, len(data), errUnexpectedEnd(len(data))
+				}
+				r, bad := hex4(data, i+1)
+				if bad >= 0 {
+					return nil, false, nonASCII, bad, errChar(data, bad, "in \\u hexadecimal character escape")
+				}
+				i += 5
+				if utf16.IsSurrogate(r) {
+					// The other half has to follow, spelled the same way,
+					// and the two have to be a high and a low in that
+					// order: anything else is an unpaired surrogate.
+					if uint(i+5) >= uint(len(data)) || data[i] != '\\' || data[i+1] != 'u' {
+						return nil, false, nonASCII, p, ErrSyntax(data, p, "invalid string literal")
+					}
+					r2, bad := hex4(data, i+2)
+					if bad >= 0 {
+						return nil, false, nonASCII, bad, errChar(data, bad, "in \\u hexadecimal character escape")
+					}
+					if r = utf16.DecodeRune(r, r2); r == utf8.RuneError {
+						return nil, false, nonASCII, p, ErrSyntax(data, p, "invalid string literal")
+					}
+					i += 6
+				}
+				out = utf8.AppendRune(out, r)
+			default:
+				return nil, false, nonASCII, i, errChar(data, i, "in string escape code")
+			}
+			run = i
+		case c < 0x20:
+			return nil, false, nonASCII, i, errChar(data, i, "in string literal")
+		case c >= utf8.RuneSelf:
+			nonASCII = true
+			if next := skipNonASCII(data, i); next >= 0 {
+				i = next
+			} else if bytes.IndexByte(data[i:], '"') < 0 {
+				return nil, false, nonASCII, len(data), errUnexpectedEnd(len(data))
+			} else {
+				return nil, false, nonASCII, p, errInvalidUTF8(data, p)
+			}
+		default:
+			i++
+		}
+	}
+	return nil, false, nonASCII, i, errUnexpectedEnd(i)
+}
+
 // validEscapes reports whether every \u escape in a string body that
 // scanString has accepted decodes under json/v2's rules. Only surrogates can
 // fail: a high surrogate must be followed by a low one, and a low one may not
@@ -261,7 +457,8 @@ func validEscapes(s []byte) bool {
 
 // ParseStringStrict is [ParseString] under json/v2's rules: invalid UTF-8 and
 // an unpaired surrogate escape are errors rather than U+FFFD. The result is
-// interned through c when it is not nil.
+// carved from c's slab when c is not nil, and not interned: see
+// [StringCache].
 func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) {
 	if uint(p) >= uint(len(data)) {
 		return "", p, errUnexpectedEnd(p)
@@ -270,28 +467,24 @@ func ParseStringStrict(data []byte, p int, c *StringCache) (string, int, error) 
 		return "", p, ErrType(data, p, "string")
 	}
 	if uint(p+9) <= uint(len(data)) {
-		if end := shortString(load64(data, p+1), p); end > 0 {
-			return c.Make(data[p+1 : end-1]), end, nil
+		w := load64(data, p+1)
+		if end := shortString(w, p); end > 0 {
+			return c.allocWord(data[p+1:p+9], end-2-p), end, nil
 		}
 	}
-	end, hasEscape, nonASCII, err := scanStringStrict(data, p)
+	// A string with escapes is decoded in the scan's own pass, into the
+	// cache's scratch buffer, and carved from its slab like any other.
+	body, aliased, _, end, err := scanStringStrictInto(data, p, c)
 	if err != nil {
 		return "", end, err
 	}
-	body := data[p+1 : end-1]
-	if !hasEscape {
-		if !nonASCII {
-			return c.Make(body), end, nil
-		}
-		// The scan has validated the body, so the entry can be marked
-		// for the callers that would otherwise check it again.
-		return c.MakeValid(body), end, nil
+	if aliased {
+		return c.alloc(body), end, nil
 	}
-	s, ok := c.unquoteString(body, true)
-	if !ok {
-		return "", p, ErrSyntax(data, p, "invalid string literal")
+	if c != nil && cap(body) > cap(c.slab.scratch) {
+		c.slab.scratch = body[:0]
 	}
-	return s, end, nil
+	return c.alloc(body), end, nil
 }
 
 // ParseStringInnerStrict is [ParseStringInner] under json/v2's rules.
@@ -493,12 +686,50 @@ func strictKey(data []byte, p int, names [][]byte, lv *strictLevel) ([][]byte, i
 // SkipValueStrict is [SkipValue] under json/v2's rules: strings must be valid
 // UTF-8 and no object may hold a name twice, at any depth.
 //
+// A scalar is settled here, with nothing on the stack: most of the values
+// a struct decoder skips are the strings and numbers of members it does
+// not know, and the arrays an object or array needs would cost each of
+// them two kilobytes of zeroing. Those live in [skipCompoundStrict].
+func SkipValueStrict(data []byte, p int) (int, error) {
+	if uint(p) >= uint(len(data)) {
+		return p, errUnexpectedEnd(p)
+	}
+	switch c := data[p]; c {
+	case '{', '[':
+		return skipCompoundStrict(data, p)
+	case '"':
+		return skipStringStrict(data, p)
+	case 't':
+		if !isTrue(data, p) {
+			return p, errBeginValue(data, p)
+		}
+		return p + 4, nil
+	case 'f':
+		if !isFalse(data, p) {
+			return p, errBeginValue(data, p)
+		}
+		return p + 5, nil
+	case 'n':
+		if !isNull(data, p) {
+			return p, errBeginValue(data, p)
+		}
+		return p + 4, nil
+	default:
+		if c != '-' && (c < '0' || c > '9') {
+			return p, errBeginValue(data, p)
+		}
+		return scanNumber(data, p)
+	}
+}
+
+// skipCompoundStrict is [SkipValueStrict] for the object or array at p.
+//
 // The names of every open object are kept back to back in one list, with a
 // [strictLevel] per non-empty object saying where that object's names start
 // and which of them might already be present. Both live in small arrays on
-// the stack, so skipping a scalar or a small object allocates nothing; only a
-// wide or deep object spills them to the heap.
-func SkipValueStrict(data []byte, p int) (int, error) {
+// the stack, so skipping a small object allocates nothing; only a wide or
+// deep object spills them to the heap.
+func skipCompoundStrict(data []byte, p int) (int, error) {
 	var inline [inlineDepth]byte
 	stack := inline[:0]
 	var namesBuf [64][]byte
@@ -622,6 +853,24 @@ func SkipValueStrict(data []byte, p int) (int, error) {
 // otherwise. It is one body rather than a call to either, so that a string
 // on the direct path costs the generated decoder a single call.
 func ParseStringV2(data []byte, p int, c *StringCache, strict bool) (string, int, error) {
+	// A short string — the closing quote inside the word after the
+	// opening one, nothing to escape or validate before it — is the
+	// common case in a document of member values, and it is taken here,
+	// one call up, with the word it was found in stored as it is.
+	if uint(p+9) <= uint(len(data)) && data[p] == '"' {
+		if end := shortString(load64(data, p+1), p); end > 0 {
+			// allocWord, written out: the call would not inline here.
+			if c != nil {
+				if sl := c.slab; sl != nil && len(sl.free) >= 8 {
+					copy(sl.free[:8], data[p+1:p+9])
+					s := unsafe.String(unsafe.SliceData(sl.free), end-2-p)
+					sl.free = sl.free[end-2-p:]
+					return s, end, nil
+				}
+			}
+			return c.allocWordSlow(data[p+1:p+9], end-2-p), end, nil
+		}
+	}
 	if strict {
 		return ParseStringStrict(data, p, c)
 	}

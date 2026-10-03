@@ -5832,7 +5832,88 @@ func (v CitmCatalog) MarshalEasyJSON(w *jwriter.Writer) {
 func (v *CitmCatalog) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson33(l, v)
 }
-func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson34(in *jlexer.Lexer, out *Canada) {
+func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson34(in *jlexer.Lexer, out *Catalog) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "items":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				in.Delim('{')
+				out.Items = make(map[string]Item)
+				for !in.IsDelim('}') {
+					key := string(in.String())
+					in.WantColon()
+					var v144 Item
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v144).UnmarshalEasyJSON(in)
+					}
+					(out.Items)[key] = v144
+					in.WantComma()
+				}
+				in.Delim('}')
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson34(out *jwriter.Writer, in Catalog) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"items\":"
+		out.RawString(prefix[1:])
+		if in.Items == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
+			out.RawString(`null`)
+		} else {
+			out.RawByte('{')
+			v145First := true
+			for v145Name, v145Value := range in.Items {
+				if v145First {
+					v145First = false
+				} else {
+					out.RawByte(',')
+				}
+				out.String(string(v145Name))
+				out.RawByte(':')
+				(v145Value).MarshalEasyJSON(out)
+			}
+			out.RawByte('}')
+		}
+	}
+	out.RawByte('}')
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v Catalog) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson34(w, v)
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *Catalog) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson34(l, v)
+}
+func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson35(in *jlexer.Lexer, out *Canada) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -5868,13 +5949,13 @@ func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson34(in *jlexe
 					out.Features = (out.Features)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v144 Feature
+					var v146 Feature
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						(v144).UnmarshalEasyJSON(in)
+						(v146).UnmarshalEasyJSON(in)
 					}
-					out.Features = append(out.Features, v144)
+					out.Features = append(out.Features, v146)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -5889,7 +5970,7 @@ func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson34(in *jlexe
 		in.Consumed()
 	}
 }
-func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson34(out *jwriter.Writer, in Canada) {
+func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson35(out *jwriter.Writer, in Canada) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -5905,11 +5986,11 @@ func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson34(out *jwri
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v145, v146 := range in.Features {
-				if v145 > 0 {
+			for v147, v148 := range in.Features {
+				if v147 > 0 {
 					out.RawByte(',')
 				}
-				(v146).MarshalEasyJSON(out)
+				(v148).MarshalEasyJSON(out)
 			}
 			out.RawByte(']')
 		}
@@ -5919,14 +6000,14 @@ func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson34(out *jwri
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v Canada) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson34(w, v)
+	easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson35(w, v)
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Canada) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson34(l, v)
+	easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson35(l, v)
 }
-func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson35(in *jlexer.Lexer, out *Bools) {
+func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson36(in *jlexer.Lexer, out *Bools) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -5956,13 +6037,13 @@ func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson35(in *jlexe
 					out.Values = (out.Values)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v147 bool
+					var v149 bool
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						v147 = bool(in.Bool())
+						v149 = bool(in.Bool())
 					}
-					out.Values = append(out.Values, v147)
+					out.Values = append(out.Values, v149)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -5977,7 +6058,7 @@ func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson35(in *jlexe
 		in.Consumed()
 	}
 }
-func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson35(out *jwriter.Writer, in Bools) {
+func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson36(out *jwriter.Writer, in Bools) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -5988,11 +6069,11 @@ func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson35(out *jwri
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v148, v149 := range in.Values {
-				if v148 > 0 {
+			for v150, v151 := range in.Values {
+				if v150 > 0 {
 					out.RawByte(',')
 				}
-				out.Bool(bool(v149))
+				out.Bool(bool(v151))
 			}
 			out.RawByte(']')
 		}
@@ -6002,14 +6083,14 @@ func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson35(out *jwri
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v Bools) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson35(w, v)
+	easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson36(w, v)
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Bools) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson35(l, v)
+	easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson36(l, v)
 }
-func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson36(in *jlexer.Lexer, out *Area) {
+func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson37(in *jlexer.Lexer, out *Area) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -6045,13 +6126,13 @@ func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson36(in *jlexe
 					out.BlockIds = (out.BlockIds)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v150 int64
+					var v152 int64
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						v150 = int64(in.Int64())
+						v152 = int64(in.Int64())
 					}
-					out.BlockIds = append(out.BlockIds, v150)
+					out.BlockIds = append(out.BlockIds, v152)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -6066,7 +6147,7 @@ func easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson36(in *jlexe
 		in.Consumed()
 	}
 }
-func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson36(out *jwriter.Writer, in Area) {
+func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson37(out *jwriter.Writer, in Area) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -6082,11 +6163,11 @@ func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson36(out *jwri
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v151, v152 := range in.BlockIds {
-				if v151 > 0 {
+			for v153, v154 := range in.BlockIds {
+				if v153 > 0 {
 					out.RawByte(',')
 				}
-				out.Int64(int64(v152))
+				out.Int64(int64(v154))
 			}
 			out.RawByte(']')
 		}
@@ -6096,10 +6177,10 @@ func easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson36(out *jwri
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v Area) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson36(w, v)
+	easyjson6601e8cdEncodeGithubComMazreanOdjsonBenchShapesEasyjson37(w, v)
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Area) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson36(l, v)
+	easyjson6601e8cdDecodeGithubComMazreanOdjsonBenchShapesEasyjson37(l, v)
 }

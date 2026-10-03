@@ -179,7 +179,7 @@ func TestParseSimpleFloatRandom(t *testing.T) {
 	if testing.Short() {
 		n = 20000
 	}
-	accepted, total := 0, 0
+	accepted, accepted32, total := 0, 0, 0
 	for range n {
 		nd := 1 + r.IntN(19)
 		var sb strings.Builder
@@ -217,10 +217,61 @@ func TestParseSimpleFloatRandom(t *testing.T) {
 		if checkSimpleFloat(t, lit, 64) {
 			accepted++
 		}
-		checkSimpleFloat(t, lit, 32)
+		if checkSimpleFloat(t, lit, 32) {
+			accepted32++
+		}
 	}
 	if accepted < total*9/10 {
 		t.Errorf("accepted %d of %d literals", accepted, total)
+	}
+	// Most of the sweep's exponents are far outside a float32, whose
+	// range is a tenth of a float64's in either direction: those decline.
+	if accepted32 < total/4 {
+		t.Errorf("accepted %d of %d literals at 32 bits", accepted32, total)
+	}
+
+	// The literals a float32 field sees: up to nine significant digits, a
+	// point somewhere in them, an exponent within the type. All of them
+	// are settled here, with the halfway cases the only declines.
+	accepted32, total = 0, 0
+	for range n {
+		nd := 1 + r.IntN(9)
+		var sb strings.Builder
+		if r.IntN(2) == 0 {
+			sb.WriteByte('-')
+		}
+		digits := make([]byte, nd)
+		for i := range digits {
+			digits[i] = byte('0' + r.IntN(10))
+		}
+		if digits[0] == '0' && nd > 1 {
+			digits[0] = '1'
+		}
+		point := r.IntN(nd + 1)
+		if point == 0 {
+			sb.WriteString("0.")
+			sb.Write(digits)
+		} else {
+			sb.Write(digits[:point])
+			if point < nd {
+				sb.WriteByte('.')
+				sb.Write(digits[point:])
+			}
+		}
+		if r.IntN(3) == 0 {
+			sb.WriteByte('e')
+			sb.WriteString(strconv.Itoa(r.IntN(76) - 38))
+		}
+		total++
+		if checkSimpleFloat(t, sb.String(), 32) {
+			accepted32++
+		}
+	}
+	if accepted32 < total*9/10 {
+		t.Errorf("accepted %d of %d float32 literals", accepted32, total)
+	}
+	for _, lit := range []string{"3.4028235e38", "3.4028236e38", "1e39", "1.17549435e-38", "1e-46", "1.4e-45", "16777217", "0.1", "123.456789"} {
+		checkSimpleFloat(t, lit, 32)
 	}
 
 	// Neighbours of halfway points: the decimal expansions of

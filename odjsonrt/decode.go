@@ -5,6 +5,7 @@ import (
 	"encoding"
 	"encoding/base64"
 	"encoding/json"
+	"math/bits"
 	"strconv"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -21,8 +22,9 @@ func ParseString(data []byte, p int) (string, int, error) {
 	return adoptString(b, aliased), next, nil
 }
 
-// ParseStringCached is [ParseString] with a string cache: a literal that
-// needed no unescaping is interned through c, which may be nil.
+// ParseStringCached is [ParseString] with a string cache: the result is
+// carved from c's slab, which may be nil, and not interned (see
+// [StringCache]).
 func ParseStringCached(data []byte, p int, c *StringCache) (string, int, error) {
 	if uint(p) >= uint(len(data)) {
 		return "", p, errUnexpectedEnd(p)
@@ -32,7 +34,7 @@ func ParseStringCached(data []byte, p int, c *StringCache) (string, int, error) 
 	}
 	if uint(p+9) <= uint(len(data)) {
 		if end := shortString(load64(data, p+1), p); end > 0 {
-			return c.Make(data[p+1 : end-1]), end, nil
+			return c.alloc(data[p+1 : end-1]), end, nil
 		}
 	}
 	end, hasEscape, nonASCII, err := scanString(data, p)
@@ -41,12 +43,9 @@ func ParseStringCached(data []byte, p int, c *StringCache) (string, int, error) 
 	}
 	body := data[p+1 : end-1]
 	if !hasEscape {
-		if !nonASCII {
-			return c.Make(body), end, nil
-		}
 		// Invalid UTF-8 becomes U+FFFD below, which is unquote's job.
-		if s, ok := c.MakeUTF8(body); ok {
-			return s, end, nil
+		if !nonASCII || utf8.Valid(body) {
+			return c.alloc(body), end, nil
 		}
 	}
 	s, ok := c.unquoteString(body, false)
@@ -210,10 +209,12 @@ func parseIntSlow(data []byte, p int, bits int) (int64, int, error) {
 
 // ParseDecimal reads the integer literal at p in one pass, accumulating the
 // digits while it scans for the end of the number. It handles the common
-// shape, an optional minus sign and up to eighteen digits with nothing after
-// them, which can neither overflow nor need strconv's range checks. Anything
-// else, including a fraction, an exponent or a leading zero followed by more
-// digits, is left to the general path, which also produces the right error.
+// shape, an optional minus sign and up to nineteen digits with nothing after
+// them, whose value fits an int64: nineteen digits cannot overflow the
+// accumulator, so the one range test at the end is all that stands between
+// the digits and the value. Anything else, including a fraction, an
+// exponent, a leading zero followed by more digits or a magnitude beyond
+// int64, is left to the general path, which also produces the right error.
 func ParseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 	i := p
 	neg := uint(i) < uint(len(data)) && data[i] == '-'
@@ -222,6 +223,17 @@ func ParseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 	}
 	start := i
 	var u uint64
+	// The first eight bytes as one word: the digits among them are found
+	// and folded together, which settles most integers in one step where
+	// the loop below took one per digit. A number of more than eight
+	// digits, or one near the end of the input, continues in the loop.
+	if uint(i+8) <= uint(len(data)) {
+		var n int
+		if u, n = wordDigits(load64(data, i)); n == 0 {
+			return 0, p, false
+		}
+		i += n
+	}
 	for uint(i) < uint(len(data)) {
 		c := data[i] - '0'
 		if c > 9 {
@@ -231,26 +243,100 @@ func ParseDecimal(data []byte, p int) (v int64, end int, ok bool) {
 		i++
 	}
 	n := i - start
-	if n == 0 || n > 18 || (data[start] == '0' && n > 1) {
+	if n == 0 || n > 19 || (data[start] == '0' && n > 1) {
 		return 0, p, false
 	}
 	if uint(i) < uint(len(data)) && (data[i] == '.' || data[i] == 'e' || data[i] == 'E') {
 		return 0, p, false
 	}
 	if neg {
+		// 1<<63 is the one magnitude the negative side has and the
+		// positive side has not; -int64(1<<63) wraps to math.MinInt64,
+		// which is the value.
+		if u > 1<<63 {
+			return 0, p, false
+		}
 		return -int64(u), i, true
 	}
+	if u > 1<<63-1 {
+		return 0, p, false
+	}
 	return int64(u), i, true
+}
+
+// wordDigits reads the run of decimal digits at the start of the word w, the
+// eight bytes of a document loaded little-endian, and returns their value
+// and their number: 8 when every byte is a digit, and 0 when the first is
+// not. The digits move to the top lanes and the rest are zero, which fold
+// to the value of the digits alone; a shift by the word's width is zero,
+// so n = 0 folds to 0. Spelled into the generated decoders, with the load
+// and the tests around it, it cost the small payload's row more than the
+// call it saved: its integers are eight and ten digits, which the word
+// does not settle, and the byte loop then read them a second time.
+func wordDigits(w uint64) (u uint64, n int) {
+	t := w ^ digitZeros
+	nz := (t + 0x7676767676767676 | t) & 0x8080808080808080
+	if nz == 0 {
+		return fold8(t), 8
+	}
+	n = bits.TrailingZeros64(nz) >> 3
+	return fold8(t << (8 * uint(8-n))), n
+}
+
+// ParseUnsigned is [ParseDecimal] for an unsigned integer: no sign, and up to
+// twenty digits, the width of a uint64. The first nineteen are accumulated
+// without a check, which they cannot overflow; only a twentieth digit is
+// tested against what the accumulator has room for.
+func ParseUnsigned(data []byte, p int) (v uint64, end int, ok bool) {
+	i := p
+	var u uint64
+	// The first eight bytes as one word, as ParseDecimal reads them.
+	if uint(i+8) <= uint(len(data)) {
+		var n int
+		if u, n = wordDigits(load64(data, i)); n == 0 {
+			return 0, p, false
+		}
+		i += n
+	}
+	for uint(i) < uint(len(data)) && i-p < 19 {
+		c := data[i] - '0'
+		if c > 9 {
+			break
+		}
+		u = u*10 + uint64(c)
+		i++
+	}
+	n := i - p
+	if n == 0 || (data[p] == '0' && n > 1) {
+		return 0, p, false
+	}
+	if uint(i) < uint(len(data)) {
+		if c := data[i] - '0'; c <= 9 {
+			// The twentieth digit, and the only step that can overflow.
+			if n < 19 || u > (1<<64-1-uint64(c))/10 {
+				return 0, p, false
+			}
+			u = u*10 + uint64(c)
+			i++
+			if uint(i) < uint(len(data)) && data[i]-'0' <= 9 {
+				return 0, p, false
+			}
+		}
+	}
+	if uint(i) < uint(len(data)) && (data[i] == '.' || data[i] == 'e' || data[i] == 'E') {
+		return 0, p, false
+	}
+	return u, i, true
 }
 
 // ParseUint parses the JSON number at p into an unsigned integer of the given
 // bit size (8, 16, 32 or 64). A negative, fractional or out of range literal
 // produces a [TypeError].
 func ParseUint(data []byte, p int, bits int) (uint64, int, error) {
-	// A minus sign is rejected by strconv even before a zero, so "-0" has to
-	// take the general path to produce that error.
-	if v, end, ok := ParseDecimal(data, p); ok && data[p] != '-' && (bits == 64 || v <= 1<<bits-1) {
-		return uint64(v), end, nil
+	// ParseUnsigned takes no sign, so "-0" takes the general path, where
+	// strconv rejects the sign even before a zero and produces that error.
+	if v, end, ok := ParseUnsigned(data, p); ok && (bits == 64 || v <= 1<<bits-1) {
+		return v, end, nil
 	}
 	return parseUintSlow(data, p, bits)
 }
@@ -450,23 +536,10 @@ var smallAny = func() (t [1000]any) {
 	return
 }()
 
-// anyFrame is one level of the container stack used by [ParseAny]. A frame
-// with a non-nil obj describes an object, otherwise it describes an array.
-type anyFrame struct {
-	arr []any
-	obj map[string]any
-	key string
-	// keyPos is where key stands in the document, for the duplicate
-	// error, which is raised when the value is attached rather than when
-	// the name is read: a lookup then and an insert later would hash the
-	// name twice, and the insert alone says whether the name was new.
-	keyPos int
-}
-
 // ParseAny decodes the value at p the way encoding/json decodes into an
 // interface{}: objects become map[string]any, arrays []any, numbers float64,
-// strings string, booleans bool and null nil. The decoder is iterative and
-// rejects documents nested deeper than [MaxDepth].
+// strings string, booleans bool and null nil. The decoder rejects documents
+// nested deeper than [MaxDepth].
 func ParseAny(data []byte, p int) (any, int, error) {
 	return parseAny(data, p, nil, false, true)
 }
@@ -477,8 +550,34 @@ func ParseAnyCached(data []byte, p int, c *StringCache) (any, int, error) {
 	return parseAny(data, p, c, false, true)
 }
 
+// anyEntry is a member of an object the any decoder has open: its name,
+// its value, and where the name stands, for the duplicate error.
+type anyEntry struct {
+	key    string
+	val    any
+	keyPos int
+}
+
+// anyState is what the any decoder carries through its recursion: the
+// document, the cache, the two rule flags, and the two scratch stacks — the
+// members of the objects it has open and the elements of the arrays —
+// from which each container is made once, at its close, sized exactly. It
+// lives on parseAny's frame and is reached through a pointer, so that a
+// push is a store into it and never a typed copy through the write
+// barrier; the stacks themselves are the cache's, kept from one document
+// to the next, and given back at the end.
+type anyState struct {
+	data    []byte
+	sc      *StringCache
+	entries []anyEntry
+	anys    []any
+	strict  bool
+	legacy  bool
+}
+
 // parseAny is the implementation of [ParseAny], [ParseAnyWith] and
-// [ParseAnyStrict]. sc, when not nil, interns the strings the result holds.
+// [ParseAnyStrict]. sc, when not nil, interns the member names the result
+// holds; the values are carved from its slab without the table.
 //
 // Two flags say which rules apply to strings and object names. legacy is
 // encoding/json: invalid UTF-8 becomes U+FFFD and the last of two equal
@@ -487,158 +586,229 @@ func ParseAnyCached(data []byte, p int, c *StringCache) (any, int, error) {
 // has validated, where nothing can occur that needs checking. They are two
 // booleans rather than one mode so that [ParseAnyV2] stays a single call
 // the compiler inlines into generated code.
+//
+// The decoder is recursive, a function per kind of container, the way
+// go-json's is, rather than one loop over a stack of frames: the loop kept
+// every container's state behind a pointer into the stack and attached
+// each value through it, which cost the `generic` row twice what the
+// recursion does. The depth is bounded by MaxDepth, as the stack was.
 func parseAny(data []byte, p int, sc *StringCache, strict, legacy bool) (any, int, error) {
-	// The values that reach an interface are shallow: an object or two
-	// with an array of numbers inside. Room for a few levels on the stack
-	// keeps the container stack itself from being an allocation per value.
-	var inline [4]anyFrame
-	stack := inline[:0]
-	var v any
+	st := anyState{data: data, sc: sc, strict: strict, legacy: legacy}
+	var sl *slab
+	if sc != nil {
+		if sl = sc.slab; sl == nil {
+			sl = new(slab)
+			sc.slab = sl
+		}
+		st.entries, st.anys = sl.entries, sl.anys
+	}
+	eb, ab := len(st.entries), len(st.anys)
+	v, p, err := st.value(p, 0)
+	if err != nil {
+		// The containers left open hold the values decoded so far.
+		clear(st.entries[eb:])
+		clear(st.anys[ab:])
+	}
+	if sl != nil {
+		sl.entries, sl.anys = st.entries[:eb], st.anys[:ab]
+	}
+	return v, p, err
+}
 
+// value decodes the value at p, depth containers down.
+func (st *anyState) value(p, depth int) (any, int, error) {
+	data := st.data
+	if uint(p) >= uint(len(data)) {
+		return nil, p, errUnexpectedEnd(p)
+	}
+	switch c := data[p]; c {
+	case '{':
+		return st.object(p, depth)
+	case '[':
+		return st.array(p, depth)
+	case '"':
+		var s string
+		var next int
+		var err error
+		switch {
+		case st.legacy:
+			s, next, err = ParseStringCached(data, p, st.sc)
+		case st.strict:
+			s, next, err = ParseStringStrict(data, p, st.sc)
+		default:
+			s, next, err = ParseStringWith(data, p, st.sc)
+		}
+		if err != nil {
+			return nil, next, err
+		}
+		return st.sc.boxString(s), next, nil
+	case 't':
+		if !isTrue(data, p) {
+			return nil, p, errBeginValue(data, p)
+		}
+		return true, p + 4, nil
+	case 'f':
+		if !isFalse(data, p) {
+			return nil, p, errBeginValue(data, p)
+		}
+		return false, p + 5, nil
+	case 'n':
+		if !isNull(data, p) {
+			return nil, p, errBeginValue(data, p)
+		}
+		return nil, p + 4, nil
+	default:
+		if c != '-' && (c < '0' || c > '9') {
+			return nil, p, errBeginValue(data, p)
+		}
+		f, next, err := ParseFloat(data, p, 64)
+		if err != nil {
+			return nil, next, err
+		}
+		if i := int(f); f >= 0 && f < float64(len(smallAny)) && float64(i) == f && data[p] != '-' {
+			// A small non-negative integer, however it was spelled:
+			// boxed once at init instead of once per value. The sign
+			// test keeps -0 its own value.
+			return smallAny[i], next, nil
+		}
+		return st.sc.boxFloat(f), next, nil
+	}
+}
+
+// object decodes the object at p. Its members are pushed to the entry
+// stack as they are read, and the map is made when the object closes,
+// with room for all of them: a map filled a member at a time grows and
+// rehashes on the way, which cost more than the members did. The
+// duplicate error is raised at that insert rather than when the name is
+// read: a lookup then and an insert later would hash the name twice, and
+// the insert alone says whether the name was new. A filter per object
+// that settled it at the name, the way UnknownName does, cost the generic
+// row 3.5%; so where an object holds both a repeated name and a later
+// fault, the fault is the error here and the name is jsontext's — a
+// difference in which error, never in whether.
+func (st *anyState) object(p, depth int) (any, int, error) {
+	data := st.data
+	if depth >= MaxDepth {
+		return nil, p, ErrSyntax(data, p, "exceeded max depth")
+	}
+	p = SkipSpace(data, p+1)
+	if uint(p) < uint(len(data)) && data[p] == '}' {
+		return map[string]any{}, p + 1, nil
+	}
+	base := len(st.entries)
 	for {
+		kp := p
+		key, next, err := parseKeyString(data, p, st.sc, st.strict)
+		if err != nil {
+			return nil, next, err
+		}
+		v, next, err := st.value(next, depth+1)
+		if err != nil {
+			return nil, next, err
+		}
+		// The entry is written into its slot field by field: an append
+		// of the literal builds it on the stack and moves it in through
+		// the write barrier's typed copy, a call per member while the
+		// collector runs.
+		n := len(st.entries)
+		if n == cap(st.entries) {
+			st.entries = growEntries(st.entries)
+		}
+		st.entries = st.entries[:n+1]
+		e := &st.entries[n]
+		e.key, e.val, e.keyPos = key, v, kp
+		p = SkipSpace(data, next)
 		if uint(p) >= uint(len(data)) {
 			return nil, p, errUnexpectedEnd(p)
 		}
-		switch c := data[p]; c {
-		case '{':
-			if len(stack) >= MaxDepth {
-				return nil, p, ErrSyntax(data, p, "exceeded max depth")
-			}
-			obj := make(map[string]any)
+		switch data[p] {
+		case ',':
 			p = SkipSpace(data, p+1)
-			if uint(p) < uint(len(data)) && data[p] == '}' {
-				p++
-				v = obj
-				break
-			}
-			key, next, err := parseKeyString(data, p, sc, strict)
-			if err != nil {
-				return nil, next, err
-			}
-			stack = append(stack, anyFrame{obj: obj, key: key, keyPos: p})
-			p = next
-			continue
-		case '[':
-			if len(stack) >= MaxDepth {
-				return nil, p, ErrSyntax(data, p, "exceeded max depth")
-			}
-			p = SkipSpace(data, p+1)
-			if uint(p) < uint(len(data)) && data[p] == ']' {
-				p++
-				v = sc.boxSlice([]any{})
-				break
-			}
-			// Room for a few elements up front: the arrays that reach an
-			// any are mostly short, and this makes each one allocation.
-			stack = append(stack, anyFrame{arr: make([]any, 0, 4)})
-			continue
-		case '"':
-			var s string
-			var next int
-			var err error
-			switch {
-			case legacy:
-				s, next, err = ParseStringCached(data, p, sc)
-			case strict:
-				s, next, err = ParseStringStrict(data, p, sc)
-			default:
-				s, next, err = ParseStringWith(data, p, sc)
-			}
-			if err != nil {
-				return nil, next, err
-			}
-			v, p = sc.boxString(s), next
-		case 't':
-			if !isTrue(data, p) {
-				return nil, p, errBeginValue(data, p)
-			}
-			v, p = true, p+4
-		case 'f':
-			if !isFalse(data, p) {
-				return nil, p, errBeginValue(data, p)
-			}
-			v, p = false, p+5
-		case 'n':
-			if !isNull(data, p) {
-				return nil, p, errBeginValue(data, p)
-			}
-			v, p = nil, p+4
-		default:
-			if c != '-' && (c < '0' || c > '9') {
-				return nil, p, errBeginValue(data, p)
-			}
-			f, next, err := ParseFloat(data, p, 64)
-			if err != nil {
-				return nil, next, err
-			}
-			if i := int(f); f >= 0 && f < float64(len(smallAny)) && float64(i) == f && data[p] != '-' {
-				// A small non-negative integer, however it was spelled:
-				// boxed once at init instead of once per value. The sign
-				// test keeps -0 its own value.
-				v = smallAny[i]
-			} else {
-				v = sc.boxFloat(f)
-			}
-			p = next
-		}
-
-		// A value has been decoded; attach it and close finished containers.
-		for {
-			if len(stack) == 0 {
-				return v, p, nil
-			}
-			f := &stack[len(stack)-1]
-			if f.obj != nil {
-				n := len(f.obj)
-				f.obj[f.key] = v
-				if strict && len(f.obj) == n {
+		case '}':
+			members := st.entries[base:]
+			m := make(map[string]any, len(members))
+			for i := range members {
+				e := &members[i]
+				m[e.key] = e.val
+				if st.strict && len(m) != i+1 {
 					// The insert found the name already there. The
 					// value it replaced was the earlier member's, which
 					// no longer matters: the document is refused.
-					return nil, f.keyPos, ErrDuplicateName(data, f.keyPos, []byte(f.key))
+					return nil, e.keyPos, ErrDuplicateName(data, e.keyPos, []byte(e.key))
 				}
-			} else {
-				f.arr = append(f.arr, v)
 			}
-			p = SkipSpace(data, p)
-			if uint(p) >= uint(len(data)) {
-				return nil, p, errUnexpectedEnd(p)
-			}
-			isObj := f.obj != nil
-			switch {
-			case data[p] == ',':
-				p = SkipSpace(data, p+1)
-				if isObj {
-					key, next, err := parseKeyString(data, p, sc, strict)
-					if err != nil {
-						return nil, next, err
-					}
-					f.key, f.keyPos = key, p
-					p = next
-				}
-			case isObj && data[p] == '}':
-				v = f.obj
-				p++
-				stack = stack[:len(stack)-1]
-				continue
-			case !isObj && data[p] == ']':
-				v = sc.boxSlice(f.arr)
-				p++
-				stack = stack[:len(stack)-1]
-				continue
-			case isObj:
-				return nil, p, errChar(data, p, "after object key:value pair")
-			default:
-				return nil, p, errChar(data, p, "after array element")
-			}
-			break
+			// The entries hold the values, which the map now does; a
+			// pooled cache must not keep them alive.
+			clear(members)
+			st.entries = st.entries[:base]
+			return m, p + 1, nil
+		default:
+			return nil, p, errChar(data, p, "after object key:value pair")
 		}
 	}
+}
+
+// array decodes the array at p. Its elements go to the element stack and
+// are copied into a slice of their number when it closes: one allocation
+// of the exact size, where a slice grown as it is appended to costs its
+// growths.
+func (st *anyState) array(p, depth int) (any, int, error) {
+	data := st.data
+	if depth >= MaxDepth {
+		return nil, p, ErrSyntax(data, p, "exceeded max depth")
+	}
+	p = SkipSpace(data, p+1)
+	if uint(p) < uint(len(data)) && data[p] == ']' {
+		return st.sc.boxSlice([]any{}), p + 1, nil
+	}
+	base := len(st.anys)
+	for {
+		v, next, err := st.value(p, depth+1)
+		if err != nil {
+			return nil, next, err
+		}
+		st.anys = append(st.anys, v)
+		p = SkipSpace(data, next)
+		if uint(p) >= uint(len(data)) {
+			return nil, p, errUnexpectedEnd(p)
+		}
+		switch data[p] {
+		case ',':
+			p = SkipSpace(data, p+1)
+		case ']':
+			elems := st.anys[base:]
+			a := make([]any, len(elems))
+			copy(a, elems)
+			clear(elems)
+			st.anys = st.anys[:base]
+			return st.sc.boxSlice(a), p + 1, nil
+		default:
+			return nil, p, errChar(data, p, "after array element")
+		}
+	}
+}
+
+// growEntries is the growth of the entry stack, kept out of the loop.
+//
+//go:noinline
+func growEntries(entries []anyEntry) []anyEntry {
+	return append(entries, anyEntry{})[:len(entries)]
 }
 
 // parseKeyString is [ParseKey] returning the member name as a Go string,
 // interned through c when it is not nil.
 func parseKeyString(data []byte, p int, c *StringCache, strict bool) (string, int, error) {
+	// A plain name of up to fifteen bytes and the colon after it are
+	// settled here, by the two words shortName reads and AfterName's
+	// inline test; that is most names, and it spares them the general
+	// path's three calls. The scan there takes the rest.
+	if uint(p) < uint(len(data)) && data[p] == '"' {
+		if end := shortName(data, p); end > 0 {
+			if next := AfterName(data, end); next > 0 {
+				return c.Make(data[p+1 : end-1]), next, nil
+			}
+		}
+	}
 	var key []byte
 	var next int
 	var err error

@@ -164,6 +164,9 @@ func incr(x ast.Expr) *ast.IncDecStmt { return &ast.IncDecStmt{X: x, Tok: token.
 
 func branch(tok token.Token) *ast.BranchStmt { return &ast.BranchStmt{Tok: tok} }
 
+// gotoStmt renders goto name.
+func gotoStmt(name string) *ast.BranchStmt { return &ast.BranchStmt{Tok: token.GOTO, Label: id(name)} }
+
 // varDecl renders var name t.
 func varDecl(name string, t ast.Expr) *ast.DeclStmt {
 	return &ast.DeclStmt{Decl: &ast.GenDecl{

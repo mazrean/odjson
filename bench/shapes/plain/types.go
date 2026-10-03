@@ -36,6 +36,13 @@ type Page struct {
 	NextCursor string `json:"next_cursor,omitempty"`
 }
 
+// Catalog is the map-items document behind a top-level object: the same
+// fifty items keyed by their uuid, as a member of a struct, where the
+// generated decoder takes the direct path that a top-level map has not.
+type Catalog struct {
+	Items map[string]Item `json:"items"`
+}
+
 // Text is a slice of strings. The benchmark varies the content of the
 // strings, which is what decides which branch of the UTF-8 and escape scans
 // runs.

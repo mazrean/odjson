@@ -305,9 +305,10 @@ cd bench && go test -bench . -count 5 ./ab/
 `ab` covers every host library — the two standard libraries, sonic, go-json,
 json-iterator, segmentio and (encode only) jettison; the sonic and go-json
 rows are what settle
-whether odjson wins their small unmarshal (sonic's by 1.15x, go-json's by
-1.07x), is level on sonic's medium unmarshal (0.99x), and loses everything
-else on them (it does, by the floor).
+whether odjson wins sonic's small unmarshal (by 1.09x), how far behind it is
+on sonic's medium unmarshal (0.95x), and that it loses everything else on
+them — every go-json row included, since go-json v0.11.1 (it does, by the
+floor).
 
 ## `shapes`
 
@@ -324,6 +325,7 @@ the generated codec still pays for itself on that shape:
 | `twitter-compact`, `page-12k-indented` | whitespace |
 | `page-3k`, `page-12k`, `page-100k` | one top-level object at the sizes between the two fixtures |
 | `array-items`, `array-pages`, `map-items` | a top-level `[]T` / `map[string]T` of a generated type, so every generated value sits below the top level; the element size puts `array-items` under `odjsonrt.WholeValue`'s threshold and `array-pages` over it, which matters on the public path |
+| `map-items-in` | the `map-items` map as a member of a struct, where the generated decoder reads the map itself; `page-12k` is the same for `array-items` |
 | `generic` | the same document decoded into `any` |
 | `text-*` | strings of ASCII, Latin-1, Cyrillic, CJK, Hangul, emoji, and escape-heavy content, 96 lines of 80 bytes |
 | `text-ascii-short`, `text-cjk-short` | the same two scripts in 1024 strings of ~8 bytes, so the per string cost is read apart from the per byte one |
@@ -392,7 +394,8 @@ json/v2's, so it reads one column per library with odjson's own column
 the baselines' table under "The other libraries on the shapes" there. The
 characteristic rows have a section of their own,
 ["What the characteristic shapes say"](../docs/internals.md#what-the-characteristic-shapes-say):
-the nineteenth digit of an integer is a cliff in the decoder, the generated
+the nineteenth digit of an integer was a cliff in the decoder until the
+fifth decode round, the generated
 map encoder sorts its keys where the runtime path does not and pays its
 whole deficit to `json/v2` for it, and the float and depth rows are the
 widest margins in the file.

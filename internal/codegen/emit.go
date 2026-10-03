@@ -121,6 +121,25 @@ func (g *generator) forStmt(b *block, init ast.Stmt, cond ast.Expr, post ast.Stm
 	b.list = append(b.list, s)
 }
 
+// blockStmt emits { body }: a scope of its own for the declarations in
+// it, which a goto past it then does not carry into scope.
+func (g *generator) blockStmt(b *block, body func(*block)) {
+	blk := &ast.BlockStmt{}
+	g.blockBody(blk, g.nextLine(), body)
+	b.list = append(b.list, blk)
+}
+
+// labeledBlock emits name: { body }: a block a goto can reach from
+// anywhere in the enclosing function body that is not nested deeper than
+// the label.
+func (g *generator) labeledBlock(b *block, name string, body func(*block)) {
+	pos := g.nextLine()
+	blk := &ast.BlockStmt{}
+	s := &ast.LabeledStmt{Label: &ast.Ident{Name: name, NamePos: pos}, Colon: pos, Stmt: blk}
+	g.blockBody(blk, g.nextLine(), body)
+	b.list = append(b.list, s)
+}
+
 // loop emits for { body }.
 func (g *generator) loop(b *block, body func(*block)) {
 	g.forStmt(b, nil, nil, nil, body)

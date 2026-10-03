@@ -19,6 +19,15 @@ import "unsafe"
 // reflect and every package that reads an interface's words rely on. It is
 // checked at init all the same, and the odjson_safe tag selects the plain
 // conversions in box_safe.go, as it does for the direct path.
+//
+// The chunks are a document's, not the cache's. A chunk stays alive while
+// any one box in it does, and a box points at a value that points at other
+// boxes: a chunk carried from one document into the next would hold the
+// earlier document's values through its own entries, and their chunks the
+// documents before that, without end. So [PutStringCache] drops the
+// chunks, and each document starts with small ones that double up to the
+// full size, which keeps a document with a handful of values from paying
+// for a chunk built for hundreds.
 
 // eface is the runtime's empty interface, as far as the boxes need it.
 type eface struct {
@@ -60,11 +69,21 @@ var boxOK = func() bool {
 	return oks && gs == s && okf && gf == f && oka && len(ga) == 1 && bs == any(s) && bf == any(f)
 }()
 
-// boxes is the free tail of each header chunk.
+// boxes is the free tail of each header chunk, and the size of the chunk
+// it was carved from, which the next chunk doubles.
 type boxes struct {
 	strs   []string
 	slices [][]any
 	floats []float64
+	strsN, slicesN, floatsN int
+}
+
+// boxFirst is the size of a document's first chunk of each kind.
+const boxFirst = 16
+
+// boxChunk returns the size of the chunk after one of size last, up to limit.
+func boxChunk(last, limit int) int {
+	return min(limit, max(2*last, boxFirst))
 }
 
 // boxString returns s as an any whose header lives in a chunk.
@@ -74,7 +93,8 @@ func (c *StringCache) boxString(s string) any {
 	}
 	b := c.boxes()
 	if len(b.strs) == 0 {
-		b.strs = make([]string, boxStrings)
+		b.strsN = boxChunk(b.strsN, boxStrings)
+		b.strs = make([]string, b.strsN)
 	}
 	p := &b.strs[0]
 	*p = s
@@ -91,7 +111,8 @@ func (c *StringCache) boxSlice(a []any) any {
 	}
 	b := c.boxes()
 	if len(b.slices) == 0 {
-		b.slices = make([][]any, boxSlices)
+		b.slicesN = boxChunk(b.slicesN, boxSlices)
+		b.slices = make([][]any, b.slicesN)
 	}
 	p := &b.slices[0]
 	*p = a
@@ -108,7 +129,8 @@ func (c *StringCache) boxFloat(f float64) any {
 	}
 	b := c.boxes()
 	if len(b.floats) == 0 {
-		b.floats = make([]float64, boxFloats)
+		b.floatsN = boxChunk(b.floatsN, boxFloats)
+		b.floats = make([]float64, b.floatsN)
 	}
 	p := &b.floats[0]
 	*p = f

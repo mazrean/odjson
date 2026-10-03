@@ -3,6 +3,7 @@ package odjsonrt_test
 import (
 	"bytes"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"math"
 	"reflect"
@@ -298,9 +299,57 @@ func TestParseInt(t *testing.T) {
 	}
 }
 
+// TestParseDecimalWidth pins the one-pass integer paths at the widths they
+// take whole: nineteen digits for ParseDecimal, twenty for ParseUnsigned,
+// and a decline rather than a wrong value one digit past each.
+func TestParseDecimalWidth(t *testing.T) {
+	signed := map[string]bool{
+		"9223372036854775807": true, "-9223372036854775808": true, "1234567890123456789": true,
+		"9223372036854775808": false, "-9223372036854775809": false, "9999999999999999999": false,
+		"12345678901234567890": false, "0123": false, "-": false, "1e5": false, "1.5": false,
+	}
+	for lit, want := range signed {
+		v, end, ok := odjsonrt.ParseDecimal([]byte(lit), 0)
+		if ok != want {
+			t.Errorf("ParseDecimal(%q) ok = %v, want %v", lit, ok, want)
+			continue
+		}
+		if ok {
+			if w, err := strconv.ParseInt(lit, 10, 64); err != nil || w != v || end != len(lit) {
+				t.Errorf("ParseDecimal(%q) = %d, %d; want %d, %d", lit, v, end, w, len(lit))
+			}
+		}
+	}
+	unsigned := map[string]bool{
+		"0": true, "9": true, "9999999999999999999": true, "10000000000000000000": true,
+		"18446744073709551615": true, "12345678901234567890": true,
+		"18446744073709551616": false, "18446744073709551620": false, "19999999999999999999": false,
+		"99999999999999999999": false, "100000000000000000000": false, "-1": false, "01": false,
+		"1e5": false, "1.5": false, "": false,
+	}
+	for lit, want := range unsigned {
+		v, end, ok := odjsonrt.ParseUnsigned([]byte(lit), 0)
+		if ok != want {
+			t.Errorf("ParseUnsigned(%q) ok = %v, want %v", lit, ok, want)
+			continue
+		}
+		if ok {
+			if w, err := strconv.ParseUint(lit, 10, 64); err != nil || w != v || end != len(lit) {
+				t.Errorf("ParseUnsigned(%q) = %d, %d; want %d, %d", lit, v, end, w, len(lit))
+			}
+		}
+	}
+	if v, end, ok := odjsonrt.ParseUnsigned([]byte("18446744073709551615,"), 0); !ok || v != math.MaxUint64 || end != 20 {
+		t.Errorf("ParseUnsigned with a terminator = %d, %d, %v", v, end, ok)
+	}
+}
+
 func TestParseUint(t *testing.T) {
 	lits := []string{"0", "-0", "1", "-1", "255", "256", "65535", "65536",
-		"4294967295", "4294967296", "18446744073709551615", "18446744073709551616", "1.0"}
+		"4294967295", "4294967296", "9223372036854775807", "9223372036854775808",
+		"9999999999999999999", "10000000000000000000", "18446744073709551615",
+		"18446744073709551616", "18446744073709551620", "99999999999999999999",
+		"100000000000000000000", "1.0", "1e2"}
 	for _, lit := range lits {
 		for _, bits := range []int{8, 16, 32, 64} {
 			got, _, err := odjsonrt.ParseUint([]byte(lit), 0, bits)
@@ -690,4 +739,33 @@ func FuzzParity(f *testing.F) {
 			t.Fatalf("ParseAny = %#v, encoding/json = %#v for %q", got, want, b)
 		}
 	})
+}
+
+// TestParseAnyStrictDuplicate checks that the any decoder refuses a
+// repeated name wherever it sits, as json/v2 does, and names it when the
+// object closes cleanly. Where the object also holds a later fault, the
+// fault is reported here and the name by jsontext (see anyState.object): the two
+// agree on refusing, not always on the reason.
+func TestParseAnyStrictDuplicate(t *testing.T) {
+	for _, tc := range []struct {
+		doc  string
+		name bool
+	}{
+		{`{"a": [], "a": null]`, false},
+		{`{"a": {}, "a": -12.5e1, "a": true`, false},
+		{`{"x": 1, "a": {"b": 1, "b": 2}, "a": 3}`, true},
+		{`{"a": 1, "b": {"c": 2}, "a": 3}`, true},
+	} {
+		c := odjsonrt.GetStringCache()
+		_, _, err := odjsonrt.ParseAnyStrict([]byte(tc.doc), 0, c)
+		odjsonrt.PutStringCache(c)
+		var v map[string]any
+		want := jsonv2.Unmarshal([]byte(tc.doc), &v)
+		if err == nil || want == nil {
+			t.Fatalf("%s: err %v, json/v2 %v", tc.doc, err, want)
+		}
+		if tc.name && !strings.Contains(err.Error(), "duplicate") {
+			t.Errorf("%s: err %v, want the duplicate name", tc.doc, err)
+		}
+	}
 }
