@@ -8,8 +8,8 @@ tool (
 )
 
 require (
-	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba
-	golang.org/x/tools v0.50.0
+	golang.org/x/exp v0.0.0-20261007192929-f45ad48fbe92
+	golang.org/x/tools v0.51.0
 	honnef.co/go/tools v0.8.1
 )
 
