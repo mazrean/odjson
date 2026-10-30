@@ -5,7 +5,7 @@ go 1.27
 replace github.com/mazrean/odjson => ../
 
 require (
-	github.com/bytedance/sonic v1.15.4
+	github.com/bytedance/sonic v1.15.5
 	github.com/francoispqt/gojay v1.2.13
 	github.com/goccy/go-json v0.11.1
 	github.com/json-iterator/go v1.1.12
@@ -19,7 +19,7 @@ require (
 
 require (
 	github.com/bytedance/gopkg v0.1.3 // indirect
-	github.com/bytedance/sonic/loader v0.5.2 // indirect
+	github.com/bytedance/sonic/loader v0.5.3 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
